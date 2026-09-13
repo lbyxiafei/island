@@ -11,6 +11,7 @@
 #   go.mod                          -> build / gofmt / test / coverage / cycles
 #   pyproject.toml|setup.py|reqs    -> pytest, once `import pytest` works
 #   package.json + node_modules/    -> npm scripts, once dependencies are installed
+#   Package.swift                   -> swift build / test / coverage / layering / swift-format
 #
 # Mirror whatever ends up enabled into hai/CONTEXT.md so a human can see the
 # commands without running make.
@@ -48,6 +49,25 @@ endif
 ifneq (,$(RUFF))
 FMT_CMD   ?= ruff format --check .
 LINT_CMD  ?= ruff check .
+endif
+endif
+
+# --- Swift / SwiftPM (macOS app) ---
+# fmt uses the swift-format bundled with Xcode; there is no third-party Swift
+# linter installed, so the lint gate checks this repo's layering invariant
+# instead (see scripts/check-layering.sh and hai/CONTEXT.md).
+ifneq (,$(wildcard Package.swift))
+SWIFT        := $(shell command -v swift 2>/dev/null)
+SWIFT_FORMAT := $(shell xcrun --find swift-format 2>/dev/null)
+ifneq (,$(SWIFT))
+BUILD_CMD ?= swift build
+TEST_CMD  ?= swift test
+COVER_CMD ?= ./scripts/coverage.sh
+CYC_CMD   ?= swift build   # SwiftPM already rejects cyclic target dependencies
+LINT_CMD  ?= ./scripts/check-layering.sh
+ifneq (,$(SWIFT_FORMAT))
+FMT_CMD   ?= xcrun swift-format lint --strict --recursive Sources Tests Package.swift
+endif
 endif
 endif
 

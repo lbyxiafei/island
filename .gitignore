@@ -1,6 +1,10 @@
 # OS
 .DS_Store
 
+# Build artifacts (SwiftPM scratch dir + the assembled app bundle)
+.build/
+build/
+
 # coverage artifacts (coverage-baseline.txt is committed on purpose)
 coverage.txt
 coverage.out
