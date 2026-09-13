@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- island menubar mark. Single colour on purpose: macOS renders it as a
+     template image and tints it for light/dark menubars and highlight states.
+     Geometry is mirrored in Sources/Island/IslandGlyph.swift (see README.md). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18">
+  <g fill="#000000">
+    <!-- the overlay panel, floating above the screen edge -->
+    <rect x="3.5" y="6.2" width="11" height="8" rx="2.6"/>
+    <!-- the screen edge it floats above -->
+    <rect x="2" y="2.2" width="14" height="2" rx="1"/>
+  </g>
+</svg>

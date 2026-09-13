@@ -68,4 +68,27 @@ final class HotkeySpecTests: XCTestCase {
             XCTAssertEqual(error as? HotkeySpecError, .unknownKey("$"))
         }
     }
+
+    /// `specText` is what gets persisted, so it has to survive a round trip.
+    func testSpecTextRoundTripsForEveryForm() throws {
+        for text in ["cmd+ctrl+,", "⌃+⌥+⇧+⌘+,", "⌃⌥⇧⌘,", "cmd+shift+k", "command+control+space"] {
+            let spec = try HotkeySpec.parse(text)
+            XCTAssertEqual(try HotkeySpec.parse(spec.specText), spec, "spec: \(spec.specText)")
+        }
+    }
+
+    /// The settings field shows what the menu shows, so that string has to
+    /// survive being typed back in.
+    func testDisplayStringRoundTrips() throws {
+        for text in ["cmd+ctrl+,", "ctrl+opt+shift+cmd+,", "cmd+shift+k"] {
+            let spec = try HotkeySpec.parse(text)
+            XCTAssertEqual(
+                try HotkeySpec.parse(spec.displayString), spec, "display: \(spec.displayString)")
+        }
+    }
+
+    func testSpecTextUsesCanonicalOrderAndNames() throws {
+        XCTAssertEqual(try HotkeySpec.parse("⌘+⌥+⇧+⌃+,").specText, "ctrl+opt+shift+cmd+,")
+        XCTAssertEqual(try HotkeySpec.parse("cmd+ctrl+space").specText, "ctrl+cmd+space")
+    }
 }

@@ -9,6 +9,16 @@ public struct HotkeySpec: Equatable, Sendable {
         case shift
         case command
 
+        /// Name used in the persisted, reparsable form of a spec.
+        var specName: String {
+            switch self {
+            case .control: return "ctrl"
+            case .option: return "opt"
+            case .shift: return "shift"
+            case .command: return "cmd"
+            }
+        }
+
         /// Symbols in the conventional macOS order: ⌃⌥⇧⌘.
         var symbol: String {
             switch self {
@@ -24,6 +34,13 @@ public struct HotkeySpec: Equatable, Sendable {
     public let keyCode: UInt32
     public let modifiers: Set<Modifier>
 
+    /// Canonical, reparsable form — what gets persisted. `displayString` is for
+    /// humans and cannot be fed back to `parse`.
+    public var specText: String {
+        (Modifier.allCases.filter(modifiers.contains).map(\.specName) + [keyLabel])
+            .joined(separator: "+")
+    }
+
     /// e.g. `⌃⌘,` — what the user should press, in macOS convention order.
     public var displayString: String {
         Modifier.allCases.filter(modifiers.contains).map(\.symbol).joined() + displayKeyLabel
@@ -34,7 +51,7 @@ public struct HotkeySpec: Equatable, Sendable {
     }
 }
 
-public enum HotkeySpecError: Error, Equatable {
+public enum HotkeySpecError: Error, Equatable, Sendable {
     case empty
     case missingModifier
     case unknownModifier(String)
@@ -42,33 +59,54 @@ public enum HotkeySpecError: Error, Equatable {
 }
 
 extension HotkeySpec {
-    /// Parses a spec such as `cmd+ctrl+,`. The last token is the key, every
-    /// preceding token is a modifier; matching is case-insensitive.
+    /// Parses a spec such as `cmd+ctrl+,` or the compact `⌃⌘,` macOS shows in
+    /// its own menus.
+    ///
+    /// Throwing adapter over `validate`, for callers that treat a bad spec as a
+    /// programmer error (tests, config bootstrap).
     public static func parse(_ text: String) throws -> HotkeySpec {
-        let trimmed = text.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { throw HotkeySpecError.empty }
+        switch validate(text) {
+        case .success(let spec): return spec
+        case .failure(let error): throw error
+        }
+    }
 
-        let tokens = trimmed.split(separator: "+", omittingEmptySubsequences: false)
+    /// Same grammar as `parse`, but returns the failure instead of throwing it —
+    /// what the settings UI needs, and free of unreachable catch branches.
+    public static func validate(_ text: String) -> Result<HotkeySpec, HotkeySpecError> {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return .failure(.empty) }
+
+        let tokens = expanded(trimmed).split(separator: "+", omittingEmptySubsequences: false)
             .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
-        guard tokens.count >= 2 else { throw HotkeySpecError.missingModifier }
+            .filter { !$0.isEmpty }
+        guard tokens.count >= 2 else { return .failure(.missingModifier) }
 
         var modifiers: Set<Modifier> = []
         for token in tokens.dropLast() {
             guard let modifier = modifierAliases[token] else {
-                throw HotkeySpecError.unknownModifier(token)
+                return .failure(.unknownModifier(token))
             }
             modifiers.insert(modifier)
         }
 
         // `count >= 2` above guarantees the index is in range; taking the key
-        // through an index keeps `parse` free of an unreachable nil branch.
+        // through an index keeps this free of an unreachable nil branch.
         let keyLabel = tokens[tokens.count - 1]
         guard let keyCode = virtualKeyCodes[keyLabel] else {
-            throw HotkeySpecError.unknownKey(keyLabel)
+            return .failure(.unknownKey(keyLabel))
         }
 
-        return HotkeySpec(keyLabel: keyLabel, keyCode: keyCode, modifiers: modifiers)
+        return .success(HotkeySpec(keyLabel: keyLabel, keyCode: keyCode, modifiers: modifiers))
     }
+
+    /// Turns the compact form into the explicit one: `⌃⌘,` -> `⌃+⌘+,`. Without
+    /// this, the string `displayString` produces could not be fed back in.
+    private static func expanded(_ text: String) -> String {
+        text.map { compactModifiers.contains(String($0)) ? "+\($0)+" : String($0) }.joined()
+    }
+
+    private static let compactModifiers: Set<String> = ["⌘", "⌃", "⌥", "⇧"]
 
     private static let modifierAliases: [String: Modifier] = [
         "cmd": .command, "command": .command, "⌘": .command,

@@ -7,6 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var panel: OverlayPanel?
     private var registrar: HotkeyRegistrar?
+    private var settings: HotkeySettingsCoordinator?
+    private var settingsWindow: HotkeySettingsWindow?
     private var statusItem: StatusItemController?
     private var hideTask: Task<Void, Never>?
 
@@ -26,23 +28,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         self.panel = panel
 
-        registrar = HotkeyRegistrar(spec: configuration.hotkey.spec) { [weak self] in
+        let registrar = HotkeyRegistrar { [weak self] in
             MainActor.assumeIsolated {
                 self?.showOverlay()
             }
         }
-        if registrar == nil {
+        self.registrar = registrar
+
+        let settings = HotkeySettingsCoordinator(
+            current: configuration.hotkey.spec,
+            store: UserDefaultsHotkeyStore(),
+            registrar: registrar
+        )
+        self.settings = settings
+
+        do {
+            try registrar.register(configuration.hotkey.spec)
+            log("hotkey registered: \(configuration.hotkey.spec.displayString)")
+        } catch {
             log(
-                "failed to register \(configuration.hotkey.spec.displayString); is another app holding it?"
+                "failed to register \(configuration.hotkey.spec.displayString): \(error.localizedDescription)"
             )
         }
 
+        let settingsWindow = HotkeySettingsWindow(coordinator: settings) { [weak self] spec in
+            self?.log("hotkey changed to \(spec.displayString) (\(spec.specText))")
+            self?.statusItem?.setHotkey(spec, source: .menu)
+        }
+        self.settingsWindow = settingsWindow
+
         statusItem = StatusItemController(
-            configuration: configuration,
+            hotkey: configuration.hotkey.spec,
+            hotkeySource: configuration.hotkey.source,
+            durationSeconds: configuration.duration.seconds,
             loginItem: LoginItemController(),
             onSummon: { [weak self] in self?.showOverlay() },
+            onOpenSettings: { [weak self] in self?.settingsWindow?.show() },
             onQuit: { NSApp.terminate(nil) }
         )
+        log("menu bar item installed; launch at login: \(LoginItemController().status.rawValue)")
 
         // Show once at launch so the POC is visible without hunting for the hotkey.
         showOverlay()
@@ -65,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func reportConfiguration() {
-        log("island POC starting")
+        log("island starting")
         for line in configuration.summary.split(separator: "\n") {
             log(String(line))
         }

@@ -1,19 +1,68 @@
 import Carbon.HIToolbox
 import IslandCore
 
-/// Registers a system-wide hotkey through Carbon's `RegisterEventHotKey`.
+enum HotkeyRegistrationError: Error, LocalizedError {
+    case eventHandlerUnavailable
+    case carbonStatus(OSStatus)
+
+    var errorDescription: String? {
+        switch self {
+        case .eventHandlerUnavailable:
+            return "could not install the Carbon event handler"
+        case .carbonStatus(let status):
+            return "RegisterEventHotKey failed (status \(status))"
+        }
+    }
+}
+
+/// Registers the system-wide hotkey through Carbon's `RegisterEventHotKey`.
 ///
-/// Deliberately not `NSEvent.addGlobalMonitorForEvents`: this API needs no
-/// Input Monitoring / Accessibility grant, which keeps the POC free of any
-/// permission prompt.
-final class HotkeyRegistrar {
-    private var hotKeyRef: EventHotKeyRef?
-    private var eventHandlerRef: EventHandlerRef?
+/// Deliberately not `NSEvent.addGlobalMonitorForEvents`: this API needs no Input
+/// Monitoring / Accessibility grant, which keeps the app free of permission
+/// prompts.
+///
+/// Registration is swappable at runtime: `register(_:)` replaces whatever was
+/// registered before, and throws instead of leaving the app with a hotkey that
+/// silently does nothing.
+final class HotkeyRegistrar: HotkeyRegistering {
     private let handler: () -> Void
+    private var eventHandlerRef: EventHandlerRef?
+    private var hotKeyRef: EventHotKeyRef?
 
-    init?(spec: HotkeySpec, handler: @escaping () -> Void) {
+    init(handler: @escaping () -> Void) {
         self.handler = handler
+        installEventHandler()
+    }
 
+    deinit {
+        unregister()
+        if let eventHandlerRef { RemoveEventHandler(eventHandlerRef) }
+    }
+
+    func register(_ spec: HotkeySpec) throws {
+        unregister()
+        guard eventHandlerRef != nil else { throw HotkeyRegistrationError.eventHandlerUnavailable }
+
+        var ref: EventHotKeyRef?
+        let status = RegisterEventHotKey(
+            spec.keyCode,
+            Self.carbonModifiers(for: spec.modifiers),
+            EventHotKeyID(signature: OSType(0x4953_4C4E), id: 1),  // 'ISLN'
+            GetApplicationEventTarget(),
+            0,
+            &ref
+        )
+        guard status == noErr else { throw HotkeyRegistrationError.carbonStatus(status) }
+        hotKeyRef = ref
+    }
+
+    func unregister() {
+        guard let hotKeyRef else { return }
+        UnregisterEventHotKey(hotKeyRef)
+        self.hotKeyRef = nil
+    }
+
+    private func installEventHandler() {
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
@@ -33,26 +82,9 @@ final class HotkeyRegistrar {
             Unmanaged.passUnretained(self).toOpaque(),
             &eventHandlerRef
         )
-        guard status == noErr else { return nil }
-
-        let hotKeyID = EventHotKeyID(signature: OSType(0x4953_4C4E), id: 1)  // 'ISLN'
-        let registerStatus = RegisterEventHotKey(
-            spec.keyCode,
-            Self.carbonModifiers(for: spec.modifiers),
-            hotKeyID,
-            GetApplicationEventTarget(),
-            0,
-            &hotKeyRef
-        )
-        guard registerStatus == noErr else {
-            if let eventHandlerRef { RemoveEventHandler(eventHandlerRef) }
-            return nil
+        if status != noErr {
+            eventHandlerRef = nil
         }
-    }
-
-    deinit {
-        if let hotKeyRef { UnregisterEventHotKey(hotKeyRef) }
-        if let eventHandlerRef { RemoveEventHandler(eventHandlerRef) }
     }
 
     private static func carbonModifiers(for modifiers: Set<HotkeySpec.Modifier>) -> UInt32 {

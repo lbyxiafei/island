@@ -26,4 +26,42 @@ final class HotkeyConfigurationTests: XCTestCase {
             XCTAssertTrue(configuration.usedFallback, "raw: \(raw)")
         }
     }
+
+    func testStoredSettingWinsOverEnvironment() throws {
+        let configuration = HotkeyConfiguration.resolve("cmd+shift+k", stored: "cmd+opt+j")
+
+        XCTAssertEqual(configuration.spec, try HotkeySpec.parse("cmd+opt+j"))
+        XCTAssertEqual(configuration.source, .menu)
+        XCTAssertFalse(configuration.usedFallback)
+    }
+
+    func testEnvironmentIsReportedAsSourceWhenNothingIsStored() throws {
+        let configuration = HotkeyConfiguration.resolve("cmd+shift+k", stored: nil)
+
+        XCTAssertEqual(configuration.source, .environment)
+    }
+
+    func testBuiltInDefaultIsReportedWhenNothingIsConfigured() {
+        let configuration = HotkeyConfiguration.resolve(nil, stored: nil)
+
+        XCTAssertEqual(configuration.source, .builtInDefault)
+    }
+
+    /// A bad stored value must not brick the hotkey: it falls through to the
+    /// environment, and the fallback is reported.
+    func testUnusableStoredValueFallsThroughToEnvironment() throws {
+        let configuration = HotkeyConfiguration.resolve("cmd+shift+k", stored: "hyper+,")
+
+        XCTAssertEqual(configuration.spec, try HotkeySpec.parse("cmd+shift+k"))
+        XCTAssertEqual(configuration.source, .environment)
+        XCTAssertTrue(configuration.usedFallback)
+    }
+
+    func testUnusableStoredAndEnvironmentValuesFallBackToBuiltInDefault() {
+        let configuration = HotkeyConfiguration.resolve("nope", stored: "also-nope")
+
+        XCTAssertEqual(configuration.spec, HotkeyConfiguration.fallbackSpec)
+        XCTAssertEqual(configuration.source, .builtInDefault)
+        XCTAssertTrue(configuration.usedFallback)
+    }
 }

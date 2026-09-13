@@ -2,64 +2,71 @@ import AppKit
 import IslandCore
 
 /// The menu-bar presence: shows at a glance that island is alive, offers a
-/// manual summon (so the hotkey is never the only way in), the login-item
-/// toggle, and a way out.
+/// manual summon (so the hotkey is never the only way in), the settings window,
+/// the login-item toggle, and a way out.
 @MainActor
 final class StatusItemController {
     private let statusItem: NSStatusItem
-    private let configuration: ResolvedConfiguration
+    private let durationSeconds: TimeInterval
     private let loginItem: LoginItemController
     private let onSummon: () -> Void
+    private let onOpenSettings: () -> Void
     private let onQuit: () -> Void
+
+    private var hotkeyDisplay: String
+    private var hotkeySourceNote: String
 
     /// Last `SMAppService` failure, surfaced in the menu instead of vanishing
     /// into a log the user cannot see.
     private var lastError: String?
 
     init(
-        configuration: ResolvedConfiguration,
+        hotkey: HotkeySpec,
+        hotkeySource: HotkeySource,
+        durationSeconds: TimeInterval,
         loginItem: LoginItemController,
         onSummon: @escaping () -> Void,
+        onOpenSettings: @escaping () -> Void,
         onQuit: @escaping () -> Void
     ) {
-        self.configuration = configuration
+        self.durationSeconds = durationSeconds
         self.loginItem = loginItem
         self.onSummon = onSummon
+        self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
+        hotkeyDisplay = hotkey.displayString
+        hotkeySourceNote = Self.note(for: hotkeySource)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        installButton()
+        rebuildMenu()
+    }
+
+    /// Called after the hotkey was changed in the settings window.
+    func setHotkey(_ spec: HotkeySpec, source: HotkeySource) {
+        hotkeyDisplay = spec.displayString
+        hotkeySourceNote = Self.note(for: source)
         installButton()
         rebuildMenu()
     }
 
     private func installButton() {
         guard let button = statusItem.button else { return }
-        if let image = NSImage(
-            systemSymbolName: "capsule.portrait.fill",
-            accessibilityDescription: "island"
-        ) {
-            image.isTemplate = true
-            button.image = image
-        } else {
-            button.title = "island"
-        }
-        button.toolTip = "island — summon with \(configuration.hotkey.spec.displayString)"
-        log("menu bar item installed; launch at login: \(loginItem.status.rawValue)")
+        button.image = IslandGlyph.menuBarImage()
+        button.toolTip = "island — summon with \(hotkeyDisplay)"
     }
 
     private func rebuildMenu() {
         let menu = NSMenu()
 
         menu.addItem(
-            action(
-                "Summon overlay (\(configuration.hotkey.spec.displayString))",
-                #selector(summon),
-                keyEquivalent: ""
-            )
+            action("Summon overlay (\(hotkeyDisplay))", #selector(summon), keyEquivalent: "")
         )
+        menu.addItem(disabled("hotkey \(hotkeyDisplay) · \(hotkeySourceNote)"))
         menu.addItem(
-            disabled(
-                "hides itself after \(ResolvedConfiguration.secondsText(configuration.duration.seconds))s"
-            ))
+            disabled("hides itself after \(ResolvedConfiguration.secondsText(durationSeconds))s"))
+        menu.addItem(.separator())
+
+        menu.addItem(action("Settings…", #selector(openSettings), keyEquivalent: ","))
         menu.addItem(.separator())
 
         let presentation = LoginItemMenuPresentation.make(for: loginItem.status)
@@ -84,6 +91,14 @@ final class StatusItemController {
         statusItem.menu = menu
     }
 
+    private static func note(for source: HotkeySource) -> String {
+        switch source {
+        case .menu: return "set in island"
+        case .environment: return "from ISLAND_HOTKEY"
+        case .builtInDefault: return "default"
+        }
+    }
+
     private func disabled(_ title: String) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         item.isEnabled = false
@@ -104,6 +119,10 @@ final class StatusItemController {
 
     @objc private func summon() {
         onSummon()
+    }
+
+    @objc private func openSettings() {
+        onOpenSettings()
     }
 
     @objc private func quit() {

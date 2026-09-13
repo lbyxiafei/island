@@ -21,7 +21,8 @@ if arguments.contains("--help") || arguments.contains("-h") {
           --login-item-enable             start at login from now on
           --login-item-disable            stop starting at login
 
-        The app lives in the menu bar; quit from its menu or `pkill -x Island`.
+        The app lives in the menu bar: summon, settings (hotkey), launch at
+        login, quit. `pkill -x Island` also works.
         """
     )
     exit(EXIT_SUCCESS)
