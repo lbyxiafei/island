@@ -5,19 +5,33 @@
 
 ## Goal
 
-（一句话说清这个项目做成什么样算成功。）
+我们要创建一个 app。该 app 会监视当前电脑的所有 AI AGENT 的运行活动，一旦检测到有 session/task 完成，会在屏幕中央上方 pop up 一个`悬浮窗`，里面是 AGENT 任务完成的总结。
+
+当用户 hover 到浮窗上后，进入交互，浮窗会扩展并展示更多的在过去时间已完成的 sessions/tasks。
+
+如果户在浮窗点击一个 session/task，根据 session/task 运行方式的不同，会有不同的交互：
+1. 如果 session/task 是在已经打开的 terminal/ghostty/tmux/cmux/codex 的窗口内执行，那么交互结果是把窗口 pop up 到最前方即可。
+2. 如果 session/task 是一个 background/daemon service，那么根据 AGENT 类型，把 session/task 的打开方式贴到 clipboard。例如：`pi --session 01a09864-466e-7336-bc20-c93637035001`。
+
+浮窗在 session/task 完成后，pop up 5秒（可配置）后消失，同时，在任何时候，都有一个 global hot key，可以调出弹窗。
 
 ## Non-goal
 
-（明确**不做什么**。这一节和 Goal 一样重要，用来帮 Agent 做减法。）
+1. 当前版本我们只考虑 `macOS` 情况，暂时不考虑其他操作系统。
 
 ## Scope
 
-（本期要做的事，边界写清楚。超出这里的需求必须先回到人。）
+### VERSION — POC
+
+当前，我们首先要验证方案是否可行，AI AGENT 的交互部分先暂时不做研究。
+
+POC 版本只做两件事：
+1. 验看 MAC OS 上做 app 的流程
+2. 如果可行，即没有手续、账号、资格的限制，我们就做一个用 global hot key 调用的悬浮窗（暂定： `cmd + ctr + ,`），悬浮窗调出后自动显示 5 秒后消失。
 
 ## Design
 
-（关键结构、模块划分、数据流。可以引用 `reference/` 里的图。）
+目前处于项目创建阶段，我们先进行几轮讨论，brainstorm、grill-me，等大致情况落实后，我再来回写。
 
 ## Key Decisions
 
