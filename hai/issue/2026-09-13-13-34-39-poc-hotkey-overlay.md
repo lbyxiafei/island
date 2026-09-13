@@ -4,7 +4,7 @@ name: poc-hotkey-overlay
 title: "POC: global hotkey 调出的悬浮窗"
 status: solved
 created_ts: 2026-09-13T13:34:39-07:00
-updated_ts: 2026-09-13T13:47:12-07:00
+updated_ts: 2026-09-13T13:49:41-07:00
 ---
 
 Scope-check: PLAN § Scope / VERSION — POC。以下改动全部落在该节范围内（验证 macOS 做 app 的流程 + hotkey 悬浮窗），不涉及 agent 检测与交互。
@@ -45,7 +45,20 @@ Scope-check: PLAN § Scope / VERSION — POC。以下改动全部落在该节范
 - 全局快捷键用 Carbon `RegisterEventHotKey` 注册成功，**没有任何权限弹窗**。对照方案 `NSEvent.addGlobalMonitorForEvents` 需要用户在「隐私与安全性 → 输入监控」里授权，故选 Carbon
 - 悬浮窗用 `NSPanel`，关键属性：`.nonactivatingPanel`、`canBecomeKey = false`、`level = .statusBar`、`canJoinAllSpaces`、`LSUIElement`。既浮在最上层又不抢终端焦点
 - 已用日志实测（`ISLAND_OVERLAY_SECONDS=2`）：`overlay shown, hiding in 2.0s` → `overlay hidden`，自动隐藏生效；进程继续常驻等待快捷键，且未出现 `failed to register`
-- **待人工确认**：按 `⌃⌘,` 能否召唤。Agent 无法在未获辅助功能授权的前提下合成按键（会弹权限框），这一步留给人肉眼验收
+- **人工验收通过（2026-09-13）**：本机实测按 `⌃⌘,` 召唤成功。捕获到的日志里共 8 次 `overlay shown`：1 次启动自动弹出 + 7 次按键触发，且每一次都按配置的 2 秒后 `overlay hidden`：
+
+  ```
+  [island] overlay shown, hiding in 2.0s   <- 启动自动弹出
+  [island] overlay hidden
+  [island] overlay shown, hiding in 2.0s   <- 以下 7 次均由按键触发
+  [island] overlay hidden
+  [island] overlay shown, hiding in 2.0s
+  [island] overlay shown, hiding in 2.0s   <- 连按：新召唤取消上一次的隐藏计时
+  [island] overlay hidden
+  ```
+
+  连续两次召唤时只出现一次 `overlay shown` 而没有配对的 `overlay hidden`，符合「重新召唤会取消上一个隐藏任务」的设计
+- Agent 侧无法自行完成这一步：合成按键需要 `AXIsProcessTrusted() == true`（本机为 `false`），且会弹系统授权框，故留给人验收。若要自动化复验，需要先给终端/agent 进程授辅助功能权限
 
 ## 验证
 
