@@ -1,0 +1,11 @@
+# OS
+.DS_Store
+
+# coverage artifacts (coverage-baseline.txt is committed on purpose)
+coverage.txt
+coverage.out
+.coverage
+htmlcov/
+
+# Python bytecode from scripts/issue.py
+__pycache__/

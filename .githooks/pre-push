@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+# Runs the same gates as `make verify` before anything leaves the machine.
+# Install once with `make hooks`; bypass deliberately with SKIP_VERIFY=1 git push.
+set -e
+
+if [ -n "${SKIP_VERIFY:-}" ]; then
+  echo "pre-push: SKIP_VERIFY set, skipping make verify"
+  exit 0
+fi
+
+exec make verify

@@ -1,0 +1,75 @@
+# Gate command auto-detection for `make verify`.
+#
+# Guesses from marker files and only enables a command when the tool it needs is
+# actually available, so a fresh repo reports [skip] instead of going red.
+# Override or clear anything here: this file is per-repo, edit it freely.
+# A `?=` assignment wins only if nothing above already set it, so your own
+# overrides at the top of this file always take precedence.
+#
+# Inside a command, `$$` is a literal shell `$`.
+#
+#   go.mod                          -> build / gofmt / test / coverage / cycles
+#   pyproject.toml|setup.py|reqs    -> pytest, once `import pytest` works
+#   package.json + node_modules/    -> npm scripts, once dependencies are installed
+#
+# Mirror whatever ends up enabled into hai/CONTEXT.md so a human can see the
+# commands without running make.
+
+GO       := $(shell command -v go 2>/dev/null)
+GOLANGCI := $(shell command -v golangci-lint 2>/dev/null)
+RUFF     := $(shell command -v ruff 2>/dev/null)
+NPM      := $(shell command -v npm 2>/dev/null)
+# Probes must not print anything; only the exit status is used.
+PYTEST   := $(shell python3 -c 'import pytest' 2>/dev/null && echo yes)
+PYCOV    := $(shell python3 -c 'import coverage' 2>/dev/null && echo yes)
+
+# --- Go ---
+ifneq (,$(wildcard go.mod))
+ifneq (,$(GO))
+BUILD_CMD ?= go build ./...
+FMT_CMD   ?= test -z "$$(gofmt -l .)"
+TEST_CMD  ?= go test ./...
+CYC_CMD   ?= go build ./...   # the Go compiler already rejects import cycles
+COVER_CMD ?= go test -coverprofile=coverage.out ./... >/dev/null && go tool cover -func=coverage.out | tail -1 | awk '{gsub(/%/,"",$$NF); print $$NF}' > coverage.txt
+ifneq (,$(GOLANGCI))
+LINT_CMD  ?= golangci-lint run
+endif
+endif
+endif
+
+# --- Python ---
+ifneq (,$(or $(wildcard pyproject.toml),$(wildcard setup.py),$(wildcard requirements.txt)))
+ifneq (,$(PYTEST))
+TEST_CMD  ?= python3 -m pytest -q
+ifneq (,$(PYCOV))
+COVER_CMD ?= python3 -m pytest -q --cov=. --cov-report= >/dev/null && python3 -m coverage report | tail -1 | awk '{gsub(/%/,"",$$NF); print $$NF}' > coverage.txt
+endif
+endif
+ifneq (,$(RUFF))
+FMT_CMD   ?= ruff format --check .
+LINT_CMD  ?= ruff check .
+endif
+endif
+
+# --- Node / TypeScript ---
+ifneq (,$(wildcard package.json))
+ifneq (,$(wildcard node_modules))
+ifneq (,$(NPM))
+ifneq (,$(shell grep -q '"build"' package.json 2>/dev/null && echo yes))
+BUILD_CMD ?= npm run --silent build
+endif
+ifneq (,$(shell grep -q '"test"' package.json 2>/dev/null && echo yes))
+TEST_CMD  ?= npm test --silent
+endif
+ifneq (,$(shell grep -q '"lint"' package.json 2>/dev/null && echo yes))
+LINT_CMD  ?= npm run --silent lint
+endif
+ifneq (,$(shell grep -q '"format"' package.json 2>/dev/null && echo yes))
+FMT_CMD   ?= npm run --silent format
+endif
+ifneq (,$(shell grep -q '"madge"' package.json 2>/dev/null && echo yes))
+CYC_CMD   ?= npx madge --circular --extensions ts,tsx,js src
+endif
+endif
+endif
+endif
