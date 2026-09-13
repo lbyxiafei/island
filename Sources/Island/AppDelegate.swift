@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var panel: OverlayPanel?
     private var registrar: HotkeyRegistrar?
+    private var statusItem: StatusItemController?
     private var hideTask: Task<Void, Never>?
 
     init(configuration: ResolvedConfiguration) {
@@ -35,6 +36,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 "failed to register \(configuration.hotkey.spec.displayString); is another app holding it?"
             )
         }
+
+        statusItem = StatusItemController(
+            configuration: configuration,
+            loginItem: LoginItemController(),
+            onSummon: { [weak self] in self?.showOverlay() },
+            onQuit: { NSApp.terminate(nil) }
+        )
 
         // Show once at launch so the POC is visible without hunting for the hotkey.
         showOverlay()

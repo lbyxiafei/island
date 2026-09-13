@@ -15,11 +15,36 @@ if arguments.contains("--help") || arguments.contains("-h") {
           ISLAND_HOTKEY=cmd+ctrl+,        hotkey that summons the overlay
           ISLAND_OVERLAY_SECONDS=5        how long the overlay stays on screen
 
-        The app has no Dock icon and no menu; stop it with Ctrl-C when started
-        from a terminal, or `pkill -x Island` when started with `open`.
+        flags (login-item flags must run from inside the app bundle):
+          --print-config                  resolve the environment and exit
+          --login-item-status             report the launch-at-login state
+          --login-item-enable             start at login from now on
+          --login-item-disable            stop starting at login
+
+        The app lives in the menu bar; quit from its menu or `pkill -x Island`.
         """
     )
     exit(EXIT_SUCCESS)
+}
+
+if arguments.contains("--login-item-status") {
+    print(LoginItemController().status.rawValue)
+    exit(EXIT_SUCCESS)
+}
+
+if arguments.contains("--login-item-enable") || arguments.contains("--login-item-disable") {
+    let enable = arguments.contains("--login-item-enable")
+    do {
+        let controller = LoginItemController()
+        try controller.setEnabled(enable)
+        print(
+            "launch at login \(enable ? "enabled" : "disabled") (status: \(controller.status.rawValue))"
+        )
+        exit(EXIT_SUCCESS)
+    } catch {
+        print("launch at login failed: \(error.localizedDescription)")
+        exit(EXIT_FAILURE)
+    }
 }
 
 if arguments.contains("--print-config") {

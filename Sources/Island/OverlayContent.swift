@@ -19,7 +19,7 @@ enum OverlayContent {
             font: .systemFont(ofSize: 15, weight: .semibold)
         )
         let hint = makeLabel(
-            "press \(hotkey.displayString) to summon · hides itself in \(format(duration.seconds))s",
+            "press \(hotkey.displayString) to summon · hides itself in \(ResolvedConfiguration.secondsText(duration.seconds))s",
             font: .systemFont(ofSize: 12),
             color: .secondaryLabelColor
         )
@@ -51,10 +51,5 @@ enum OverlayContent {
         label.textColor = color
         label.alignment = .center
         return label
-    }
-
-    /// `5` instead of `5.0`, `2.5` stays `2.5`.
-    private static func format(_ seconds: TimeInterval) -> String {
-        String(format: "%g", seconds)
     }
 }

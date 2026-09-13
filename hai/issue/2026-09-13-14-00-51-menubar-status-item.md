@@ -2,9 +2,9 @@
 type: feat
 name: menubar-status-item
 title: "无法感知 island 是否在运行，也没有退出入口"
-status: new
+status: solved
 created_ts: 2026-09-13T14:00:51-07:00
-updated_ts: 2026-09-13T14:00:51-07:00
+updated_ts: 2026-09-13T14:12:26-07:00
 ---
 
 ## 背景
@@ -32,3 +32,24 @@ pkill -x Island     # 退出
   2. 只在启动时用系统通知提示一次 + 保持无图标
   3. Dock 图标（`NSApplicationActivationPolicy.regular`），但会出现在 ⌘Tab 与 Dock 里，打扰度最高
 - 若采纳方案 1，退出入口顺带解决，无需再为"怎么退出"单独设计
+
+## Decision
+
+- 2026-09-13，binyanli 在会话中明确指令「poc3、4 go」：授权实施本 issue 与配套的 ``launch-at-login`（开机自启）` 两项。这两项超出 `PLAN.md` § Scope（当前仅 POC）的范围，按 AGENTS.md「用户在会话中的明确指令 > PLAN 的 scope」执行。
+- 授权范围**仅限这两项功能**；`PLAN.md` 的 scope / design 仍由人回写，Agent 不改。
+
+## 实现
+
+- `Sources/Island/StatusItemController.swift`：`NSStatusItem`，图标 SF Symbol `capsule.portrait.fill`（template image，自动跟随深浅色），鼠标悬停显示当前快捷键
+- 菜单结构：
+  - `Summon overlay (⌃⌘,)` —— 手动召唤，快捷键不再是唯一入口
+  - `hides itself after 5s`（禁用项，展示当前配置）
+  - `Launch at login`（勾选项 → 见 `launch-at-login`）
+  - 状态需要解释时追加一行提示（例如"去系统设置里允许"）
+  - `Quit island ⌘Q` —— 退出入口，不再需要 `pkill`
+- 唯一带决策的逻辑（登录项状态 → 是否勾选 / 是否需要提示）落在 `IslandCore/LoginItemMenuPresentation`，由 3 个测试覆盖；`StatusItemController` 本身是 AppKit wiring，计入 `coverage.config` 排除项
+
+## 验证
+
+- 启动日志：`[island] menu bar item installed; launch at login: enabled`
+- 运行实例 PID `22716`，菜单栏图标与菜单如上

@@ -15,7 +15,7 @@ struct ResolvedConfiguration {
     }
 
     var summary: String {
-        let seconds = String(format: "%g", duration.seconds)
+        let seconds = Self.secondsText(duration.seconds)
         var lines = [
             "hotkey            \(hotkey.spec.displayString)",
             "overlay duration  \(seconds)s",
@@ -27,9 +27,14 @@ struct ResolvedConfiguration {
         }
         if duration.usedFallback {
             lines.append(
-                "warning           \(Self.durationEnvironmentKey) unusable; using \(String(format: "%g", OverlayDuration.fallbackSeconds))s"
+                "warning           \(Self.durationEnvironmentKey) unusable; using \(Self.secondsText(OverlayDuration.fallbackSeconds))s"
             )
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// `5` instead of `5.0`; `2.5` stays `2.5`.
+    static func secondsText(_ seconds: TimeInterval) -> String {
+        String(format: "%g", seconds)
     }
 }
