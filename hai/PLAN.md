@@ -27,8 +27,8 @@
     > a. 验看 MAC OS 上做 app 的流程； 
     > b. 如果可行，即没有手续、账号、资格的限制，我们就做一个用 global hot key 调用的悬浮窗（暂定： `cmd + ctr + ,`），悬浮窗调出后自动显示 5 秒后消失。
 2. 接下来，帮我验证：这个可否做成app，并发布，即其他人可以通过brew install安装？同时，帮我做一个menubar上的图标 —— 已验证
-3. 帮我做一个 menubar 的图标，图标你来定，做好了放到 reference 里面，打开图标后可以有设置，设置目前就设置快捷键，以及退出选项。
-4. 关于开机启动，帮我调研下可否在 mac os 的setting里面进行注册：launch item on 开机这个选项。
+3. 帮我做一个 menubar 的图标，图标你来定，做好了放到 reference 里面，打开图标后可以有设置，设置目前就设置快捷键，以及退出选项。 —— done
+4. 关于开机启动，帮我调研下可否在 mac os 的setting里面进行注册：launch item on 开机这个选项。 —— done
 
 
 ## Design
