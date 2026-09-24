@@ -4,7 +4,7 @@ name: brew-distribution
 title: "调研 brew install 分发路径（等本地 MVP 走通后再做）"
 status: new
 created_ts: 2026-09-13T14:20:51-07:00
-updated_ts: 2026-09-13T14:20:51-07:00
+updated_ts: 2026-09-24T15:47:33-07:00
 ---
 
 ## 背景
@@ -30,5 +30,43 @@ updated_ts: 2026-09-13T14:20:51-07:00
 
 ## 备注
 
-- 依赖前置：先有本地 MVP（agent 活动检测 + 悬浮窗真实内容），发布才有意义
+- 依赖前置：先有本地 MVP（agent 活动检测 + 悬浮窗真实内容），发布才有意义 —— **前置已具备（2026-09-24 MVP 走通）**
 - 相关但独立：`launch-at-login`、`menubar-status-item`
+
+## 调研结果（2026-09-24，只做了本机可验证的部分）
+
+**已验证（本机事实）**
+
+| 项 | 结果 |
+|---|---|
+| 当前签名 | `codesign -dv` → `flags=0x2(adhoc)`、`TeamIdentifier=not set` |
+| Gatekeeper 评估 | `spctl -a -vvv build/Island.app` → **rejected** |
+| 版本号 | `scripts/build-app.sh` 写死 `version="0.1.0"` → `CFBundleShortVersionString` |
+| 本机工具链 | `brew 7.0.4`、`xcrun notarytool` 均可用 |
+| bundle id | `com.binyanli.island.poc`（名字带 `poc`，正式分发前应改成稳定 id） |
+
+**结论（基于以上 + Homebrew 机制）**
+
+1. **硬成本在这里**：ad-hoc 签名的 app `spctl` 直接 rejected。别人拿到它，即使没有 quarantine 属性，macOS 也会拦。要「下载即开」，需要 **Apple Developer Program（99 USD/年）→ Developer ID Application 证书 → `notarytool` 公证 → `stapler staple`**。这是 POC #1「无门槛」的适用边界：**本地自用无门槛 ≠ 对外分发无门槛**。
+2. **一个待验证的中间地带**：`brew install --cask` 下载走 `curl`，而 `curl` **不会**加 `com.apple.quarantine`（只有浏览器会）。理论上可能绕过 Gatekeeper 首次拦截，但 macOS 新版本对未公证 app 的策略在收紧，**必须在干净机器上实测**，不能拿本机（已 trust、已运行过）当依据。
+3. **formula 还是 cask**：GUI app → **cask**（`brew install --cask island`），`app` stanza 投放到 `/Applications`。
+4. **托管**：两种都行 —— GitHub Releases（打 tag + 上传 `.zip`/`.dmg` + `sha256`）或自建 `homebrew-island` tap。推荐 Releases + 官方 cask 或自建 tap。
+5. **自动更新**：`brew upgrade` 需要版本号单调递增，`0.1.0` 写死要改成从 tag/环境变量注入。
+6. **默认开机自启**：`SMAppService.mainApp` 是用户主动勾的，不是安装即注册，这点 OK；但 cask 安装到一个被别人用的机器上时，仍需在 README 里说清。
+
+**建议的分发路径（待授权后执行）**
+
+```
+1. 买 Apple Developer Program → 生成 Developer ID Application 证书
+2. build-app.sh 支持注入版本号 + Developer ID 签名 + 公证 + staple
+3. 打 tag（v0.1.0）→ GitHub Release 上传 zip + sha256
+4. 写 cask formula（version / sha256 / url / app stanza）到自建 tap 或提交 homebrew-cask
+5. 干净机器验证：brew install --cask island → 双击能开、登录项可用、快捷键可用
+```
+
+**卡点（必须人来定）**
+
+- 是否花 99 USD/年买 Apple Developer Program。不买就只能停在「本机 / 可信机器手动 `xattr -d com.apple.quarantine`」
+- `publish / release / 打 tag` 属 AGENTS.md § Boundaries 的 Ask first；未获明确授权前本 issue 停在 `new`
+
+> 2026-09-24 会话：用户授权「把未完成的 issues 都自主处理」，但该授权带有「如果顺利」前提，而本 issue 的下一步是付费 + 公开发布，不属可自主执行范围，故只做到本机可验证的调研。
