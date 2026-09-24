@@ -90,3 +90,17 @@ public struct AgentTask: Equatable, Sendable {
         return name.isEmpty || name == "/" ? "(untitled)" : name
     }
 }
+
+/// What island puts in a task row: the agent's own title when it has one, else
+/// the last message of the run, else the directory (PLAN § Design / 下拉框 UX #1).
+public enum TaskTitle {
+    public static func resolve(title: String?, lastMessage: String?, cwd: String?) -> String {
+        cleaned(title) ?? cleaned(lastMessage) ?? AgentTask.fallbackTitle(cwd: cwd)
+    }
+
+    private static func cleaned(_ text: String?) -> String? {
+        guard let text else { return nil }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : JSON.truncated(trimmed)
+    }
+}

@@ -165,10 +165,31 @@ final class ClaudeCodeActivitySourceTests: XCTestCase {
         XCTAssertEqual(task.title, "(untitled)")
     }
 
-    func testTitleFallsBackToTheWorkingDirectory() {
+    func testTitleFallsBackToTheLastMessageThenTheDirectory() {
         XCTAssertEqual(
-            ClaudeCodeActivitySource.title(name: "   ", cwd: "/Users/x/Repos/island"), "island")
-        XCTAssertEqual(ClaudeCodeActivitySource.title(name: nil, cwd: nil), "(untitled)")
+            ClaudeCodeActivitySource.task(
+                from: .init(
+                    pid: 1, sessionId: "s", cwd: "/Users/x/Repos/island", name: nil,
+                    status: "idle", updatedAt: nil),
+                lastMessage: "done with the thing"
+            )?.title,
+            "done with the thing"
+        )
+        XCTAssertEqual(
+            ClaudeCodeActivitySource.task(
+                from: .init(
+                    pid: 1, sessionId: "s", cwd: "/Users/x/Repos/island", name: "   ",
+                    status: "idle", updatedAt: nil)
+            )?.title,
+            "island"
+        )
+        XCTAssertEqual(
+            ClaudeCodeActivitySource.task(
+                from: .init(
+                    pid: 1, sessionId: "s", cwd: nil, name: nil, status: "idle", updatedAt: nil))?
+                .title,
+            "(untitled)"
+        )
     }
 
     func testCompletedTasksReadsTheSessionsDirectory() throws {
@@ -194,6 +215,42 @@ final class ClaudeCodeActivitySourceTests: XCTestCase {
         let home = try makeTempHome()
 
         XCTAssertTrue(ClaudeCodeActivitySource.standard(home: home).completedTasks().isEmpty)
+    }
+
+    func testNamelessSessionFallsBackToItsTranscript() throws {
+        let home = try makeTempHome()
+        let sessions = home.appendingPathComponent(".claude/sessions")
+        let project = home.appendingPathComponent(".claude/projects/-tmp-island")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        try write(
+            #"{"pid":7,"sessionId":"sess","cwd":"/tmp/island","name":"","status":"idle","updatedAt":1790268825080}"#,
+            to: sessions.appendingPathComponent("7.json"))
+        try write(
+            #"{"type":"assistant","message":{"content":[{"type":"text","text":"final from transcript"}]}}"#,
+            to: project.appendingPathComponent("sess.jsonl"))
+
+        let tasks = ClaudeCodeActivitySource.standard(home: home).completedTasks()
+
+        XCTAssertEqual(tasks.map(\.title), ["final from transcript"])
+    }
+
+    func testNamelessSessionWithoutATranscriptFallsBackToTheDirectory() throws {
+        let home = try makeTempHome()
+        let sessions = home.appendingPathComponent(".claude/sessions")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        try write(
+            #"{"pid":8,"sessionId":"nofile","cwd":"/tmp/island","name":"   ","status":"idle","updatedAt":1790268825080}"#,
+            to: sessions.appendingPathComponent("8.json"))
+        // Name is blank and there is no transcript, so this session is skipped
+        // by the transcript lookup and titled from its working directory.
+        try write(
+            #"{"pid":9,"cwd":"/tmp/other","name":"","status":"idle","updatedAt":1790268825080}"#,
+            to: sessions.appendingPathComponent("9.json"))
+
+        let tasks = ClaudeCodeActivitySource.standard(home: home).completedTasks()
+
+        XCTAssertEqual(tasks.map(\.title), ["island"])
     }
 
     private func makeTempHome() throws -> URL {
@@ -331,7 +388,22 @@ final class PiActivitySourceTests: XCTestCase {
         XCTAssertTrue(PiActivitySource.standard(home: home).completedTasks().isEmpty)
     }
 
-    func testTitleFallsBackToTheWorkingDirectoryWhenThereIsNoUserMessage() throws {
+    func testTitleFallsBackToTheLastAssistantMessage() throws {
+        let home = try makeTempHome()
+        let project = home.appendingPathComponent(".pi/agent/sessions/--tmp-island--")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        try write(
+            """
+            {"type":"session","id":"quiet","cwd":"/tmp/island"}
+            {"type":"message","message":{"role":"assistant","stopReason":"stop","content":[{"type":"text","text":"all done here"}]}}
+            """, to: project.appendingPathComponent("run.jsonl"))
+
+        let tasks = PiActivitySource.standard(home: home).completedTasks()
+
+        XCTAssertEqual(tasks.map(\.title), ["all done here"])
+    }
+
+    func testTitleFallsBackToTheWorkingDirectoryWhenThereIsNoMessageAtAll() throws {
         let home = try makeTempHome()
         let project = home.appendingPathComponent(".pi/agent/sessions/--tmp-island--")
         try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
@@ -344,6 +416,21 @@ final class PiActivitySourceTests: XCTestCase {
         let tasks = PiActivitySource.standard(home: home).completedTasks()
 
         XCTAssertEqual(tasks.map(\.title), ["island"])
+    }
+
+    func testScanCapturesTheLastAssistantText() throws {
+        let contents = """
+            {"type":"session","id":"s","cwd":"/tmp/island"}
+            {"type":"message","message":{"role":"assistant","stopReason":"toolUse","content":[{"type":"text","text":"working"}]}}
+            {"type":"message","message":{"role":"assistant","stopReason":"stop","content":[{"type":"text","text":"all done"}]}}
+            """
+
+        let scan = try XCTUnwrap(
+            PiActivitySource.scan(contents: contents, fileModified: .distantPast))
+
+        XCTAssertNil(scan.title)
+        XCTAssertEqual(scan.lastMessage, "all done")
+        XCTAssertTrue(scan.isComplete)
     }
 
     func testModifiedAtFallsBackForAnUnreadableFile() {
@@ -419,8 +506,9 @@ final class CodexActivitySourceTests: XCTestCase {
             [
               {"id":"01a","name":"评估 AI 玩游戏","title":"你有办法玩游戏吗","cwd":"/Users/x/Repos/compounding","completed_at":1789162387},
               {"id":"01b","name":null,"title":"raw first message","cwd":"/tmp","completed_at":1789162388},
-              {"id":"01c","name":"","title":"","cwd":null,"completed_at":1789162389},
-              {"id":"01d","name":"no time","cwd":"/tmp"},
+              {"id":"01c","name":"","title":"","cwd":null,"completed_at":1789162389,"last_message":"codex said this last"},
+              {"id":"01d","name":"","title":"","cwd":null,"completed_at":1789162390},
+              {"id":"01e","name":"no time","cwd":"/tmp"},
               {"name":"no id","completed_at":1},
               "not an object"
             ]
@@ -428,9 +516,10 @@ final class CodexActivitySourceTests: XCTestCase {
 
         let tasks = CodexTurnActivitySource.parse(json)
 
-        XCTAssertEqual(tasks.map(\.sessionID), ["01a", "01b", "01c"])
+        XCTAssertEqual(tasks.map(\.sessionID), ["01a", "01b", "01c", "01d"])
         XCTAssertEqual(
-            tasks.map(\.title), ["评估 AI 玩游戏", "raw first message", "(untitled)"])
+            tasks.map(\.title),
+            ["评估 AI 玩游戏", "raw first message", "codex said this last", "(untitled)"])
         XCTAssertEqual(tasks.first?.cwd, "/Users/x/Repos/compounding")
         XCTAssertEqual(tasks.first?.resumeCommand, "codex resume 01a")
         XCTAssertEqual(
@@ -572,4 +661,117 @@ private func makeTask(
         host: .unknown,
         resumeCommand: nil
     )
+}
+
+final class TaskTitleTests: XCTestCase {
+    func testPrefersTheAgentsOwnTitle() {
+        XCTAssertEqual(
+            TaskTitle.resolve(title: "island-6d", lastMessage: "done", cwd: "/tmp/x"), "island-6d")
+    }
+
+    func testFallsBackToTheLastMessage() {
+        XCTAssertEqual(
+            TaskTitle.resolve(title: "   ", lastMessage: "finished the task", cwd: "/tmp/x"),
+            "finished the task"
+        )
+        XCTAssertEqual(TaskTitle.resolve(title: nil, lastMessage: "done", cwd: nil), "done")
+    }
+
+    func testFallsBackToTheDirectory() {
+        XCTAssertEqual(
+            TaskTitle.resolve(title: nil, lastMessage: "", cwd: "/Users/x/Repos/island"), "island")
+        XCTAssertEqual(TaskTitle.resolve(title: nil, lastMessage: nil, cwd: nil), "(untitled)")
+    }
+
+    func testCollapsesWhitespaceAndTruncates() {
+        XCTAssertEqual(TaskTitle.resolve(title: "a\n  b", lastMessage: nil, cwd: nil), "a b")
+        XCTAssertEqual(
+            TaskTitle.resolve(title: String(repeating: "x", count: 80), lastMessage: nil, cwd: nil)
+                .count,
+            73
+        )
+    }
+}
+
+final class ClaudeTranscriptTests: XCTestCase {
+    private var temporary: [URL] = []
+
+    override func tearDown() {
+        for url in temporary { try? FileManager.default.removeItem(at: url) }
+        temporary = []
+    }
+
+    func testHasTitle() {
+        XCTAssertTrue(
+            ClaudeCodeActivitySource.hasTitle(
+                .init(
+                    pid: 1, sessionId: "s", cwd: nil, name: "island", status: "idle", updatedAt: nil
+                )
+            ))
+        XCTAssertFalse(
+            ClaudeCodeActivitySource.hasTitle(
+                .init(pid: 1, sessionId: "s", cwd: nil, name: "  ", status: "idle", updatedAt: nil))
+        )
+        XCTAssertFalse(
+            ClaudeCodeActivitySource.hasTitle(
+                .init(pid: 1, sessionId: "s", cwd: nil, name: nil, status: "idle", updatedAt: nil)))
+    }
+
+    func testSessionFileIsFoundBySessionID() throws {
+        let projects = try makeTempDirectory().appendingPathComponent("projects")
+        let project = projects.appendingPathComponent("-tmp-island")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        try "x".write(
+            to: project.appendingPathComponent("sess.jsonl"), atomically: true, encoding: .utf8)
+        try "y".write(
+            to: project.appendingPathComponent("other.jsonl"), atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(
+            ClaudeCodeActivitySource.sessionFile(sessionID: "sess", in: projects)?
+                .lastPathComponent,
+            "sess.jsonl"
+        )
+        XCTAssertNil(ClaudeCodeActivitySource.sessionFile(sessionID: "missing", in: projects))
+        XCTAssertNil(ClaudeCodeActivitySource.sessionFile(sessionID: "sess", in: project))
+    }
+
+    func testLastAssistantTextPicksTheFinalOne() {
+        let contents = """
+            {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"first"}]}}
+            {"type":"user","message":{"role":"user","content":"hi"}}
+            {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"final answer"}]}}
+            """
+
+        XCTAssertEqual(ClaudeCodeActivitySource.lastAssistantText(in: contents), "final answer")
+    }
+
+    func testLastAssistantTextWhenThereIsNone() {
+        XCTAssertNil(ClaudeCodeActivitySource.lastAssistantText(in: ""))
+        XCTAssertNil(ClaudeCodeActivitySource.lastAssistantText(in: #"{"type":"user"}"#))
+        XCTAssertNil(
+            ClaudeCodeActivitySource.lastAssistantText(
+                in:
+                    #"{"type":"assistant","message":{"role":"assistant","content":[{"type":"thinking","thinking":"x"}]}}"#
+            ))
+    }
+
+    func testLastAssistantTextFromAFile() throws {
+        let directory = try makeTempDirectory()
+        let file = directory.appendingPathComponent("sess.jsonl")
+        try #"{"type":"assistant","message":{"content":[{"type":"text","text":"from disk"}]}}"#
+            .write(to: file, atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(ClaudeCodeActivitySource.lastAssistantText(inFile: file), "from disk")
+        XCTAssertNil(
+            ClaudeCodeActivitySource.lastAssistantText(
+                inFile: directory.appendingPathComponent("missing.jsonl")))
+    }
+
+    private func makeTempDirectory() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("island-claude-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        temporary.append(url)
+        return url
+    }
 }

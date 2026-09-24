@@ -142,6 +142,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func selectTask(_ entry: AgentInbox.Entry) {
         inbox?.markRead(id: entry.id)
         refreshAgentUI()
+        // PLAN § Design / 下拉框 UX #2: picking a task dismisses the list.
+        hideOverlay(reason: "overlay hidden after selecting a task")
         let action = reopenExecutor.plan(for: entry.task)
         reopenExecutor.perform(action, for: entry.task)
         log("selected \(entry.task.title) -> \(action)")
@@ -184,15 +186,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .show:
             showOverlay()
         case .hide:
-            hideOverlay()
+            hideOverlay(reason: "overlay hidden by hotkey")
         }
     }
 
-    private func hideOverlay() {
+    private func hideOverlay(reason: String = "overlay hidden") {
         hideTask?.cancel()
         hideTask = nil
         panel?.orderOut(nil)
-        log("overlay hidden by hotkey")
+        log(reason)
     }
 
     /// Switches the global hotkey on or off, from either the menu or the

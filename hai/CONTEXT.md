@@ -104,7 +104,7 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   OverlayToggle.swift          #   按快捷键时“显示还是收起”的决策
   LoginItem.swift              #   登录项状态 + 菜单勾选/提示的映射
   HotkeySettings.swift         #   换绑协调器（失败回滚）+ on/off 开关 + UserDefaults 存储
-  AgentTask.swift              #   统一任务模型（agent / sessionID / title / cwd / completedAt / host / resume）
+  AgentTask.swift              #   统一任务模型（agent / sessionID / title / cwd / completedAt / host / resume）+ TaskTitle 标题兑底
   AgentActivity.swift          #   Claude Code / pi 的落盘解析 + AgentActivityScanner
   CodexTurns.swift             #   Codex：turn 历史（sqlite，注入 runner）+ session_index 兑底
   AgentReopen.swift            #   点击任务后“回到它”的决策（ps 父链 + tmux pane → action）
@@ -173,7 +173,9 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - **agent 任务只算增量**：`AgentMonitor` 用启动时间卡一个 `completedAt >= startedAt` 过滤（在 `Sources/Island`，不在 IslandCore），所以历史 run 与重开 app 前的 run 一律不显示；`--scan-agents` 相反，故意列出全部已完成 run 供调试
 - **三类 CLI agent 的完成信号**（详见 `hai/reference/agents/README.md`）：Claude Code = `~/.claude/sessions/<pid>.json` 的 `status == idle`；pi = 会话 jsonl 最后一条 assistant 的 `stopReason == stop`；Codex = `thread_history_1.sqlite` 的 `thread_turns.status == 'completed'`（两个库要 `attach`；**不能用 `sqlite3 -readonly`**，会 CANTOPEN）。三者都按 `sessionId + completedAt` 去重，所以同一 session 的下一轮会产生新条目
 - **Codex 的 sqlite 访问走注入的 `SQLiteQuerying`**：IslandCore 只定义协议 + 解析，`Sources/Island/ProcessSQLite.swift` 才是 `/usr/bin/sqlite3` 包装。测试用 `NoSQLiteQuerying` / stub，所以核心层不会 spawn 进程
-- **点击任务后的行为**：`AgentReopen.plan`（纯逻辑，有测试）看 `host` 与 `ps` 父进程链——命中 tmux pane 就 `focusTmux`，否则若 host 是 terminal 就 `focusHostApp`（沿祖先链找已知终端 app；VS Code 用 `open -b com.microsoft.VSCode <cwd>` 聚焦到目录），桌面 app 就 `activateApp`，host 仍无法确定时才 `copyToClipboard`。执行层 `AgentReopenExecutor` 在 Sources/Island。调试：`--reopen-plan <pid>` 或 `--reopen-plan <agent> <cwd>`（后者走无 pid 的宿主反查）
+- **点击任务后的行为**（`AgentReopen.plan`，纯逻辑有测试）：命中 tmux pane 就 `focusTmux`；host 是 terminal 但不在 tmux 就 `focusHostApp`（沿祖先链找已知终端 app；VS Code 用 `open -b com.microsoft.VSCode <cwd>` 聚焦到目录）；桌面 app 就 `activateApp`；host 仍无法确定时才 `copyToClipboard(resume)`。执行层 `AgentReopenExecutor` 在 Sources/Island。调试：`--reopen-plan <pid>` 或 `--reopen-plan <agent> <cwd>`（后者走无 pid 的宿主反查）
+- **任务标题的取值是 `title → last msg → 目录名`**（`TaskTitle.resolve`，PLAN § Design / 下拉框 UX #1）：Claude 的 `name`、pi 的首条 user 文本、Codex 的 `name`/`title` 都算 title；没有 title 时，Claude 去 `~/.claude/projects/*/<sessionId>.jsonl` 取最后一条 assistant 文本（**仅 name 为空时才读文件**），pi 用扫描时顺手记下的最后一条 assistant 文本，Codex 用 sqlite 子查询取最后一条 `agentMessage` 的 `text`
+- **点任务后悬浮窗会立刻收起**（PLAN § Design / 下拉框 UX #2）：`selectTask` 先 `markRead` + `refreshAgentUI`，再 `hideOverlay(reason:)`，最后才 focus/跳转（顺序重要，否则聚焦那一刻悬浮窗还会闪）
 - **pi 没有 host pid 落盘**，`AgentReopenExecutor.resolveHost` 在点击时才反查：`ps -axo pid=,comm=` 筛命令名 `pi`，再 `lsof -a -p <pids> -d cwd -Fpn` 取 cwd，按 session 的 cwd 匹配。**`lsof -c pi` 不好使**——pi 是 node 脚本，lsof 看到的命令名是 node，必须先用 ps 拿到 pid 再 `lsof -p`
 - **悬浮窗是可点击列表**：`OverlayPanel` 仍然 `canBecomeKey = false`，行用 `OverlayTaskRowView.mouseUp` 自己处理点击（不依赖窗口变 key）；hover 时 `AppDelegate.setOverlayHovered` 取消自动隐藏，离开后重新计时。如果鼠标事件在非 key 窗口下有意外行为，菜单栏里同一份任务列表是保底入口（`StatusItemController.setTasks`）
 - **Codex 桌面版与 CLI 共用 `state_5.sqlite` / `thread_history_1.sqlite`**，桌面线程只是 `threads.source` 不同；本机调研时最新线程停在 2026-09-11（`source='vscode'`），即桌面路径尚无真实数据验证。Claude 桌面版没有可读的任务列表，目前不支持

@@ -60,7 +60,13 @@ public struct CodexTurnActivitySource: AgentActivitySource {
                threads.name as name,
                threads.title as title,
                threads.cwd as cwd,
-               max(history.thread_turns.completed_at) as completed_at
+               max(history.thread_turns.completed_at) as completed_at,
+               (select json_extract(items.item_json, '$.text')
+                from history.thread_items as items
+                where items.thread_id = threads.id
+                  and items.item_type = 'agentMessage'
+                order by items.rollout_ordinal desc
+                limit 1) as last_message
         from history.thread_turns
         join threads on threads.id = history.thread_turns.thread_id
         where history.thread_turns.status = 'completed'
@@ -87,7 +93,8 @@ public struct CodexTurnActivitySource: AgentActivitySource {
             return AgentTask(
                 agent: .codex,
                 sessionID: id,
-                title: chosen ?? AgentTask.fallbackTitle(cwd: cwd),
+                title: TaskTitle.resolve(
+                    title: chosen, lastMessage: row["last_message"] as? String, cwd: cwd),
                 cwd: cwd,
                 completedAt: Date(timeIntervalSince1970: seconds),
                 host: .desktop(bundleID: "com.openai.codex"),
@@ -133,7 +140,7 @@ public struct CodexIndexActivitySource: AgentActivitySource {
             return AgentTask(
                 agent: .codex,
                 sessionID: id,
-                title: title.isEmpty ? AgentTask.fallbackTitle(cwd: nil) : title,
+                title: TaskTitle.resolve(title: title, lastMessage: nil, cwd: nil),
                 cwd: nil,
                 completedAt: updatedAt,
                 host: .desktop(bundleID: "com.openai.codex"),

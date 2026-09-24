@@ -45,16 +45,20 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
     public let agent = AgentKind.claudeCode
 
     private let sessionsDirectory: URL
+    private let projectsDirectory: URL
 
-    public init(sessionsDirectory: URL) {
+    public init(sessionsDirectory: URL, projectsDirectory: URL) {
         self.sessionsDirectory = sessionsDirectory
+        self.projectsDirectory = projectsDirectory
     }
 
     public static func standard(
         home: URL = FileManager.default.homeDirectoryForCurrentUser
     ) -> ClaudeCodeActivitySource {
         ClaudeCodeActivitySource(
-            sessionsDirectory: home.appendingPathComponent(".claude/sessions"))
+            sessionsDirectory: home.appendingPathComponent(".claude/sessions"),
+            projectsDirectory: home.appendingPathComponent(".claude/projects")
+        )
     }
 
     public func completedTasks() -> [AgentTask] {
@@ -64,11 +68,52 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
                 guard let data = try? Data(contentsOf: url),
                     let state = try? JSONDecoder().decode(ClaudeSessionState.self, from: data)
                 else { return nil }
-                return Self.task(from: state)
+                // Only pay for the transcript read when the session has no name.
+                let lastMessage = Self.hasTitle(state) ? nil : lastMessage(for: state)
+                return Self.task(from: state, lastMessage: lastMessage)
             }
     }
 
-    static func task(from state: ClaudeSessionState) -> AgentTask? {
+    private func lastMessage(for state: ClaudeSessionState) -> String? {
+        guard let sessionID = state.sessionId, !sessionID.isEmpty else { return nil }
+        guard let file = Self.sessionFile(sessionID: sessionID, in: projectsDirectory) else {
+            return nil
+        }
+        return Self.lastAssistantText(inFile: file)
+    }
+
+    static func hasTitle(_ state: ClaudeSessionState) -> Bool {
+        !(state.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// The transcript lives in `<projects>/<cwd-slug>/<sessionId>.jsonl`; the
+    /// slug encoding is undocumented, so just look for the file by id.
+    static func sessionFile(sessionID: String, in projectsDirectory: URL) -> URL? {
+        AgentFiles.directoryContents(projectsDirectory)
+            .map { $0.appendingPathComponent("\(sessionID).jsonl") }
+            .first { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
+    /// The final assistant text of a transcript. Only read when the session has
+    /// no name, which is rare — so reading the whole file is fine.
+    static func lastAssistantText(inFile url: URL) -> String? {
+        guard let contents = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        return lastAssistantText(in: contents)
+    }
+
+    static func lastAssistantText(in contents: String) -> String? {
+        for line in contents.split(separator: "\n").reversed() {
+            guard let object = JSON.object(fromLine: String(line)),
+                object["type"] as? String == "assistant",
+                let message = object["message"] as? [String: Any],
+                let content = JSON.firstText(in: message["content"])
+            else { continue }
+            return content
+        }
+        return nil
+    }
+
+    static func task(from state: ClaudeSessionState, lastMessage: String? = nil) -> AgentTask? {
         guard state.status == "idle", let sessionID = state.sessionId, !sessionID.isEmpty else {
             return nil
         }
@@ -76,17 +121,12 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
         return AgentTask(
             agent: .claudeCode,
             sessionID: sessionID,
-            title: Self.title(name: state.name, cwd: state.cwd),
+            title: TaskTitle.resolve(title: state.name, lastMessage: lastMessage, cwd: state.cwd),
             cwd: state.cwd,
             completedAt: completedAt,
             host: state.pid.map(AgentHost.terminal) ?? .unknown,
             resumeCommand: "claude --resume \(sessionID)"
         )
-    }
-
-    static func title(name: String?, cwd: String?) -> String {
-        if let name, !name.trimmingCharacters(in: .whitespaces).isEmpty { return name }
-        return AgentTask.fallbackTitle(cwd: cwd)
     }
 
     struct ClaudeSessionState: Decodable {
@@ -134,7 +174,8 @@ public struct PiActivitySource: AgentActivitySource {
             return AgentTask(
                 agent: .pi,
                 sessionID: scan.sessionID,
-                title: scan.title ?? AgentTask.fallbackTitle(cwd: scan.cwd),
+                title: TaskTitle.resolve(
+                    title: scan.title, lastMessage: scan.lastMessage, cwd: scan.cwd),
                 cwd: scan.cwd,
                 completedAt: scan.completedAt,
                 host: .unknown,
@@ -152,6 +193,8 @@ public struct PiActivitySource: AgentActivitySource {
         let sessionID: String
         let cwd: String?
         let title: String?
+        /// The last thing the agent said — the fallback when there is no title.
+        let lastMessage: String?
         let completedAt: Date
         let isComplete: Bool
     }
@@ -162,6 +205,7 @@ public struct PiActivitySource: AgentActivitySource {
         var cwd: String?
         var firstUserText: String?
         var lastAssistantStop: String?
+        var lastAssistantText: String?
         var lastAssistantDate: Date?
         var lastTimestamp: Date?
 
@@ -185,6 +229,7 @@ public struct PiActivitySource: AgentActivitySource {
                     }
                 case "assistant":
                     lastAssistantStop = message["stopReason"] as? String
+                    lastAssistantText = JSON.firstText(in: message["content"])
                     lastAssistantDate =
                         (object["timestamp"] as? String).flatMap(AgentTimestamp.date(from:))
                 default:
@@ -199,7 +244,8 @@ public struct PiActivitySource: AgentActivitySource {
         return SessionScan(
             sessionID: sessionID,
             cwd: cwd,
-            title: firstUserText.map { JSON.truncated($0) },
+            title: firstUserText,
+            lastMessage: lastAssistantText,
             completedAt: lastAssistantDate ?? lastTimestamp ?? fileModified,
             isComplete: lastAssistantStop == "stop"
         )
