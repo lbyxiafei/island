@@ -30,7 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let registrar = HotkeyRegistrar { [weak self] in
             MainActor.assumeIsolated {
-                self?.showOverlay()
+                self?.toggleOverlay()
             }
         }
         self.registrar = registrar
@@ -95,6 +95,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.panel?.orderOut(nil)
             self?.log("overlay hidden")
         }
+    }
+
+    /// PLAN § Scope #5: the hotkey toggles the overlay, so a press while it is
+    /// on screen dismisses it instead of only restarting the auto-hide timer.
+    private func toggleOverlay() {
+        switch OverlayToggle.hotkeyPress(isOverlayVisible: panel?.isVisible ?? false) {
+        case .show:
+            showOverlay()
+        case .hide:
+            hideOverlay()
+        }
+    }
+
+    private func hideOverlay() {
+        hideTask?.cancel()
+        hideTask = nil
+        panel?.orderOut(nil)
+        log("overlay hidden by hotkey")
     }
 
     /// Switches the global hotkey on or off, from either the menu or the

@@ -10,6 +10,8 @@ island —— 一个 macOS 常驻小工具：监视本机 AI AGENT 的运行活�
 
 实现形态：SwiftPM 工程 + AppKit。accessory app（无 Dock 图标），菜单栏有一个 status item 常驻；global hotkey 用 Carbon `RegisterEventHotKey`，悬浮窗是 `NSPanel`，开机自启用 `SMAppService.mainApp`。**零第三方依赖**。
 
+快捷键行为（PLAN § Scope #5）：它 summon 悬浮窗；悬浮窗已经显示时再按一次会立刻收起（toggle），而不仅是重置自动隐藏计时。菜单里的 `Summon overlay` 始终是“显示”。
+
 ## Setup
 
 ```bash
@@ -95,6 +97,7 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   HotkeySpec.swift             #   hotkey 文案解析 + US 布局 keycode + 展示串
   HotkeyConfiguration.swift    #   环境变量取值，非法时回落并上报
   OverlayDuration.swift        #   悬浮窗停留时长，同上
+  OverlayToggle.swift          #   按快捷键时“显示还是收起”的决策
   LoginItem.swift              #   登录项状态 + 菜单勾选/提示的映射
   HotkeySettings.swift         #   换绑协调器（失败回滚）+ on/off 开关 + UserDefaults 存储
 Sources/Island/                # 可执行 target：NSApplication / NSPanel / Carbon 装配
@@ -140,6 +143,7 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - **hotkey 用 Carbon 而不是 `NSEvent.addGlobalMonitorForEvents`**。后者需要用户在「隐私与安全性 → 输入监控/辅助功能」里授权，Carbon 的 `RegisterEventHotKey` 不需要任何授权。这是 POC 要验证的结论之一，改动前先想清楚
 - Carbon 的 keycode 是 **US 布局**的物理键位；真正的产品阶段要考虑非 US 布局下的键位映射（POC 不管）
 - 悬浮窗靠 `NSPanel` + `.nonactivatingPanel` + `canBecomeKey = false` + `level = .statusBar` + `canJoinAllSpaces` 实现"浮在最上层且绝不抢焦点"。这几个属性少一个行为就会退化（比如抢走终端焦点）
+- 按键 toggle 的依据是 `panel.isVisible`（由 `OverlayToggle.hotkeyPress` 决策）：显示中则 `orderOut` 并取消 `hideTask`，否则走 `showOverlay` 重新计时。自动隐藏后 `isVisible` 变回 false，所以下一次按键又是"显示"
 - 进程是 accessory（`LSUIElement=true` 且 `setActivationPolicy(.accessory)`）：**没有 Dock 图标**，唯一的界面是菜单栏 status item。退出走菜单的 `Quit island`，前台运行也可以 Ctrl-C，或者 `pkill -x Island`
 - 菜单栏 status item 是 2026-09-13 才加的。在那之前 app 完全不可见，导致"按快捷键没反应"时无法判断是没进程还是功能坏了（见 issue `menubar-status-item`）
 - 开机自启用 `SMAppService.mainApp`（不是 LaunchAgent plist）。已实测 **ad-hoc 签名 + 非 `/Applications` 路径下可用**，但：
