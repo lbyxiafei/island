@@ -35,4 +35,16 @@ final class UserDefaultsHotkeyStoreTests: XCTestCase {
 
         XCTAssertNil(store.loadHotkeyText())
     }
+
+    func testNothingStoredMeansTheEnabledFlagIsUnknown() {
+        let store = UserDefaultsHotkeyStore(defaults: defaults)
+
+        XCTAssertNil(store.loadHotkeyEnabled())
+    }
+
+    func testEnabledFlagSurvivesANewStoreInstance() {
+        UserDefaultsHotkeyStore(defaults: defaults).saveHotkeyEnabled(false)
+
+        XCTAssertEqual(UserDefaultsHotkeyStore(defaults: defaults).loadHotkeyEnabled(), false)
+    }
 }

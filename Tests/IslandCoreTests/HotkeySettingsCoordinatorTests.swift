@@ -84,6 +84,130 @@ final class HotkeySettingsCoordinatorTests: XCTestCase {
         XCTAssertEqual(registrar.unregisterCount, 0)
         XCTAssertTrue(registrar.registered.isEmpty)
     }
+
+    // MARK: - Enable / disable (PLAN § Scope #5)
+
+    func testEnabledByDefaultWhenNothingWasStored() {
+        XCTAssertTrue(HotkeySettingsCoordinator.initialEnabled(stored: nil))
+        XCTAssertFalse(HotkeySettingsCoordinator.initialEnabled(stored: false))
+        XCTAssertTrue(HotkeySettingsCoordinator.initialEnabled(stored: true))
+    }
+
+    func testStartRegistersWhenEnabled() throws {
+        let registrar = FakeRegistrar()
+        let spec = try HotkeySpec.parse("cmd+ctrl+,")
+        let settings = HotkeySettingsCoordinator(
+            current: spec, isEnabled: true, store: FakeStore(), registrar: registrar)
+
+        try settings.start()
+
+        XCTAssertEqual(registrar.registered, [spec])
+    }
+
+    func testStartIsANoOpWhenDisabled() throws {
+        let registrar = FakeRegistrar()
+        let settings = HotkeySettingsCoordinator(
+            current: try HotkeySpec.parse("cmd+ctrl+,"),
+            isEnabled: false,
+            store: FakeStore(),
+            registrar: registrar
+        )
+
+        try settings.start()
+
+        XCTAssertTrue(registrar.registered.isEmpty)
+    }
+
+    func testDisablingUnregistersAndPersistsTheChoice() throws {
+        let registrar = FakeRegistrar()
+        let store = FakeStore()
+        let settings = HotkeySettingsCoordinator(
+            current: try HotkeySpec.parse("cmd+ctrl+,"),
+            isEnabled: true,
+            store: store,
+            registrar: registrar
+        )
+
+        let outcome = settings.setEnabled(false)
+
+        XCTAssertEqual(outcome, .disabled)
+        XCTAssertFalse(settings.isEnabled)
+        XCTAssertEqual(registrar.unregisterCount, 1)
+        XCTAssertEqual(store.savedEnabled, false)
+    }
+
+    func testReenablingRegistersTheKeptHotkey() throws {
+        let registrar = FakeRegistrar()
+        let store = FakeStore()
+        let spec = try HotkeySpec.parse("cmd+ctrl+,")
+        let settings = HotkeySettingsCoordinator(
+            current: spec, isEnabled: false, store: store, registrar: registrar)
+
+        let outcome = settings.setEnabled(true)
+
+        XCTAssertEqual(outcome, .enabled(spec))
+        XCTAssertTrue(settings.isEnabled)
+        XCTAssertEqual(registrar.registered, [spec])
+        XCTAssertEqual(store.savedEnabled, true)
+    }
+
+    /// A refused re-enable must leave the app disabled instead of pretending.
+    func testReenablingFailureStaysDisabledAndReportsTheReason() throws {
+        let registrar = FakeRegistrar()
+        let store = FakeStore()
+        let spec = try HotkeySpec.parse("cmd+ctrl+,")
+        registrar.rejects = spec
+        let settings = HotkeySettingsCoordinator(
+            current: spec, isEnabled: false, store: store, registrar: registrar)
+
+        let outcome = settings.setEnabled(true)
+
+        XCTAssertEqual(outcome, .registrationFailed("hotkey is taken"))
+        XCTAssertFalse(settings.isEnabled)
+        XCTAssertTrue(registrar.registered.isEmpty)
+        XCTAssertNil(store.savedEnabled)
+    }
+
+    /// While disabled the settings window can still record a key; it must be
+    /// remembered without touching the OS registration.
+    func testApplyingWhileDisabledStoresWithoutRegistering() throws {
+        let registrar = FakeRegistrar()
+        let store = FakeStore()
+        let settings = HotkeySettingsCoordinator(
+            current: try HotkeySpec.parse("cmd+ctrl+,"),
+            isEnabled: false,
+            store: store,
+            registrar: registrar
+        )
+
+        let outcome = settings.apply("cmd+shift+k")
+
+        XCTAssertEqual(outcome, .applied(try HotkeySpec.parse("cmd+shift+k")))
+        XCTAssertEqual(settings.current, try HotkeySpec.parse("cmd+shift+k"))
+        XCTAssertTrue(registrar.registered.isEmpty)
+        XCTAssertEqual(registrar.unregisterCount, 0)
+        XCTAssertEqual(store.saved, "shift+cmd+k")
+        XCTAssertFalse(settings.isEnabled)
+    }
+
+    /// Toggling to the state you are already in must not re-register or write.
+    func testSettingTheSameEnabledStateIsANoOp() throws {
+        let spec = try HotkeySpec.parse("cmd+ctrl+,")
+        let registrar = FakeRegistrar()
+        let store = FakeStore()
+
+        let alreadyOn = HotkeySettingsCoordinator(
+            current: spec, isEnabled: true, store: store, registrar: registrar)
+        XCTAssertEqual(alreadyOn.setEnabled(true), .enabled(spec))
+        XCTAssertTrue(registrar.registered.isEmpty)
+        XCTAssertEqual(registrar.unregisterCount, 0)
+        XCTAssertNil(store.savedEnabled)
+
+        let alreadyOff = HotkeySettingsCoordinator(
+            current: spec, isEnabled: false, store: store, registrar: registrar)
+        XCTAssertEqual(alreadyOff.setEnabled(false), .disabled)
+        XCTAssertEqual(registrar.unregisterCount, 0)
+    }
 }
 
 private final class FakeRegistrar: HotkeyRegistering {
@@ -110,6 +234,7 @@ private final class FakeRegistrar: HotkeyRegistering {
 
 private final class FakeStore: HotkeyStoring {
     var saved: String?
+    var savedEnabled: Bool?
     private var text: String?
 
     func loadHotkeyText() -> String? { text }
@@ -117,5 +242,11 @@ private final class FakeStore: HotkeyStoring {
     func saveHotkeyText(_ text: String?) {
         self.text = text
         saved = text
+    }
+
+    func loadHotkeyEnabled() -> Bool? { savedEnabled }
+
+    func saveHotkeyEnabled(_ enabled: Bool) {
+        savedEnabled = enabled
     }
 }

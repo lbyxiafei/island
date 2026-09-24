@@ -2,19 +2,21 @@ import AppKit
 import IslandCore
 
 /// The menu-bar presence: shows at a glance that island is alive, offers a
-/// manual summon (so the hotkey is never the only way in), the settings window,
-/// the login-item toggle, and a way out.
+/// manual summon (so the hotkey is never the only way in), the on/off switch for
+/// the global hotkey, the settings window, the login-item toggle, and a way out.
 @MainActor
 final class StatusItemController {
     private let statusItem: NSStatusItem
     private let durationSeconds: TimeInterval
     private let loginItem: LoginItemController
     private let onSummon: () -> Void
+    private let onToggleHotkey: (Bool) -> Void
     private let onOpenSettings: () -> Void
     private let onQuit: () -> Void
 
     private var hotkeyDisplay: String
     private var hotkeySourceNote: String
+    private var hotkeyEnabled: Bool
 
     /// Last `SMAppService` failure, surfaced in the menu instead of vanishing
     /// into a log the user cannot see.
@@ -23,19 +25,23 @@ final class StatusItemController {
     init(
         hotkey: HotkeySpec,
         hotkeySource: HotkeySource,
+        hotkeyEnabled: Bool,
         durationSeconds: TimeInterval,
         loginItem: LoginItemController,
         onSummon: @escaping () -> Void,
+        onToggleHotkey: @escaping (Bool) -> Void,
         onOpenSettings: @escaping () -> Void,
         onQuit: @escaping () -> Void
     ) {
         self.durationSeconds = durationSeconds
         self.loginItem = loginItem
         self.onSummon = onSummon
+        self.onToggleHotkey = onToggleHotkey
         self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
         hotkeyDisplay = hotkey.displayString
         hotkeySourceNote = Self.note(for: hotkeySource)
+        self.hotkeyEnabled = hotkeyEnabled
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         installButton()
         rebuildMenu()
@@ -49,10 +55,20 @@ final class StatusItemController {
         rebuildMenu()
     }
 
+    /// Called after the hotkey was switched on or off in the settings window.
+    func setHotkeyEnabled(_ enabled: Bool) {
+        hotkeyEnabled = enabled
+        installButton()
+        rebuildMenu()
+    }
+
     private func installButton() {
         guard let button = statusItem.button else { return }
         button.image = IslandGlyph.menuBarImage()
-        button.toolTip = "island — summon with \(hotkeyDisplay)"
+        button.toolTip =
+            hotkeyEnabled
+            ? "island — summon with \(hotkeyDisplay)"
+            : "island — hotkey switched off"
     }
 
     private func rebuildMenu() {
@@ -61,7 +77,21 @@ final class StatusItemController {
         menu.addItem(
             action("Summon overlay (\(hotkeyDisplay))", #selector(summon), keyEquivalent: "")
         )
-        menu.addItem(disabled("hotkey \(hotkeyDisplay) · \(hotkeySourceNote)"))
+        menu.addItem(
+            action(
+                "Summon hotkey",
+                #selector(toggleHotkey),
+                keyEquivalent: "",
+                isChecked: hotkeyEnabled
+            )
+        )
+        menu.addItem(
+            disabled(
+                hotkeyEnabled
+                    ? "hotkey \(hotkeyDisplay) · \(hotkeySourceNote)"
+                    : "hotkey off — the key is free for other apps"
+            )
+        )
         menu.addItem(
             disabled("hides itself after \(ResolvedConfiguration.secondsText(durationSeconds))s"))
         menu.addItem(.separator())
@@ -119,6 +149,10 @@ final class StatusItemController {
 
     @objc private func summon() {
         onSummon()
+    }
+
+    @objc private func toggleHotkey() {
+        onToggleHotkey(!hotkeyEnabled)
     }
 
     @objc private func openSettings() {

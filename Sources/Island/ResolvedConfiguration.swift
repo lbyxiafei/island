@@ -8,6 +8,7 @@ struct ResolvedConfiguration {
     static let durationEnvironmentKey = "ISLAND_OVERLAY_SECONDS"
 
     let hotkey: HotkeyConfiguration
+    let hotkeyEnabled: Bool
     let duration: OverlayDuration
 
     init(environment: [String: String], store: HotkeyStoring = UserDefaultsHotkeyStore()) {
@@ -15,12 +16,13 @@ struct ResolvedConfiguration {
             environment[Self.hotkeyEnvironmentKey],
             stored: store.loadHotkeyText()
         )
+        hotkeyEnabled = HotkeySettingsCoordinator.initialEnabled(stored: store.loadHotkeyEnabled())
         duration = OverlayDuration.resolve(environment[Self.durationEnvironmentKey])
     }
 
     var summary: String {
         var lines = [
-            "hotkey            \(hotkey.spec.displayString)  (\(sourceNote))",
+            "hotkey            \(hotkey.spec.displayString)  (\(sourceNote)\(hotkeyEnabled ? "" : ", disabled"))",
             "overlay duration  \(Self.secondsText(duration.seconds))s",
         ]
         if hotkey.usedFallback {

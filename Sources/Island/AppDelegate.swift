@@ -37,32 +37,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let settings = HotkeySettingsCoordinator(
             current: configuration.hotkey.spec,
+            isEnabled: configuration.hotkeyEnabled,
             store: UserDefaultsHotkeyStore(),
             registrar: registrar
         )
         self.settings = settings
 
         do {
-            try registrar.register(configuration.hotkey.spec)
-            log("hotkey registered: \(configuration.hotkey.spec.displayString)")
+            try settings.start()
+            if settings.isEnabled {
+                log("hotkey registered: \(settings.current.displayString)")
+            } else {
+                log("hotkey is switched off; summon from the menu bar icon")
+            }
         } catch {
             log(
-                "failed to register \(configuration.hotkey.spec.displayString): \(error.localizedDescription)"
+                "failed to register \(settings.current.displayString): \(error.localizedDescription)"
             )
         }
 
-        let settingsWindow = HotkeySettingsWindow(coordinator: settings) { [weak self] spec in
-            self?.log("hotkey changed to \(spec.displayString) (\(spec.specText))")
+        let settingsWindow = HotkeySettingsWindow(coordinator: settings) {
+            [weak self] spec, enabled in
+            self?.log("hotkey changed to \(spec.displayString) (enabled: \(enabled))")
             self?.statusItem?.setHotkey(spec, source: .menu)
+            self?.statusItem?.setHotkeyEnabled(enabled)
         }
         self.settingsWindow = settingsWindow
 
         statusItem = StatusItemController(
-            hotkey: configuration.hotkey.spec,
+            hotkey: settings.current,
             hotkeySource: configuration.hotkey.source,
+            hotkeyEnabled: settings.isEnabled,
             durationSeconds: configuration.duration.seconds,
             loginItem: LoginItemController(),
             onSummon: { [weak self] in self?.showOverlay() },
+            onToggleHotkey: { [weak self] enabled in self?.setHotkeyEnabled(enabled) },
             onOpenSettings: { [weak self] in self?.settingsWindow?.show() },
             onQuit: { NSApp.terminate(nil) }
         )
@@ -86,6 +95,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.panel?.orderOut(nil)
             self?.log("overlay hidden")
         }
+    }
+
+    /// Switches the global hotkey on or off, from either the menu or the
+    /// settings window. The status item is always re-synced from the
+    /// coordinator, because a refused re-enable must stay visually off.
+    private func setHotkeyEnabled(_ enabled: Bool) {
+        guard let settings else { return }
+        switch settings.setEnabled(enabled) {
+        case .enabled(let spec):
+            log("hotkey enabled: \(spec.displayString)")
+        case .disabled:
+            log("hotkey switched off")
+        case .registrationFailed(let reason):
+            log("could not enable hotkey: \(reason)")
+        }
+        statusItem?.setHotkeyEnabled(settings.isEnabled)
     }
 
     private func reportConfiguration() {

@@ -30,16 +30,18 @@ open build/Island.app                       # 后台运行（无日志输出）
 pkill -x Island
 ```
 
-菜单栏 island 图标（点开）提供：`Summon overlay (⌃⌘,)`、当前配置展示（快捷键 + 来源）、`Settings…`（改快捷键）、`Launch at login` 勾选项、`Quit island`。
+菜单栏 island 图标（点开）提供：`Summon overlay (⌃⌘,)`、`Summon hotkey` on/off 勾选项、当前配置展示（快捷键 + 来源）、`Settings…`（录制快捷键 + `Enabled` + `Clear`）、`Launch at login` 勾选项、`Quit island`。
 
-启动日志里 `hotkey registered: ...` 与 `menu bar item installed; launch at login: <status>` 两行可以确认快捷键注册与菜单栏挂载。
+启动日志里 `hotkey registered: ...`（关掉时是 `hotkey is switched off; ...`）与 `menu bar item installed; launch at login: <status>` 两行可以确认快捷键注册与菜单栏挂载。
 
-**快捷键的取值优先级**：应用内设置（`Settings…`，存在 `UserDefaults`）> 环境变量 `ISLAND_HOTKEY` > 内置默认 `cmd+ctrl+,`。
+**快捷键的取值优先级**：应用内设置（`Settings…`，存在 `UserDefaults`）> 环境变量 `ISLAND_HOTKEY` > 内置默认 `cmd+ctrl+,`。快捷键可以整体开关：关掉后不再向系统注册（键位还给其他 app），但配置保留，随时可再打开。开关状态也存在 `UserDefaults`（`IslandHotkeyEnabled`，缺省即开启）。
 
 ```bash
 # 看/改/清用户设置（app 退出后生效；菜单栏里改则立即生效并写入同一处）
 defaults read com.binyanli.island.poc IslandHotkeyText
+defaults read com.binyanli.island.poc IslandHotkeyEnabled
 defaults delete com.binyanli.island.poc IslandHotkeyText   # 回到环境变量或默认
+defaults delete com.binyanli.island.poc IslandHotkeyEnabled   # 回到默认开启
 ```
 
 配置全部走环境变量，无需重新构建：
@@ -81,7 +83,7 @@ defaults delete com.binyanli.island.poc IslandHotkeyText   # 回到环境变量�
 - 覆盖率：`./scripts/coverage.sh` 把**单行百分数**写进 `coverage.txt`；`make verify` 的 coverage gate 先刷新它，再与 `coverage-baseline.txt` 比对（当前基线 `100`，即 `IslandCore` 的 65 行全部被覆盖）
 - 覆盖率排除项声明在 **`coverage.config`**（`llvm-cov -ignore-filename-regex`，一行一条正则），理由如下：
   1. `Tests/`、`\.derived/runner\.swift` —— 测试自身与 SwiftPM 自动生成的测试入口（AGENTS 排除类 1：自动生成的代码）
-  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
+  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `HotkeyRecorderView.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
   - 没有类 3（纯数据结构）、类 4（平台分支）的排除项
 - 增量覆盖率：本 repo 没有可用的 Swift delta-coverage 工具（`xcrun llvm-cov` 没有 diff 模式）。改动达到增量门槛时，用 `xcrun llvm-cov show` 人工核对改动行，并在 commit body 说明；`IslandCore` 的基线是 100%，任何新增未覆盖行都会在下次 `make verify` 里暴露
 
@@ -94,7 +96,7 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   HotkeyConfiguration.swift    #   环境变量取值，非法时回落并上报
   OverlayDuration.swift        #   悬浮窗停留时长，同上
   LoginItem.swift              #   登录项状态 + 菜单勾选/提示的映射
-  HotkeySettings.swift         #   换绑协调器（失败回滚）+ UserDefaults 存储
+  HotkeySettings.swift         #   换绑协调器（失败回滚）+ on/off 开关 + UserDefaults 存储
 Sources/Island/                # 可执行 target：NSApplication / NSPanel / Carbon 装配
   main.swift                   #   入口 + --help / --print-config
   AppDelegate.swift            #   启动、注册 hotkey、显示与自动隐藏
@@ -103,7 +105,8 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
   HotkeyRegistrar.swift        #   Carbon RegisterEventHotKey 包装
   StatusItemController.swift   #   菜单栏图标与菜单
   IslandGlyph.swift            #   菜单栏图标绘制（对应 reference/icon/menubar-icon.svg）
-  HotkeySettingsWindow.swift   #   设置窗口：改快捷键
+  HotkeySettingsWindow.swift   #   设置窗口：录制快捷键 / 开关 / 清空
+  HotkeyRecorderView.swift     #   点击录制：NSEvent -> HotkeySpec
   LoginItemController.swift    #   SMAppService.mainApp 包装
   ResolvedConfiguration.swift  #   环境变量 -> 配置对象
 Tests/IslandCoreTests/         # IslandCore 的行为测试（XCTest）
@@ -146,8 +149,10 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - **快捷键换绑**：`HotkeySettingsCoordinator` 保证"app 不会变成没有可用快捷键"——解析失败什么都不动；macOS 拒绝新键（被别的 app 占用）时会把旧键重新注册回来并提示。改这一块务必保住这条不变量
 - `HotkeySpec.displayString`（`⌃⌘,`，给人看）与 `HotkeySpec.specText`（`ctrl+cmd+,`，可持久化）是两个不同的东西。两者都能被 `parse` 接受，但落盘只写 `specText`
 - 设置窗口是全 app 唯一会主动抢焦点的东西（`NSApp.activate(ignoringOtherApps:)`）。它由用户点菜单触发，属于预期行为；悬浮窗绝不能这样
+- 设置窗口里录快捷键的是 `HotkeyRecorderView`：它成为 first responder 后捕获 `keyDown`，并吞掉 `performKeyEquivalent`，否则 `⌘Q` 之类会被 window/菜单先一步拿走。从 `NSEvent` 到 `HotkeySpec` 的映射在 `HotkeySpec.captured`（IslandCore，有测试）
+- 快捷键 on/off 关闭时 `HotkeySettingsCoordinator.isEnabled == false`，不再注册全局键，但 `current` 与落盘配置都保留；重新打开会重新注册，被系统拒绝则保持关闭并在 UI 提示（不会假装成功）
 - 菜单栏图标有**两处真源**：设计资产在 `hai/reference/icon/menubar-icon.svg`，运行时绘制在 `Sources/Island/IslandGlyph.swift`。改图标必须同时改（AGENTS.md 禁止 reference 被编译或作为运行时依赖，所以不能直接读那个 SVG）
-- 应用内改快捷键立即生效并写 `UserDefaults`（key `IslandHotkeyText`）；直接用 `defaults write` 改则要重启 app 才生效
+- 应用内改快捷键立即生效并写 `UserDefaults`（key `IslandHotkeyText`）；开关状态写 `IslandHotkeyEnabled`（缺省开启）。直接用 `defaults write` 改则要重启 app 才生效
 - 检查登录项是否真的注册了：`sfltool dumpbtm | grep -iA6 "Name: island"`（`Disposition: [enabled, ...]` 即已启用）
 - `.app` 是 ad-hoc 签名（`codesign --sign -`）的，本地运行足够；重新构建后必须重新签名，`scripts/build-app.sh` 每次都会重签
 - 先跑 `swift test`（不带 `--enable-code-coverage`）会让 `.build` 里的二进制失去插桩，之后直接调 `llvm-cov` 会报 `no coverage data found`。覆盖率只走 `scripts/coverage.sh`

@@ -9,7 +9,9 @@
 - 按 `⌃⌘,` 全局召唤屏幕顶部中央的悬浮窗，**不需要任何系统权限授权**（不弹输入监控 / 辅助功能对话框）
 - 悬浮窗 5 秒后自动消失，时长可配置；重复召唤会重置计时
 - 悬浮窗不抢焦点，也不会出现在窗口切换器里
-- 菜单栏常驻一个 island 图标：一眼看出它在跑，可手动召唤、改快捷键、切换开机自启、退出
+- 菜单栏常驻一个 island 图标：一眼看出它在跑，可手动召唤、开关召唤快捷键、改快捷键、切换开机自启、退出
+- 快捷键可以随时 on / off：关掉后键位还给系统，配置仍然保留，随时可以再打开
+- 改快捷键时直接**按组合键录制**（不用记语法），并有一键 `Clear` 清空
 - 支持开机 / 登录自启（`SMAppService`，可在系统设置的登录项里关掉）
 - 构建与运行只需要本机 Xcode，**不需要 Apple Developer 账号**（ad-hoc 签名）
 
@@ -34,17 +36,23 @@ open build/Island.app       # 启动，无日志输出
 
 ## 配置快捷键
 
-两种方式，**应用内设置优先**：
+菜单栏图标 → `Settings…`：点一下录制框，直接按下想要的组合键即可录入（至少含一个 `⌘⌃⌥⇧` 修饰键）。`Apply` 立即生效并记住；`Clear` 清空并关掉快捷键；`Reset to default` 回到内置默认。失败的换绑会自动保留旧快捷键。
+
+快捷键也可以随时停用：录制框上方的 `Enabled` 勾选框、菜单里的 `Summon hotkey` 勾选项，效果一致（关掉后配置保留，随时可再打开）。
+
+另外两种方式，**应用内设置优先**：
 
 | 方式 | 说明 |
 |---|---|
-| 菜单栏图标 → `Settings…` | 立即生效并记住；非法输入会当场提示，改坏了会自动保留旧快捷键 |
+| 菜单栏图标 → `Settings…` | 立即生效并记住；非法组合会当场提示，改坏了会自动保留旧快捷键 |
 | 环境变量 `ISLAND_HOTKEY` | 启动时读取，适合一次性试用；被应用内设置覆盖 |
 
 内置默认是 `cmd+ctrl+,`。清掉应用内设置即回到环境变量或默认：
 
 ```bash
+# 恢复默认快捷键，并重新打开
 defaults delete com.binyanli.island.poc IslandHotkeyText
+defaults delete com.binyanli.island.poc IslandHotkeyEnabled
 ```
 
 ## 配置
@@ -63,8 +71,9 @@ defaults delete com.binyanli.island.poc IslandHotkeyText
 | 菜单项 | 作用 |
 |---|---|
 | `Summon overlay (⌃⌘,)` | 手动召唤一次（快捷键之外的备用入口） |
-| `hotkey ⌃⌘, · default` | 当前快捷键及其来源（应用内设置 / 环境变量 / 默认） |
-| `Settings…` | 改快捷键 |
+| `Summon hotkey` | 召唤快捷键的 on / off 开关，勾选状态即真实状态 |
+| `hotkey ⌃⌘, · default` | 当前快捷键及其来源（应用内设置 / 环境变量 / 默认），关掉时显示 `hotkey off` |
+| `Settings…` | 录制快捷键、开关、清空 |
 | `Launch at login` | 开机自启开关，勾选状态即系统真实状态 |
 | `Quit island` | 退出 |
 
@@ -78,7 +87,7 @@ defaults delete com.binyanli.island.poc IslandHotkeyText
 
 关闭自启后，也可以在「系统设置 → 通用 → 登录项」里确认。
 
-modifier 可写 `cmd`/`command`/`⌘`、`ctrl`/`control`/`⌃`、`opt`/`option`/`alt`/`⌥`、`shift`/`⇧`；key 是 US 布局的单字符，或 `space` / `tab` / `return` / `escape`。
+modifier 可写 `cmd`/`command`/`⌘`、`ctrl`/`control`/`⌃`、`opt`/`option`/`alt`/`⌥`、`shift`/`⇧`；key 是 US 布局的单字符，或 `space` / `tab` / `return` / `escape`（这条语法只有写环境变量 / `defaults` 时才需要，应用内录制不涉及）。
 
 ```bash
 ISLAND_HOTKEY=cmd+shift+k ISLAND_OVERLAY_SECONDS=2 ./build/Island.app/Contents/MacOS/Island

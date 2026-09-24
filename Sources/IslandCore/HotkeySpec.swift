@@ -100,6 +100,19 @@ extension HotkeySpec {
         return .success(HotkeySpec(keyLabel: keyLabel, keyCode: keyCode, modifiers: modifiers))
     }
 
+    /// Builds a spec from a raw key press — what the settings recorder gets
+    /// from `NSEvent`. The key code is the US-layout virtual key code
+    /// (`NSEvent.keyCode`, same numbering as Carbon's `kVK_ANSI_*`).
+    ///
+    /// Returns nil when the key is not bindable or no modifier is held: a bare
+    /// key would swallow that key system-wide, which is never what the user
+    /// wants from a global hotkey.
+    public static func captured(keyCode: UInt32, modifiers: Set<Modifier>) -> HotkeySpec? {
+        guard !modifiers.isEmpty else { return nil }
+        guard let keyLabel = keyLabelsByCode[keyCode] else { return nil }
+        return HotkeySpec(keyLabel: keyLabel, keyCode: keyCode, modifiers: modifiers)
+    }
+
     /// Turns the compact form into the explicit one: `⌃⌘,` -> `⌃+⌘+,`. Without
     /// this, the string `displayString` produces could not be fed back in.
     private static func expanded(_ text: String) -> String {
@@ -124,4 +137,10 @@ extension HotkeySpec {
         "return": 36, "l": 37, "j": 38, "'": 39, "k": 40, ";": 41, "\\": 42, ",": 43,
         "/": 44, "n": 45, "m": 46, ".": 47, "tab": 48, "space": 49, "`": 50, "escape": 53,
     ]
+
+    /// Reverse of `virtualKeyCodes`, for capture. Derived rather than written
+    /// out so the two can never drift apart.
+    private static let keyLabelsByCode: [UInt32: String] = Dictionary(
+        uniqueKeysWithValues: virtualKeyCodes.map { ($0.value, $0.key) }
+    )
 }

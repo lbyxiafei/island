@@ -91,4 +91,41 @@ final class HotkeySpecTests: XCTestCase {
         XCTAssertEqual(try HotkeySpec.parse("⌘+⌥+⇧+⌃+,").specText, "ctrl+opt+shift+cmd+,")
         XCTAssertEqual(try HotkeySpec.parse("cmd+ctrl+space").specText, "ctrl+cmd+space")
     }
+
+    // MARK: - Capture (what the settings recorder hands us)
+
+    func testCapturedBuildsSpecFromKeyCodeAndModifiers() {
+        XCTAssertEqual(
+            HotkeySpec.captured(keyCode: 43, modifiers: [.command, .control]),
+            try? HotkeySpec.parse("cmd+ctrl+,")
+        )
+    }
+
+    /// A bare key would swallow that key system-wide, so capture refuses it.
+    func testCapturedRejectsAKeyWithoutModifiers() {
+        XCTAssertNil(HotkeySpec.captured(keyCode: 40, modifiers: []))
+    }
+
+    func testCapturedRejectsAnUnknownKeyCode() {
+        XCTAssertNil(HotkeySpec.captured(keyCode: 255, modifiers: [.command]))
+    }
+
+    /// Every bindable key must survive key-code capture; this is what keeps the
+    /// reverse table honest when a key is added or removed.
+    func testCapturedRoundTripsForEveryBindableKey() throws {
+        let labels = [
+            "a", "s", "d", "f", "h", "g", "z", "x", "c", "v", "b", "q", "w", "e", "r",
+            "y", "t", "1", "2", "3", "4", "6", "5", "=", "9", "7", "-", "8", "0", "]",
+            "o", "u", "[", "i", "p", "return", "l", "j", "'", "k", ";", "\\", ",",
+            "/", "n", "m", ".", "tab", "space", "`", "escape",
+        ]
+        for label in labels {
+            let spec = try HotkeySpec.parse("cmd+\(label)")
+            XCTAssertEqual(
+                HotkeySpec.captured(keyCode: spec.keyCode, modifiers: [.command]),
+                spec,
+                "key: \(label)"
+            )
+        }
+    }
 }
