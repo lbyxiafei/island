@@ -18,6 +18,7 @@ if arguments.contains("--help") || arguments.contains("-h") {
         flags (login-item flags must run from inside the app bundle):
           --print-config                  resolve the environment and exit
           --scan-agents                   list completed agent tasks and exit
+          --reopen-plan <pid>             print how island would reopen a task on that pid
           --login-item-status             report the launch-at-login state
           --login-item-enable             start at login from now on
           --login-item-disable            stop starting at login
@@ -50,7 +51,7 @@ if arguments.contains("--login-item-enable") || arguments.contains("--login-item
 }
 
 if arguments.contains("--scan-agents") {
-    let tasks = AgentActivityScanner.standard().completedTasks()
+    let tasks = AgentActivityScanner.standard(sqlite: ProcessSQLiteQuerying()).completedTasks()
     if tasks.isEmpty {
         print("no completed agent tasks found")
     } else {
@@ -61,6 +62,23 @@ if arguments.contains("--scan-agents") {
             )
         }
     }
+    exit(EXIT_SUCCESS)
+}
+
+if let flag = CommandLine.arguments.firstIndex(of: "--reopen-plan"),
+    flag + 1 < CommandLine.arguments.count,
+    let pid = Int32(CommandLine.arguments[flag + 1])
+{
+    let task = AgentTask(
+        agent: .claudeCode,
+        sessionID: "debug",
+        title: "debug",
+        cwd: nil,
+        completedAt: Date(),
+        host: .terminal(processID: pid),
+        resumeCommand: "claude --resume debug"
+    )
+    print(AgentReopenExecutor().plan(for: task))
     exit(EXIT_SUCCESS)
 }
 

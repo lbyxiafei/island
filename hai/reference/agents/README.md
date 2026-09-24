@@ -63,15 +63,30 @@ AgentTask                               # 统一模型，UI 只认这个
 
 | 项 | 值 |
 |---|---|
-| 完成信号 | rollout jsonl 里 `event_msg` → `payload.type == "task_complete"`（带 `last_agent_message`） |
-| rollout | `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<threadId>.jsonl` |
-| 目录索引 | `~/.codex/session_index.jsonl`：`{"id","thread_name","updated_at"}` —— 现成的 id + 标题 + 时间 |
-| 身份 | `threadId` |
-| 标题 | `session_index.jsonl` 的 `thread_name` |
-| 宿主 | 桌面：`ChatGPT.app`（进程 `codex app-server`）；CLI：同 `claude` 思路 |
-| resume | CLI `codex resume <id>`；桌面直接激活 `ChatGPT.app` |
+| **完成信号（权威）** | `~/.codex/thread_history_1.sqlite` 的 `thread_turns.status == 'completed'`，带 `completed_at`（秒） |
+| **任务元数据** | `~/.codex/state_5.sqlite` 的 `threads` 表：`id` / `name`（短标题）/ `title`（首条 user message）/ `cwd` / `updated_at_ms` / `source` / `archived` |
+| 轻量索引（兜底） | `~/.codex/session_index.jsonl`：`{"id","thread_name","updated_at"}` |
+| 身份 | `threads.id`（= `thread_turns.thread_id`） |
+| 标题 | `threads.name`，没有时用 `title`，再没有用 `cwd` basename |
+| 宿主 | 桌面 `ChatGPT.app`（bundle id `com.openai.codex`）；CLI 同样写这张表（`source='vscode'`） |
+| resume | `codex resume <id>` |
 
-实测 `session_index.jsonl` 里线程只到 2026-09-11，而桌面 app 明显还在用（`ChatGPT.app` 常驻）——**桌面版的活动可能没写进这个 index**，需要补查 `state_5.sqlite` / `thread_history_1.sqlite`。
+实测可用的查询（两个库靠 `attach` 连起来，`sqlite3 -json` 直出 JSON，省得处理分隔符）：
+
+```sql
+attach database '~/.codex/thread_history_1.sqlite' as history;
+select threads.id as id, threads.name as name, threads.title as title,
+       threads.cwd as cwd, max(history.thread_turns.completed_at) as completed_at
+from history.thread_turns
+join threads on threads.id = history.thread_turns.thread_id
+where history.thread_turns.status = 'completed'
+group by threads.id
+order by completed_at desc limit 100;
+```
+
+**坑（重要）**：这两个库用 `sqlite3 -readonly` 打不开（`unable to open database file (14)`，WAL 无法在只读连接下恢复）；去掉 `-readonly`、只跑 SELECT 即可。实测 `thread_turns.status` 取值只有 `completed`(857) 与 `interrupted`(2)。
+
+> 说明：截至调研时，`threads` 里最新的线程也是 2026-09-11，`source` 全是 `vscode`。即**本机最近没用过 Codex 桌面版**，所以桌面路径无法用真实新数据验证；实现用的是同一张表，桌面线程只是 `source` 不同。
 
 ## 4. Claude 桌面版
 
@@ -86,7 +101,7 @@ AgentTask                               # 统一模型，UI 只认这个
 
 ## 6. 未决问题（下一轮调研）
 
-- Codex 桌面版的活动到底落在哪张 sqlite，是否有「turn 完成」时间戳
-- Claude 桌面版有没有可读的本地任务状态（否则只能 computer use）
+- ~~Codex 桌面版的活动到底落在哪张 sqlite~~ → 已解决，见 § 3
+- Claude 桌面版有没有可读的本地任务状态（目前结论：没有，只能 computer use）
 - 非 tmux 终端窗口的定位手段（iTerm2 AppleScript 的 session 匹配、Ghostty 未来是否有 CLI）
 - 一个 agent 在 VS Code 内运行时，如何把焦点给到正确 terminal 面板

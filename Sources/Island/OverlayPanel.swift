@@ -26,6 +26,14 @@ final class OverlayPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
+    /// Grows/shrinks with the number of tasks shown, keeping the top edge put.
+    func setContentSize(width: CGFloat, height: CGFloat) {
+        var frame = self.frame
+        frame.size = NSSize(width: width, height: height)
+        setFrame(frame, display: true)
+        positionNearTopOfScreen()
+    }
+
     /// Centered horizontally, near the top of the screen — the "island" spot.
     func positionNearTopOfScreen() {
         guard let screen = NSScreen.main else { return }

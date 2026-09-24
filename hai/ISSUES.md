@@ -4,10 +4,10 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
-| feat | [mvp-open-or-focus-task](./issue/2026-09-24-15-28-55-mvp-open-or-focus-task.md) | MVP: 点击任务回到宿主窗口 / 兜底贴 clipboard | new | 2026-09-24T15:28:55-07:00 | 2026-09-24T15:34:10-07:00 |
-| feat | [mvp-overlay-task-list](./issue/2026-09-24-15-28-55-mvp-overlay-task-list.md) | MVP: 悬浮窗展示任务列表 + 未读红点 | new | 2026-09-24T15:28:55-07:00 | 2026-09-24T15:34:10-07:00 |
-| chore | [mvp-desktop-agent-sources](./issue/2026-09-24-15-28-57-mvp-desktop-agent-sources.md) | MVP: 调研 Codex 桌面版与 Claude 桌面版的活动数据源 | new | 2026-09-24T15:28:57-07:00 | 2026-09-24T15:34:10-07:00 |
 | chore | [brew-distribution](./issue/2026-09-13-14-20-51-brew-distribution.md) | 调研 brew install 分发路径（等本地 MVP 走通后再做） | new | 2026-09-13T14:20:51-07:00 | 2026-09-13T14:20:51-07:00 |
+| feat | [mvp-open-or-focus-task](./issue/2026-09-24-15-28-55-mvp-open-or-focus-task.md) | MVP: 点击任务回到宿主窗口 / 兜底贴 clipboard | solved | 2026-09-24T15:28:55-07:00 | 2026-09-24T15:48:00-07:00 |
+| feat | [mvp-overlay-task-list](./issue/2026-09-24-15-28-55-mvp-overlay-task-list.md) | MVP: 悬浮窗展示任务列表 + 未读红点 | solved | 2026-09-24T15:28:55-07:00 | 2026-09-24T15:48:00-07:00 |
+| chore | [mvp-desktop-agent-sources](./issue/2026-09-24-15-28-57-mvp-desktop-agent-sources.md) | MVP: 调研 Codex 桌面版与 Claude 桌面版的活动数据源 | solved | 2026-09-24T15:28:57-07:00 | 2026-09-24T15:48:00-07:00 |
 | feat | [mvp-agent-detection-core](./issue/2026-09-24-15-28-55-mvp-agent-detection-core.md) | MVP: 统一 agent 任务检测内核（Claude Code / pi / Codex） | solved | 2026-09-24T15:28:55-07:00 | 2026-09-24T15:34:10-07:00 |
 | feat | [mvp-menubar-unread-badge](./issue/2026-09-24-15-28-55-mvp-menubar-unread-badge.md) | MVP: menu bar 未读任务数角标 | solved | 2026-09-24T15:28:55-07:00 | 2026-09-24T15:34:10-07:00 |
 | bug | [hotkey-should-hide-overlay](./issue/2026-09-24-13-58-41-hotkey-should-hide-overlay.md) | 快捷键只能召唤悬浮窗，再次按下无法 toggle off | solved | 2026-09-24T13:58:41-07:00 | 2026-09-24T14:00:00-07:00 |

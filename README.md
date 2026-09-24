@@ -6,8 +6,11 @@
 
 ## 现在能做什么
 
-- **检测本机已完成的 agent run**：支持 Claude Code（terminal）、pi（terminal）、Codex，完成信号、任务身份、标题、宿主进程的调研见 `hai/reference/agents/README.md`
-- 菜单栏图标右侧显示**未读任务数**；只统计 island 启动之后完成的 run，不看历史
+- **检测本机已完成的 agent run**：支持 Claude Code（terminal）、pi（terminal）、Codex（CLI + 桌面）；完成信号、任务身份、标题、宿主进程的调研见 `hai/reference/agents/README.md`
+- 任务完成时自动弹出悬浮窗，里面是任务列表（未读优先，未读左侧有红点）；hover 会暂停自动隐藏
+- 点击任务跳回它：tmux 就选中对应 window/pane 并激活终端，桌面 app 就激活对应应用，无法精确定位时把 resume 命令（如 `claude --resume <id>`）贴到剪贴板；点过后红点消失但条目保留
+- 菜单栏图标右侧显示**未读任务数**，菜单里也有一份同样的任务列表（点击即跳回）
+- 只统计 island 启动之后完成的 run，不看历史
 - 按 `⌃⌘,` 全局召唤屏幕顶部中央的悬浮窗，**不需要任何系统权限授权**（不弹输入监控 / 辅助功能对话框）；悬浮窗显示期间再按一次即可立即收起（toggle）
 - 悬浮窗 5 秒后自动消失，时长可配置；重复召唤会重置计时
 - 悬浮窗不抢焦点，也不会出现在窗口切换器里
@@ -73,7 +76,10 @@ defaults delete com.binyanli.island.poc IslandHotkeyEnabled
 
 ```bash
 ./build/Island.app/Contents/MacOS/Island --scan-agents
+./build/Island.app/Contents/MacOS/Island --reopen-plan <pid>   # 某个 agent 进程会被怎么跳回
 ```
+
+任务条数用 `ISLAND_TASK_LIMIT` 调，默认 10。
 
 ## 菜单栏
 

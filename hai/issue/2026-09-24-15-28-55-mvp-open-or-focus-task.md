@@ -2,29 +2,44 @@
 type: feat
 name: mvp-open-or-focus-task
 title: "MVP: 点击任务回到宿主窗口 / 兜底贴 clipboard"
-status: new
+status: solved
 created_ts: 2026-09-24T15:28:55-07:00
-updated_ts: 2026-09-24T15:34:10-07:00
+updated_ts: 2026-09-24T15:48:00-07:00
 ---
 
-Scope-check: PLAN § Scope / VERSION — MVP；PLAN § Design / Agents 交互 interface 第 3 条。
+Scope-check: PLAN § Scope / VERSION — MVP；PLAN § Design / Agents 交互 interface 第 3 条。授权来源：用户会话指令「把未完成的 issues 都自主处理了」。
 
-## 背景
+## 实现
 
-`AgentTask` 已经带 `host`（`.terminal(processID)` / `.desktop(bundleID)` / `.unknown`）与 `resumeCommand`。缺的是「点一下真的回到那个任务」。
+可测的决策层 `IslandCore/AgentReopen.swift`：
 
-## 调研结论（详见 `hai/reference/agents/README.md`）
+- `ProcessTree.parse` / `ancestors(of:in:)`：吃 `ps -axo pid=,ppid=`，沿父进程链上溯（到 launchd 停，带环保护）
+- `TmuxPane.parse`：吃 `tmux list-panes -a -F '#{pane_pid} #{session_name}:#{window_index}.#{pane_index}'`
+- `AgentReopen.plan(for:processNodes:tmuxPanes:)`：agent pid 的祖先链命中某个 pane → `.focusTmux`；否则桌面 host → `.activateApp`；否则 `.copyToClipboard(resumeCommand)`；都没有 → `.nothing`
 
-1. **tmux 最靠谱**：本机 Claude Code 全部是 `claude → zsh → tmux`。可由 pid 沿父进程链上溯到 tmux，再 `tmux list-panes -a -F '#{pane_pid} ...'` 反查到 `session:window.pane`，`tmux select-window/select-pane` 之后激活终端 app。pane 标题已经带 claude 会话标题，可直接复用
-2. **桌面 app**：按 bundle id 激活（`com.openai.codex` / `com.anthropic.claudefordesktop`）
-3. **非 tmux 终端**：Ghostty 无脚本接口，Terminal/iTerm2 的 AppleScript 定位不到具体 tab，VS Code 内终端无法可靠定位 → 一律把 `resumeCommand` 贴到 clipboard
+执行层 `Sources/Island/AgentReopenExecutor.swift`：
 
-## 期望结果
+- `.focusTmux`：`tmux select-window` + `select-pane`，再找出 tmux client 的祖先里第一个真实 GUI app（`NSRunningApplication`）并激活；找不到就按 Ghostty / Terminal / iTerm2 / Warp / VS Code 的顺序激活
+- `.activateApp`：未运行就 `NSWorkspace.openApplication`
+- `.copyToClipboard`：`NSPasteboard`
+- tmux 路径按 `/opt/homebrew` → `/usr/local` → `/opt/local` → `/usr/bin` 探测（`open` 启动的 app 没有 Homebrew PATH）
 
-- 点击 task：优先「精确聚焦」（tmux pane / 桌面 app），做不到就激活兜底 app，再做不到就 `resumeCommand` → clipboard，并给用户一句反馈
-- 每种情况都要有明确 fallback 链，不能点了没反应
+## 验证
+
+- 单元测试 `AgentReopenTests`：tmux 命中 / 无 tmux 兑底 clipboard / terminal 无 resume / 桌面 app / unknown，以及 `ps`、`tmux` 输出的解析与环保护
+- 真机：新增调试命令 `--reopen-plan <pid>`，对 5 个真实 claude 进程的输出与 `tmux list-panes` 完全对应：
+
+```
+83859 -> focusTmux(windowTarget: "island:1",   paneTarget: "island:1.1")
+11639 -> focusTmux(windowTarget: "job:3",      paneTarget: "job:3.1")
+ 9408 -> focusTmux(windowTarget: "job:1",      paneTarget: "job:1.1")
+43569 -> focusTmux(windowTarget: "job:2",      paneTarget: "job:2.1")
+14052 -> focusTmux(windowTarget: "dalaoshi:1", paneTarget: "dalaoshi:1.1")
+```
+
+- 未验证：真正的 `select-window` + 激活终端（会抢焦点，不适合在无头环境自动跑，会打扰用户）。**请验收时实际点一个 Claude Code 任务**，确认 tmux 切过去了。
 
 ## 备注
 
-- 需要研究 `NSWorkspace` / `NSRunningApplication` 激活的正确姿势（accessory app 激活别的 app 有额外限制）
-- 需要把「pid → tmux target」做成可测的纯逻辑（父进程链解析吃 `ps`/`sysctl` 输出）
+- 非 tmux 终端（Ghostty 本身 / VS Code 内终端）仍然只能兑底 clipboard —— 与 PLAN 认可的 second best 一致
+- `.focusTmux` 后若 tmux 客户端在多个终端里 attach，激活的是祖先链里第一个 app，不保证是最前台的那个

@@ -383,7 +383,7 @@ final class CodexActivitySourceTests: XCTestCase {
             {"id":"01d","thread_name":"no time"}
             """
 
-        let tasks = CodexActivitySource.parseIndex(index)
+        let tasks = CodexIndexActivitySource.parseIndex(index)
 
         XCTAssertEqual(tasks.map(\.sessionID), ["01a", "01b", "01c"])
         XCTAssertEqual(tasks.first?.title, "评估 AI 玩游戏")
@@ -401,7 +401,7 @@ final class CodexActivitySourceTests: XCTestCase {
                 to: directory.appendingPathComponent("session_index.jsonl"), atomically: true,
                 encoding: .utf8)
 
-        let tasks = CodexActivitySource.standard(home: home).completedTasks()
+        let tasks = CodexIndexActivitySource.standard(home: home).completedTasks()
 
         XCTAssertEqual(tasks.map(\.sessionID), ["x"])
     }
@@ -409,7 +409,92 @@ final class CodexActivitySourceTests: XCTestCase {
     func testCompletedTasksWithoutAnIndexFile() throws {
         let home = try makeTempHome()
 
-        XCTAssertTrue(CodexActivitySource.standard(home: home).completedTasks().isEmpty)
+        XCTAssertTrue(CodexIndexActivitySource.standard(home: home).completedTasks().isEmpty)
+    }
+
+    // MARK: - Turn history (SQLite)
+
+    func testParsesTurnHistoryRows() throws {
+        let json = """
+            [
+              {"id":"01a","name":"评估 AI 玩游戏","title":"你有办法玩游戏吗","cwd":"/Users/x/Repos/compounding","completed_at":1789162387},
+              {"id":"01b","name":null,"title":"raw first message","cwd":"/tmp","completed_at":1789162388},
+              {"id":"01c","name":"","title":"","cwd":null,"completed_at":1789162389},
+              {"id":"01d","name":"no time","cwd":"/tmp"},
+              {"name":"no id","completed_at":1},
+              "not an object"
+            ]
+            """
+
+        let tasks = CodexTurnActivitySource.parse(json)
+
+        XCTAssertEqual(tasks.map(\.sessionID), ["01a", "01b", "01c"])
+        XCTAssertEqual(
+            tasks.map(\.title), ["评估 AI 玩游戏", "raw first message", "(untitled)"])
+        XCTAssertEqual(tasks.first?.cwd, "/Users/x/Repos/compounding")
+        XCTAssertEqual(tasks.first?.resumeCommand, "codex resume 01a")
+        XCTAssertEqual(
+            tasks.first?.completedAt, Date(timeIntervalSince1970: 1_789_162_387))
+    }
+
+    func testTurnHistoryRejectsGarbage() {
+        XCTAssertTrue(CodexTurnActivitySource.parse("").isEmpty)
+        XCTAssertTrue(CodexTurnActivitySource.parse("not json").isEmpty)
+        XCTAssertTrue(CodexTurnActivitySource.parse(#"{"a":1}"#).isEmpty)
+    }
+
+    func testTurnSourceAsksTheRunnerForJoinedRows() {
+        let runner = StubSQLite(rows: #"[{"id":"t","name":"n","cwd":"/tmp","completed_at":5}]"#)
+        let source = CodexTurnActivitySource(
+            threadsDatabase: URL(fileURLWithPath: "/tmp/threads.sqlite"),
+            historyDatabase: URL(fileURLWithPath: "/tmp/history.sqlite"),
+            runner: runner
+        )
+
+        XCTAssertEqual(source.completedTasks().map(\.sessionID), ["t"])
+        XCTAssertTrue(runner.lastSQL?.contains("attach database") == true)
+        XCTAssertTrue(runner.lastSQL?.contains("'/tmp/history.sqlite'") == true)
+    }
+
+    func testTurnSourceIsEmptyWhenTheRunnerCannotRead() {
+        let source = CodexTurnActivitySource(
+            threadsDatabase: URL(fileURLWithPath: "/tmp/threads.sqlite"),
+            historyDatabase: URL(fileURLWithPath: "/tmp/history.sqlite"),
+            runner: StubSQLite(rows: nil)
+        )
+
+        XCTAssertTrue(source.completedTasks().isEmpty)
+    }
+
+    func testTurnsWinOverTheIndex() throws {
+        let home = try makeTempHome()
+        let directory = home.appendingPathComponent(".codex")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try #"{"id":"from-index","thread_name":"i","updated_at":"2026-09-11T21:32:17Z"}"#
+            .write(
+                to: directory.appendingPathComponent("session_index.jsonl"), atomically: true,
+                encoding: .utf8)
+        let source = CodexActivitySource.standard(
+            home: home,
+            sqlite: StubSQLite(
+                rows: #"[{"id":"from-turns","name":"t","cwd":"/tmp","completed_at":5}]"#)
+        )
+
+        XCTAssertEqual(source.completedTasks().map(\.sessionID), ["from-turns"])
+    }
+
+    func testIndexIsUsedWhenThereAreNoTurns() throws {
+        let home = try makeTempHome()
+        let directory = home.appendingPathComponent(".codex")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try #"{"id":"from-index","thread_name":"i","updated_at":"2026-09-11T21:32:17Z"}"#
+            .write(
+                to: directory.appendingPathComponent("session_index.jsonl"), atomically: true,
+                encoding: .utf8)
+
+        let source = CodexActivitySource.standard(home: home, sqlite: StubSQLite(rows: "[]"))
+
+        XCTAssertEqual(source.completedTasks().map(\.sessionID), ["from-index"])
     }
 
     private func makeTempHome() throws -> URL {
@@ -448,6 +533,21 @@ final class AgentActivityScannerTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: home) }
 
         XCTAssertEqual(AgentActivityScanner.standard(home: home).completedTasks(), [])
+    }
+}
+
+private struct StubSQLite: SQLiteQuerying {
+    let rows: String?
+    // `nonisolated(unsafe)` would be needed for a class; a fresh value per test
+    // keeps this a plain box.
+    final class Box: @unchecked Sendable { var sql: String? }
+    let box = Box()
+
+    var lastSQL: String? { box.sql }
+
+    func query(database: URL, sql: String) -> String? {
+        box.sql = sql
+        return rows
     }
 }
 

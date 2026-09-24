@@ -12,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: StatusItemController?
     private var monitor: AgentMonitor?
     private var inbox: AgentInbox?
+    private var overlayContent: OverlayContentView?
+    private let reopenExecutor = AgentReopenExecutor()
     private var hideTask: Task<Void, Never>?
 
     init(configuration: ResolvedConfiguration) {
@@ -22,13 +24,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         reportConfiguration()
 
-        let panel = OverlayPanel(
-            contentView: OverlayContent.makeView(
-                hotkey: configuration.hotkey.spec,
-                duration: configuration.duration
+        let content = OverlayContentView(
+            frame: NSRect(
+                x: 0, y: 0,
+                width: OverlayContentView.width,
+                height: OverlayContentView.emptyHeight
             )
         )
-        self.panel = panel
+        content.onSelect = { [weak self] entry in self?.selectTask(entry) }
+        content.onHoverChange = { [weak self] hovering in self?.setOverlayHovered(hovering) }
+        overlayContent = content
+        self.panel = OverlayPanel(contentView: content)
 
         let registrar = HotkeyRegistrar { [weak self] in
             MainActor.assumeIsolated {
@@ -74,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             loginItem: LoginItemController(),
             onSummon: { [weak self] in self?.showOverlay() },
             onToggleHotkey: { [weak self] enabled in self?.setHotkeyEnabled(enabled) },
+            onSelectTask: { [weak self] id in self?.selectTask(id: id) },
             onOpenSettings: { [weak self] in self?.settingsWindow?.show() },
             onQuit: { NSApp.terminate(nil) }
         )
@@ -91,13 +98,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func startAgentMonitor() {
         let inbox = AgentInbox(limit: configuration.taskLimit)
         self.inbox = inbox
-        let monitor = AgentMonitor(scanner: .standard(), inbox: inbox) { [weak self] in
-            guard let count = self?.inbox?.unreadCount else { return }
-            self?.statusItem?.setUnreadCount(count)
-            self?.log("agent tasks: \(count) unread, \(inbox.allEntries.count) tracked")
+        let monitor = AgentMonitor(
+            scanner: .standard(sqlite: ProcessSQLiteQuerying()), inbox: inbox
+        ) { [weak self] in
+            // PLAN § Goal: a finished run pops the overlay with its summary.
+            self?.refreshAgentUI()
+            self?.showOverlay()
         }
         self.monitor = monitor
         monitor.start()
+        refreshAgentUI()
+    }
+
+    /// Pushes the inbox into the three places it shows up: the menu bar badge,
+    /// the overlay list, and the menu's task section.
+    private func refreshAgentUI() {
+        guard let inbox else { return }
+        let entries = inbox.visibleEntries
+        statusItem?.setUnreadCount(inbox.unreadCount)
+        statusItem?.setTasks(entries)
+        overlayContent?.update(
+            entries: entries,
+            unread: inbox.unreadCount,
+            limit: inbox.limit,
+            hotkey: configuration.hotkey.spec
+        )
+        panel?.setContentSize(
+            width: OverlayContentView.width,
+            height: OverlayContentView.height(forEntryCount: entries.count, limit: inbox.limit)
+        )
+        log("agent tasks: \(inbox.unreadCount) unread, \(inbox.allEntries.count) tracked")
+    }
+
+    // MARK: - Task selection
+
+    private func selectTask(id: String) {
+        guard let entry = inbox?.allEntries.first(where: { $0.id == id }) else { return }
+        selectTask(entry)
+    }
+
+    /// PLAN § Design: opening a task marks it read (the red dot clears, the row
+    /// stays) and then does its best to put the user back in that session.
+    private func selectTask(_ entry: AgentInbox.Entry) {
+        inbox?.markRead(id: entry.id)
+        refreshAgentUI()
+        let action = reopenExecutor.plan(for: entry.task)
+        reopenExecutor.perform(action)
+        log("selected \(entry.task.title) -> \(action)")
     }
 
     private func showOverlay() {
@@ -105,8 +152,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.positionNearTopOfScreen()
         panel.orderFrontRegardless()
         log("overlay shown, hiding in \(configuration.duration.seconds)s")
+        scheduleHide()
+    }
 
-        let seconds = configuration.duration.seconds
+    /// Hovering the overlay pauses the auto-hide so the list stays clickable;
+    /// leaving restarts it.
+    private func setOverlayHovered(_ hovering: Bool) {
+        if hovering {
+            hideTask?.cancel()
+            hideTask = nil
+        } else if panel?.isVisible == true {
+            scheduleHide()
+        }
+    }
+
+    private func scheduleHide(after seconds: TimeInterval? = nil) {
+        let seconds = seconds ?? configuration.duration.seconds
         hideTask?.cancel()
         hideTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(seconds))

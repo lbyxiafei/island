@@ -89,7 +89,7 @@ defaults delete com.binyanli.island.poc IslandHotkeyEnabled   # 回到默认开�
 - 覆盖率：`./scripts/coverage.sh` 把**单行百分数**写进 `coverage.txt`；`make verify` 的 coverage gate 先刷新它，再与 `coverage-baseline.txt` 比对（当前基线 `100`，即 `IslandCore` 的 65 行全部被覆盖）
 - 覆盖率排除项声明在 **`coverage.config`**（`llvm-cov -ignore-filename-regex`，一行一条正则），理由如下：
   1. `Tests/`、`\.derived/runner\.swift` —— 测试自身与 SwiftPM 自动生成的测试入口（AGENTS 排除类 1：自动生成的代码）
-  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
+  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift` / `AgentReopenExecutor.swift` / `ProcessSQLite.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
   - 没有类 3（纯数据结构）、类 4（平台分支）的排除项
 - 增量覆盖率：本 repo 没有可用的 Swift delta-coverage 工具（`xcrun llvm-cov` 没有 diff 模式）。改动达到增量门槛时，用 `xcrun llvm-cov show` 人工核对改动行，并在 commit body 说明；`IslandCore` 的基线是 100%，任何新增未覆盖行都会在下次 `make verify` 里暴露
 
@@ -105,13 +105,17 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   LoginItem.swift              #   登录项状态 + 菜单勾选/提示的映射
   HotkeySettings.swift         #   换绑协调器（失败回滚）+ on/off 开关 + UserDefaults 存储
   AgentTask.swift              #   统一任务模型（agent / sessionID / title / cwd / completedAt / host / resume）
-  AgentActivity.swift          #   三种 agent 的落盘解析 + AgentActivityScanner
+  AgentActivity.swift          #   Claude Code / pi 的落盘解析 + AgentActivityScanner
+  CodexTurns.swift             #   Codex：turn 历史（sqlite，注入 runner）+ session_index 兑底
+  AgentReopen.swift            #   点击任务后“回到它”的决策（ps 父链 + tmux pane → action）
   AgentInbox.swift             #   增量入库 + 已读/未读 + 排序 + 条数上限（N）
 Sources/Island/                # 可执行 target：NSApplication / NSPanel / Carbon 装配
-  main.swift                   #   入口 + --help / --print-config / --scan-agents
+  main.swift                   #   入口 + --help / --print-config / --scan-agents / --reopen-plan
   AppDelegate.swift            #   启动、注册 hotkey、显示与自动隐藏
   OverlayPanel.swift           #   不抢焦点的悬浮 NSPanel
-  OverlayContent.swift         #   面板内容（占位文案）
+  OverlayContent.swift         #   悬浮窗列表（可点击行 + 未读红点 + hover 暂停自动隐藏）
+  AgentReopenExecutor.swift    #   执行 reopen 计划：tmux select / 激活 app / 写剪贴板
+  ProcessSQLite.swift          #   /usr/bin/sqlite3 -json 包装（Codex turn 历史用）
   HotkeyRegistrar.swift        #   Carbon RegisterEventHotKey 包装
   StatusItemController.swift   #   菜单栏图标与菜单
   IslandGlyph.swift            #   菜单栏图标绘制（对应 reference/icon/menubar-icon.svg）
@@ -167,8 +171,11 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - 快捷键 on/off 关闭时 `HotkeySettingsCoordinator.isEnabled == false`，不再注册全局键，但 `current` 与落盘配置都保留；重新打开会重新注册，被系统拒绝则保持关闭并在 UI 提示（不会假装成功）
 - 菜单栏图标有**两处真源**：设计资产在 `hai/reference/icon/menubar-icon.svg`，运行时绘制在 `Sources/Island/IslandGlyph.swift`。改图标必须同时改（AGENTS.md 禁止 reference 被编译或作为运行时依赖，所以不能直接读那个 SVG）
 - **agent 任务只算增量**：`AgentMonitor` 用启动时间卡一个 `completedAt >= startedAt` 过滤（在 `Sources/Island`，不在 IslandCore），所以历史 run 与重开 app 前的 run 一律不显示；`--scan-agents` 相反，故意列出全部已完成 run 供调试
-- **三类 CLI agent 的完成信号**（详见 `hai/reference/agents/README.md`）：Claude Code = `~/.claude/sessions/<pid>.json` 的 `status == idle`；pi = 会话 jsonl 最后一条 assistant 的 `stopReason == stop`；Codex = `~/.codex/session_index.jsonl` 的 `updated_at`。三者都按 `sessionId + completedAt` 去重，所以同一 session 的下一轮会产生新条目
-- **Codex 桌面版的活动未必写进 `session_index.jsonl`**（实测 index 停在旧日期，而 `ChatGPT.app` 常驻）；Claude 桌面版没有可读的任务列表。这两块是 issue `mvp-desktop-agent-sources`
+- **三类 CLI agent 的完成信号**（详见 `hai/reference/agents/README.md`）：Claude Code = `~/.claude/sessions/<pid>.json` 的 `status == idle`；pi = 会话 jsonl 最后一条 assistant 的 `stopReason == stop`；Codex = `thread_history_1.sqlite` 的 `thread_turns.status == 'completed'`（两个库要 `attach`；**不能用 `sqlite3 -readonly`**，会 CANTOPEN）。三者都按 `sessionId + completedAt` 去重，所以同一 session 的下一轮会产生新条目
+- **Codex 的 sqlite 访问走注入的 `SQLiteQuerying`**：IslandCore 只定义协议 + 解析，`Sources/Island/ProcessSQLite.swift` 才是 `/usr/bin/sqlite3` 包装。测试用 `NoSQLiteQuerying` / stub，所以核心层不会 spawn 进程
+- **点击任务后的行为**：`AgentReopen.plan`（纯逻辑，有测试）看 `host` 与 `ps` 父进程链——命中 tmux pane 就 `focusTmux`，桌面 app 就 `activateApp`，否则把 `resumeCommand` 写剪贴板。执行层 `AgentReopenExecutor` 在 Sources/Island。调试：`--reopen-plan <pid>` 直接打印某个 pid 会被怎么处理
+- **悬浮窗是可点击列表**：`OverlayPanel` 仍然 `canBecomeKey = false`，行用 `OverlayTaskRowView.mouseUp` 自己处理点击（不依赖窗口变 key）；hover 时 `AppDelegate.setOverlayHovered` 取消自动隐藏，离开后重新计时。如果鼠标事件在非 key 窗口下有意外行为，菜单栏里同一份任务列表是保底入口（`StatusItemController.setTasks`）
+- **Codex 桌面版与 CLI 共用 `state_5.sqlite` / `thread_history_1.sqlite`**，桌面线程只是 `threads.source` 不同；本机调研时最新线程停在 2026-09-11（`source='vscode'`），即桌面路径尚无真实数据验证。Claude 桌面版没有可读的任务列表，目前不支持
 - 应用内改快捷键立即生效并写 `UserDefaults`（key `IslandHotkeyText`）；开关状态写 `IslandHotkeyEnabled`（缺省开启）。直接用 `defaults write` 改则要重启 app 才生效
 - 检查登录项是否真的注册了：`sfltool dumpbtm | grep -iA6 "Name: island"`（`Disposition: [enabled, ...]` 即已启用）
 - `.app` 是 ad-hoc 签名（`codesign --sign -`）的，本地运行足够；重新构建后必须重新签名，`scripts/build-app.sh` 每次都会重签

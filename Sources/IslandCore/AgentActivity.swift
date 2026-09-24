@@ -18,14 +18,16 @@ public struct AgentActivityScanner: Sendable {
         self.sources = sources
     }
 
-    /// The sources wired to this machine's standard agent locations.
+    /// The sources wired to this machine's standard agent locations. `sqlite`
+    /// is supplied by the app; core has no process plumbing of its own.
     public static func standard(
-        home: URL = FileManager.default.homeDirectoryForCurrentUser
+        home: URL = FileManager.default.homeDirectoryForCurrentUser,
+        sqlite: any SQLiteQuerying = NoSQLiteQuerying()
     ) -> AgentActivityScanner {
         AgentActivityScanner(sources: [
             ClaudeCodeActivitySource.standard(home: home),
             PiActivitySource.standard(home: home),
-            CodexActivitySource.standard(home: home),
+            CodexActivitySource.standard(home: home, sqlite: sqlite),
         ])
     }
 
@@ -201,53 +203,6 @@ public struct PiActivitySource: AgentActivitySource {
             completedAt: lastAssistantDate ?? lastTimestamp ?? fileModified,
             isComplete: lastAssistantStop == "stop"
         )
-    }
-}
-
-// MARK: - Codex
-
-/// Codex (CLI and the ChatGPT desktop app) share `~/.codex`. The thread index
-/// carries id, title and the last update time.
-public struct CodexActivitySource: AgentActivitySource {
-    public let agent = AgentKind.codex
-
-    private let sessionIndex: URL
-
-    public init(sessionIndex: URL) {
-        self.sessionIndex = sessionIndex
-    }
-
-    public static func standard(
-        home: URL = FileManager.default.homeDirectoryForCurrentUser
-    ) -> CodexActivitySource {
-        CodexActivitySource(sessionIndex: home.appendingPathComponent(".codex/session_index.jsonl"))
-    }
-
-    public func completedTasks() -> [AgentTask] {
-        guard let contents = try? String(contentsOf: sessionIndex, encoding: .utf8) else {
-            return []
-        }
-        return Self.parseIndex(contents)
-    }
-
-    static func parseIndex(_ contents: String) -> [AgentTask] {
-        contents.split(separator: "\n").compactMap { line in
-            guard let object = JSON.object(fromLine: String(line)),
-                let id = object["id"] as? String,
-                let updatedText = object["updated_at"] as? String,
-                let updatedAt = AgentTimestamp.date(from: updatedText)
-            else { return nil }
-            let title = (object["thread_name"] as? String) ?? ""
-            return AgentTask(
-                agent: .codex,
-                sessionID: id,
-                title: title.isEmpty ? AgentTask.fallbackTitle(cwd: nil) : title,
-                cwd: nil,
-                completedAt: updatedAt,
-                host: .desktop(bundleID: "com.openai.codex"),
-                resumeCommand: "codex resume \(id)"
-            )
-        }
     }
 }
 

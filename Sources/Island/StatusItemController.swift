@@ -11,6 +11,7 @@ final class StatusItemController {
     private let loginItem: LoginItemController
     private let onSummon: () -> Void
     private let onToggleHotkey: (Bool) -> Void
+    private let onSelectTask: (String) -> Void
     private let onOpenSettings: () -> Void
     private let onQuit: () -> Void
 
@@ -18,6 +19,7 @@ final class StatusItemController {
     private var hotkeySourceNote: String
     private var hotkeyEnabled: Bool
     private var unreadCount = 0
+    private var taskEntries: [AgentInbox.Entry] = []
 
     /// Last `SMAppService` failure, surfaced in the menu instead of vanishing
     /// into a log the user cannot see.
@@ -31,6 +33,7 @@ final class StatusItemController {
         loginItem: LoginItemController,
         onSummon: @escaping () -> Void,
         onToggleHotkey: @escaping (Bool) -> Void,
+        onSelectTask: @escaping (String) -> Void,
         onOpenSettings: @escaping () -> Void,
         onQuit: @escaping () -> Void
     ) {
@@ -38,6 +41,7 @@ final class StatusItemController {
         self.loginItem = loginItem
         self.onSummon = onSummon
         self.onToggleHotkey = onToggleHotkey
+        self.onSelectTask = onSelectTask
         self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
         hotkeyDisplay = hotkey.displayString
@@ -68,6 +72,12 @@ final class StatusItemController {
         guard count != unreadCount else { return }
         unreadCount = count
         installButton()
+    }
+
+    /// The tasks the menu lists (same order as the overlay).
+    func setTasks(_ entries: [AgentInbox.Entry]) {
+        taskEntries = entries
+        rebuildMenu()
     }
 
     private func installButton() {
@@ -107,6 +117,18 @@ final class StatusItemController {
             disabled("hides itself after \(ResolvedConfiguration.secondsText(durationSeconds))s"))
         menu.addItem(.separator())
 
+        if !taskEntries.isEmpty {
+            for entry in taskEntries {
+                let item = action(
+                    entry.task.title, #selector(selectTask(_:)), keyEquivalent: "")
+                item.representedObject = entry.id
+                item.image = entry.isRead ? nil : Self.unreadDot()
+                item.toolTip = Self.toolTip(for: entry.task)
+                menu.addItem(item)
+            }
+            menu.addItem(.separator())
+        }
+
         menu.addItem(action("Settings…", #selector(openSettings), keyEquivalent: ","))
         menu.addItem(.separator())
 
@@ -130,6 +152,23 @@ final class StatusItemController {
         menu.addItem(action("Quit island", #selector(quit), keyEquivalent: "q"))
 
         statusItem.menu = menu
+    }
+
+    private static func unreadDot() -> NSImage {
+        let size = NSSize(width: 8, height: 8)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        NSColor.systemRed.setFill()
+        NSBezierPath(ovalIn: NSRect(origin: .zero, size: size)).fill()
+        image.unlockFocus()
+        return image
+    }
+
+    private static func toolTip(for task: AgentTask) -> String {
+        var pieces = [task.agent.displayName, task.title]
+        if let cwd = task.cwd { pieces.append(cwd) }
+        if let command = task.resumeCommand { pieces.append(command) }
+        return pieces.joined(separator: "\n")
     }
 
     private static func note(for source: HotkeySource) -> String {
@@ -164,6 +203,11 @@ final class StatusItemController {
 
     @objc private func toggleHotkey() {
         onToggleHotkey(!hotkeyEnabled)
+    }
+
+    @objc private func selectTask(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        onSelectTask(id)
     }
 
     @objc private func openSettings() {
