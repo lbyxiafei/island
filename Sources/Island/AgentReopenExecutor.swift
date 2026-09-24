@@ -2,7 +2,8 @@ import AppKit
 import IslandCore
 
 /// Executes the plan `AgentReopen` produces: focus the tmux pane hosting the
-/// task, activate a desktop app, or put the resume command on the clipboard.
+/// task, bring the app hosting its terminal forward, activate a desktop app, or
+/// put the resume command on the clipboard.
 ///
 /// Everything here is best effort — PLAN § Design accepts "second best" — so a
 /// missing `tmux` or a dead app degrades to the next step instead of failing.
@@ -15,27 +16,38 @@ final class AgentReopenExecutor {
         "/usr/bin/tmux",
     ]
 
-    /// Terminals island falls back to when it cannot tell which one hosts tmux.
-    private static let terminalBundleIDs = [
+    /// Apps that can host an agent's terminal. Found by walking the agent's
+    /// ancestor chain, so island never guesses "some terminal".
+    private static let hostingBundleIDs = [
+        "com.microsoft.VSCode",
         "com.mitchellh.ghostty",
         "com.apple.Terminal",
         "com.googlecode.iterm2",
         "dev.warp.Warp-Stable",
-        "com.microsoft.VSCode",
     ]
 
-    /// Builds the plan from this machine's live process and tmux state.
+    /// VS Code can be pointed at a folder, which focuses the window showing it.
+    private static let vscodeBundleID = "com.microsoft.VSCode"
+
+    /// Builds the plan from this machine's live process and tmux state. Task
+    /// hosts are resolved here (not in the sources) because only some agents
+    /// record a pid; pi is found by working directory.
     func plan(for task: AgentTask) -> AgentReopenAction {
+        let resolved = resolveHost(for: task).map { task.withHost($0) } ?? task
         let nodes = ProcessTree.parse(run(["/bin/ps", "-axo", "pid=,ppid="]) ?? "")
         let panes = TmuxPane.parse(
             run(tmuxArguments(["list-panes", "-a", "-F", Self.paneFormat])) ?? "")
-        return AgentReopen.plan(for: task, processNodes: nodes, tmuxPanes: panes)
+        return AgentReopen.plan(for: resolved, processNodes: nodes, tmuxPanes: panes)
     }
 
-    func perform(_ action: AgentReopenAction) {
+    func perform(_ action: AgentReopenAction, for task: AgentTask) {
         switch action {
         case .focusTmux(let windowTarget, let paneTarget):
-            focusTmux(windowTarget: windowTarget, paneTarget: paneTarget)
+            focusTmux(windowTarget: windowTarget, paneTarget: paneTarget, task: task)
+        case .focusHostApp(let pid, let cwd):
+            if !focusHostApp(processID: pid, cwd: cwd) {
+                copyResumeCommand(for: task)
+            }
         case .activateApp(let bundleID):
             activate(bundleID: bundleID)
         case .copyToClipboard(let command):
@@ -45,34 +57,46 @@ final class AgentReopenExecutor {
         }
     }
 
+    // MARK: - Host resolution
+
+    /// Finds the running agent process for a task that has no pid, matching on
+    /// working directory.
+    private func resolveHost(for task: AgentTask) -> AgentHost? {
+        guard case .unknown = task.host else { return nil }
+        let names = Set(task.agent.processNames)
+        let processList = run(["/bin/ps", "-axo", "pid=,comm="]) ?? ""
+        let pids = AgentProcess.pids(fromProcessList: processList, names: names)
+        guard !pids.isEmpty else { return nil }
+
+        let pidList = pids.map(String.init).joined(separator: ",")
+        let output = run(["/usr/sbin/lsof", "-a", "-p", pidList, "-d", "cwd", "-Fpn"]) ?? ""
+        guard let match = AgentProcess.match(AgentProcess.parseLsof(output), cwd: task.cwd) else {
+            return nil
+        }
+        log("resolved \(task.agent.rawValue) host for \"\(task.title)\": pid \(match.pid)")
+        return .terminal(processID: match.pid)
+    }
+
     // MARK: - Actions
 
-    private func focusTmux(windowTarget: String, paneTarget: String) {
+    private func focusTmux(windowTarget: String, paneTarget: String, task: AgentTask) {
         _ = run(tmuxArguments(["select-window", "-t", windowTarget]))
         _ = run(tmuxArguments(["select-pane", "-t", paneTarget]))
         log("tmux -> \(paneTarget)")
-        activateHostingTerminal()
+        activateTmuxHost()
     }
 
     /// The tmux client's ancestor chain ends at the GUI terminal showing it, so
-    /// activating the first ancestor that is a real app brings that window up.
-    private func activateHostingTerminal() {
+    /// focusing the first client we can place brings that window up.
+    private func activateTmuxHost() {
         let clients =
             (run(tmuxArguments(["list-clients", "-F", "#{client_pid}"])) ?? "")
             .split(separator: "\n")
             .compactMap { Int32($0.trimmingCharacters(in: .whitespaces)) }
-        let nodes = ProcessTree.parse(run(["/bin/ps", "-axo", "pid=,ppid="]) ?? "")
-        for client in clients {
-            for ancestor in ProcessTree.ancestors(of: client, in: nodes) {
-                guard let app = NSRunningApplication(processIdentifier: ancestor),
-                    app.activationPolicy != .prohibited
-                else { continue }
-                app.activate()
-                log("activated \(app.localizedName ?? "app") (pid \(ancestor))")
-                return
-            }
+        for client in clients where focusHostApp(processID: client, cwd: nil) {
+            return
         }
-        for bundleID in Self.terminalBundleIDs {
+        for bundleID in Self.hostingBundleIDs {
             guard
                 let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
                     .first
@@ -82,6 +106,29 @@ final class AgentReopenExecutor {
             return
         }
         log("could not find the terminal hosting tmux")
+    }
+
+    /// Walks the ancestor chain looking for one of the known terminal apps.
+    /// Returns false when the agent is not running under any of them.
+    private func focusHostApp(processID: Int32, cwd: String?) -> Bool {
+        let nodes = ProcessTree.parse(run(["/bin/ps", "-axo", "pid=,ppid="]) ?? "")
+        let chain = Set(ProcessTree.ancestors(of: processID, in: nodes))
+
+        for bundleID in Self.hostingBundleIDs {
+            let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            guard let app = apps.first(where: { chain.contains($0.processIdentifier) }) else {
+                continue
+            }
+            if bundleID == Self.vscodeBundleID, let cwd, !cwd.isEmpty {
+                // Focuses the VS Code window showing that folder.
+                _ = run(["/usr/bin/open", "-b", bundleID, cwd])
+            } else {
+                app.activate()
+            }
+            log("focused \(bundleID) for pid \(processID)")
+            return true
+        }
+        return false
     }
 
     private func activate(bundleID: String) {
@@ -97,6 +144,14 @@ final class AgentReopenExecutor {
         }
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
         log("launching \(bundleID)")
+    }
+
+    private func copyResumeCommand(for task: AgentTask) {
+        guard let command = task.resumeCommand, !command.isEmpty else {
+            log("could not find a window or a resume command for \"\(task.title)\"")
+            return
+        }
+        copy(command)
     }
 
     private func copy(_ command: String) {

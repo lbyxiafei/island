@@ -143,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         inbox?.markRead(id: entry.id)
         refreshAgentUI()
         let action = reopenExecutor.plan(for: entry.task)
-        reopenExecutor.perform(action)
+        reopenExecutor.perform(action, for: entry.task)
         log("selected \(entry.task.title) -> \(action)")
     }
 

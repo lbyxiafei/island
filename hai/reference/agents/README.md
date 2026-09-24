@@ -4,7 +4,8 @@
 所有路径都是在本机 macOS 26.6.2 上实测的，样本来自 2026-09-24 的运行。
 
 > 结论先行：三类 CLI agent（Claude Code / pi / Codex）都有**结构化落盘**，能稳定拿到「谁、什么时候、哪件事、在哪个目录」；
-> 唯一缺的是「把用户送回对应窗口」那一步 —— tmux 可行，桌面 app 依赖 AppleScript / `open`，非 tmux 的终端窗口最弱。
+> “把用户送回对应窗口”也能做到大多数情况：tmux 精确命中，VS Code 可聚焦到对应文件夹，桌面 app 直接激活；
+> 只有非 tmux、非 VS Code 的终端（Ghostty / Terminal / iTerm2）只能到 app 级别，其余兑底 resume 命令进 clipboard。
 
 ## 0. 通用中间层（提议）
 
@@ -54,7 +55,8 @@ AgentTask                               # 统一模型，UI 只认这个
 | 会话文件 | `~/.pi/agent/sessions/<cwd-slug>/<ISO-ts>_<session-uuid>.jsonl` |
 | 身份 | 首行 `{"type":"session","id":...,"cwd":...}` 的 `id` |
 | 标题 | 没有专门字段；取第一条 user message 的文本（截断），兜底用 `cwd` basename |
-| 宿主 | **没有 pid 落盘**（`~/.pi/agent` 下无状态/锁文件）→ 目前只能靠 `cwd` 猜，或后续用 `lsof` 反查 |
+| 宿主 | 没有 pid 落盘。改为**点击时反查**：`ps -axo pid=,comm=` 筛出命令名为 `pi` 的进程，再用 `lsof -a -p <pids> -d cwd -Fpn` 取各自 cwd，按 session 的 cwd 匹配。实测 `pi` 是 node 脚本，`lsof -c pi` **匹配不到**（lsof 看到的是 node），所以必须走 `ps` 拿 pid |
+| 实测宿主链 | `pi → zsh → Code Helper → Code`，即 **VS Code 集成终端**，不在 tmux 里 |
 | resume | `pi --session <id>` |
 
 实测 `stopReason` 分布：`toolUse: 105, stop: 3` —— 信号清晰。
@@ -96,8 +98,9 @@ order by completed_at desc limit 100;
 ## 5. 回到任务的可行手段（按可靠性排序）
 
 1. **tmux**（本机最常见）：`claude → zsh → tmux`。可由 pid 沿父进程链上溯到 tmux server pid，再 `tmux list-panes -a -F '#{pane_pid} ...'` 反查 `session:window.pane`，然后 `tmux select-window -t <target>` + `tmux select-pane -t <target>`，最后激活终端 app。实测 pane 标题已经带上 claude 的会话标题（`✳ 多Agent工作流框架`），可直接用于展示。
-2. **桌面 app**：`NSRunningApplication` / `open -a`，按 bundle id 激活（`com.openai.chat` / `com.anthropic.claudefordesktop`）。
-3. **非 tmux 终端**（Ghostty / Terminal / iTerm2 / VS Code 内终端）：Ghostty 无脚本接口；Terminal/iTerm2 有 AppleScript 但难以定位到具体 tab；VS Code 内终端无法可靠定位。→ **兜底一律把 `resumeCommand` 贴到 clipboard**（PLAN § Design 已认可这是 second best）。
+2. **终端 app（非 tmux）**：在 agent 的祖先链里找已知终端的 bundle id。实测 pi 的链是 `pi → zsh → Code Helper → Code`，即 `com.microsoft.VSCode`；VS Code 可以用 `open -b com.microsoft.VSCode <cwd>` 直接聚焦到对应文件夹的窗口（最接近“回到那个会话”）。Ghostty / Terminal / iTerm2 只能 `activate()` 到 app 级别，定位不到具体 tab。
+3. **桌面 app**：`NSRunningApplication` / `open -a`，按 bundle id 激活（`com.openai.codex` / `com.anthropic.claudefordesktop`）。
+4. **都定位不到**：把 `resumeCommand` 贴到 clipboard（PLAN § Design 已认可这是 second best）。
 
 ## 6. 未决问题（下一轮调研）
 

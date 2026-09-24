@@ -66,19 +66,42 @@ if arguments.contains("--scan-agents") {
 }
 
 if let flag = CommandLine.arguments.firstIndex(of: "--reopen-plan"),
-    flag + 1 < CommandLine.arguments.count,
-    let pid = Int32(CommandLine.arguments[flag + 1])
+    flag + 1 < CommandLine.arguments.count
 {
-    let task = AgentTask(
-        agent: .claudeCode,
-        sessionID: "debug",
-        title: "debug",
-        cwd: nil,
-        completedAt: Date(),
-        host: .terminal(processID: pid),
-        resumeCommand: "claude --resume debug"
-    )
-    print(AgentReopenExecutor().plan(for: task))
+    // One argument: a pid to treat as the agent process. Two: an agent name and
+    // a working directory, which exercises the no-pid host resolution.
+    let executor = AgentReopenExecutor()
+    let first = CommandLine.arguments[flag + 1]
+    let task: AgentTask
+    if let pid = Int32(first) {
+        task = AgentTask(
+            agent: .claudeCode,
+            sessionID: "debug",
+            title: "debug",
+            cwd: nil,
+            completedAt: Date(),
+            host: .terminal(processID: pid),
+            resumeCommand: "claude --resume debug"
+        )
+    } else if flag + 2 < CommandLine.arguments.count,
+        let agent = AgentKind(rawValue: first),
+        !(CommandLine.arguments[flag + 2].isEmpty)
+    {
+        let cwd = CommandLine.arguments[flag + 2]
+        task = AgentTask(
+            agent: agent,
+            sessionID: "debug",
+            title: "debug",
+            cwd: cwd,
+            completedAt: Date(),
+            host: .unknown,
+            resumeCommand: "\(agent.rawValue) --resume debug"
+        )
+    } else {
+        print("usage: --reopen-plan <pid> | <agent: claude-code|pi|codex> <cwd>")
+        exit(EXIT_FAILURE)
+    }
+    print(executor.plan(for: task))
     exit(EXIT_SUCCESS)
 }
 

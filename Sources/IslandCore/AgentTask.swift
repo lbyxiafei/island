@@ -13,6 +13,15 @@ public enum AgentKind: String, Sendable, CaseIterable {
         case .codex: return "Codex"
         }
     }
+
+    /// Executable names to look for in `ps` when a task has no recorded host.
+    public var processNames: [String] {
+        switch self {
+        case .claudeCode: return ["claude"]
+        case .pi: return ["pi"]
+        case .codex: return ["codex"]
+        }
+    }
 }
 
 /// Where a task runs, so island can decide how to bring it back to the front.
@@ -59,6 +68,19 @@ public struct AgentTask: Equatable, Sendable {
     /// completing another turn is a new entry (PLAN: only incremental runs).
     public var id: String {
         "\(agent.rawValue):\(sessionID):\(Int(completedAt.timeIntervalSince1970 * 1000))"
+    }
+
+    /// A copy with a host resolved at click time (some agents do not record one).
+    public func withHost(_ host: AgentHost) -> AgentTask {
+        AgentTask(
+            agent: agent,
+            sessionID: sessionID,
+            title: title,
+            cwd: cwd,
+            completedAt: completedAt,
+            host: host,
+            resumeCommand: resumeCommand
+        )
     }
 
     /// `~/Repos/island` when the agent reported no title.

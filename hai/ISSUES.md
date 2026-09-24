@@ -5,6 +5,7 @@
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
 | chore | [brew-distribution](./issue/2026-09-13-14-20-51-brew-distribution.md) | 调研 brew install 分发路径（等本地 MVP 走通后再做） | new | 2026-09-13T14:20:51-07:00 | 2026-09-24T15:47:33-07:00 |
+| bug | [pi-task-cannot-reopen](./issue/2026-09-24-15-53-00-pi-task-cannot-reopen.md) | 点击 pi 任务无法回到宿主（pi 无 tmux 且无 host pid） | solved | 2026-09-24T15:53:00-07:00 | 2026-09-24T15:57:00-07:00 |
 | feat | [mvp-open-or-focus-task](./issue/2026-09-24-15-28-55-mvp-open-or-focus-task.md) | MVP: 点击任务回到宿主窗口 / 兜底贴 clipboard | solved | 2026-09-24T15:28:55-07:00 | 2026-09-24T15:48:00-07:00 |
 | feat | [mvp-overlay-task-list](./issue/2026-09-24-15-28-55-mvp-overlay-task-list.md) | MVP: 悬浮窗展示任务列表 + 未读红点 | solved | 2026-09-24T15:28:55-07:00 | 2026-09-24T15:48:00-07:00 |
 | chore | [mvp-desktop-agent-sources](./issue/2026-09-24-15-28-57-mvp-desktop-agent-sources.md) | MVP: 调研 Codex 桌面版与 Claude 桌面版的活动数据源 | solved | 2026-09-24T15:28:57-07:00 | 2026-09-24T15:48:00-07:00 |

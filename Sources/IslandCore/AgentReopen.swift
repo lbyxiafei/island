@@ -72,9 +72,62 @@ public struct TmuxPane: Equatable, Sendable {
 /// What island does when the user picks a task.
 public enum AgentReopenAction: Equatable, Sendable {
     case focusTmux(windowTarget: String, paneTarget: String)
+    /// A terminal agent that is not inside tmux: the executor walks up from this
+    /// pid to the GUI app showing it (VS Code, Ghostty, …) and brings it forward.
+    case focusHostApp(processID: Int32, cwd: String?)
     case activateApp(bundleID: String)
     case copyToClipboard(String)
     case nothing
+}
+
+/// A running process that a session can be attributed to. Agents that do not
+/// record a pid (pi) are matched by working directory.
+public struct AgentProcess: Equatable, Sendable {
+    public let pid: Int32
+    public let cwd: String?
+
+    public init(pid: Int32, cwd: String?) {
+        self.pid = pid
+        self.cwd = cwd
+    }
+
+    /// Parses `ps -axo pid=,comm=`, keeping the pids whose command matches one
+    /// of `names` (compared on the basename).
+    public static func pids(fromProcessList text: String, names: Set<String>) -> [Int32] {
+        text.split(separator: "\n").compactMap { line in
+            let fields = line.split(whereSeparator: { $0 == " " || $0 == "\t" })
+            guard fields.count >= 2, let pid = Int32(fields[0]) else { return nil }
+            let command = (String(fields[1]) as NSString).lastPathComponent
+            return names.contains(command) ? pid : nil
+        }
+    }
+
+    /// Parses `lsof -a -p <pids> -d cwd -Fpn`.
+    public static func parseLsof(_ text: String) -> [AgentProcess] {
+        var processes: [AgentProcess] = []
+        var currentPID: Int32?
+        for line in text.split(separator: "\n") {
+            guard let marker = line.first else { continue }
+            let value = String(line.dropFirst())
+            switch marker {
+            case "p":
+                currentPID = Int32(value)
+            case "n" where value.hasPrefix("/"):
+                if let pid = currentPID {
+                    processes.append(AgentProcess(pid: pid, cwd: value))
+                }
+            default:
+                continue
+            }
+        }
+        return processes
+    }
+
+    /// The process working in `cwd`.
+    public static func match(_ processes: [AgentProcess], cwd: String?) -> AgentProcess? {
+        guard let cwd, !cwd.isEmpty else { return nil }
+        return processes.first { $0.cwd == cwd }
+    }
 }
 
 /// PLAN § Design: get the user back to the task, best effort. tmux first (it is
@@ -86,17 +139,16 @@ public enum AgentReopen {
         processNodes: [ProcessNode],
         tmuxPanes: [TmuxPane]
     ) -> AgentReopenAction {
-        if case .terminal(let pid) = task.host {
+        switch task.host {
+        case .terminal(let pid):
             let chain = ProcessTree.ancestors(of: pid, in: processNodes)
             if let pane = tmuxPanes.first(where: { chain.contains($0.pid) }) {
                 return .focusTmux(windowTarget: pane.windowTarget, paneTarget: pane.paneTarget)
             }
-        }
-
-        switch task.host {
+            return .focusHostApp(processID: pid, cwd: task.cwd)
         case .desktop(let bundleID):
             return .activateApp(bundleID: bundleID)
-        case .terminal, .unknown:
+        case .unknown:
             guard let command = task.resumeCommand, !command.isEmpty else { return .nothing }
             return .copyToClipboard(command)
         }
