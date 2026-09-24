@@ -6,9 +6,11 @@
 
 island —— 一个 macOS 常驻小工具：监视本机 AI AGENT 的运行活动，session/task 完成时在屏幕中央上方弹出悬浮窗。
 
-当前处于 **POC 阶段**（见 `hai/PLAN.md` § Scope），只验证两件事：macOS 上做 app 的流程有没有门槛，以及 global hotkey 召唤悬浮窗是否可行。agent 检测与交互部分尚未开始。
+当前处于 **MVP 阶段**（见 `hai/PLAN.md` § Scope / VERSION — MVP）：已经能检测本机 Claude Code / pi / Codex 的**已完成 agent run**，并在菜单栏显示未读数；悬浮窗列表、回到宿主窗口等 UX 仍在做。POC 阶段已完成的悬浮窗、global hotkey、菜单栏、开机自启继续沿用。
 
 实现形态：SwiftPM 工程 + AppKit。accessory app（无 Dock 图标），菜单栏有一个 status item 常驻；global hotkey 用 Carbon `RegisterEventHotKey`，悬浮窗是 `NSPanel`，开机自启用 `SMAppService.mainApp`。**零第三方依赖**。
+
+Agent 检测的调研结论（各类 agent 的落盘格式、完成信号、宿主进程、回到任务的手段）在 `hai/reference/agents/README.md`；实现分两层：`IslandCore` 里是纯解析 + 状态（`AgentTask` / `AgentActivitySource` / `AgentInbox`），`Sources/Island/AgentMonitor.swift` 负责轮询并把未读数推到菜单栏。
 
 快捷键行为（PLAN § Scope #5）：它 summon 悬浮窗；悬浮窗已经显示时再按一次会立刻收起（toggle），而不仅是重置自动隐藏计时。菜单里的 `Summon overlay` 始终是“显示”。
 
@@ -32,7 +34,7 @@ open build/Island.app                       # 后台运行（无日志输出）
 pkill -x Island
 ```
 
-菜单栏 island 图标（点开）提供：`Summon overlay (⌃⌘,)`、`Summon hotkey` on/off 勾选项、当前配置展示（快捷键 + 来源）、`Settings…`（录制快捷键 + `Enabled` + `Clear`）、`Launch at login` 勾选项、`Quit island`。
+菜单栏 island 图标（点开）提供：`Summon overlay (⌃⌘,)`、`Summon hotkey` on/off 勾选项、当前配置展示（快捷键 + 来源）、`Settings…`（录制快捷键 + `Enabled` + `Clear`）、`Launch at login` 勾选项、`Quit island`。图标右侧的**数字**是未读 agent 任务数（PLAN § Design 的微信式角标）。
 
 启动日志里 `hotkey registered: ...`（关掉时是 `hotkey is switched off; ...`）与 `menu bar item installed; launch at login: <status>` 两行可以确认快捷键注册与菜单栏挂载。
 
@@ -52,9 +54,11 @@ defaults delete com.binyanli.island.poc IslandHotkeyEnabled   # 回到默认开�
 |---|---|---|
 | `ISLAND_HOTKEY` | `cmd+ctrl+,` | 召唤快捷键。见下方语法；被应用内设置覆盖 |
 | `ISLAND_OVERLAY_SECONDS` | `5` | 悬浮窗停留秒数，正数 |
+| `ISLAND_TASK_LIMIT` | `10` | 悬浮窗展示的任务条数（PLAN § Design 里的 N），正数 |
 
 ```bash
 ./build/Island.app/Contents/MacOS/Island --print-config   # 只解析并打印配置后退出，不开窗
+./build/Island.app/Contents/MacOS/Island --scan-agents    # 列出本机检测到的所有已完成 agent run（调试用）
 ./build/Island.app/Contents/MacOS/Island --help
 
 # 登录项（开机自启）：必须用 .app 包内的可执行文件调用
@@ -85,7 +89,7 @@ defaults delete com.binyanli.island.poc IslandHotkeyEnabled   # 回到默认开�
 - 覆盖率：`./scripts/coverage.sh` 把**单行百分数**写进 `coverage.txt`；`make verify` 的 coverage gate 先刷新它，再与 `coverage-baseline.txt` 比对（当前基线 `100`，即 `IslandCore` 的 65 行全部被覆盖）
 - 覆盖率排除项声明在 **`coverage.config`**（`llvm-cov -ignore-filename-regex`，一行一条正则），理由如下：
   1. `Tests/`、`\.derived/runner\.swift` —— 测试自身与 SwiftPM 自动生成的测试入口（AGENTS 排除类 1：自动生成的代码）
-  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `HotkeyRecorderView.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
+  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
   - 没有类 3（纯数据结构）、类 4（平台分支）的排除项
 - 增量覆盖率：本 repo 没有可用的 Swift delta-coverage 工具（`xcrun llvm-cov` 没有 diff 模式）。改动达到增量门槛时，用 `xcrun llvm-cov show` 人工核对改动行，并在 commit body 说明；`IslandCore` 的基线是 100%，任何新增未覆盖行都会在下次 `make verify` 里暴露
 
@@ -100,8 +104,11 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   OverlayToggle.swift          #   按快捷键时“显示还是收起”的决策
   LoginItem.swift              #   登录项状态 + 菜单勾选/提示的映射
   HotkeySettings.swift         #   换绑协调器（失败回滚）+ on/off 开关 + UserDefaults 存储
+  AgentTask.swift              #   统一任务模型（agent / sessionID / title / cwd / completedAt / host / resume）
+  AgentActivity.swift          #   三种 agent 的落盘解析 + AgentActivityScanner
+  AgentInbox.swift             #   增量入库 + 已读/未读 + 排序 + 条数上限（N）
 Sources/Island/                # 可执行 target：NSApplication / NSPanel / Carbon 装配
-  main.swift                   #   入口 + --help / --print-config
+  main.swift                   #   入口 + --help / --print-config / --scan-agents
   AppDelegate.swift            #   启动、注册 hotkey、显示与自动隐藏
   OverlayPanel.swift           #   不抢焦点的悬浮 NSPanel
   OverlayContent.swift         #   面板内容（占位文案）
@@ -111,12 +118,14 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
   HotkeySettingsWindow.swift   #   设置窗口：录制快捷键 / 开关 / 清空
   HotkeyRecorderView.swift     #   点击录制：NSEvent -> HotkeySpec
   LoginItemController.swift    #   SMAppService.mainApp 包装
+  AgentMonitor.swift           #   轮询 agent 落盘，把未读数推到菜单栏
   ResolvedConfiguration.swift  #   环境变量 -> 配置对象
 Tests/IslandCoreTests/         # IslandCore 的行为测试（XCTest）
 scripts/build-app.sh           # 打包 .app + ad-hoc 签名
 scripts/coverage.sh            # 刷新 coverage.txt
 scripts/check-layering.sh      # 依赖方向检查
 hai/reference/icon/            # 菜单栏图标的设计资产（SVG + 预览 + 说明），非运行时依赖
+hai/reference/agents/          # MVP 调研：各 agent 的完成信号 / 任务身份 / 宿主 / 回到任务的手段
 coverage.config                # 覆盖率排除项
 .swift-format                  # 格式化配置（4 空格缩进）
 ```
@@ -134,6 +143,7 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - Swift 6 严格并发：`AppKit` / `NSPanel` 相关代码都在 `MainActor` 上；`IslandCore` 的类型一律 `Sendable`，方便从任何上下文使用
 - 直接 touch AppKit 的代码一律放 `Sources/Island/`，并同步加进 `coverage.config` 的排除项
 - 所有行为开关走环境变量（`ISLAND_*`），不引入配置文件——POC 阶段要的是"改一个数就能重验"
+- **agent 检测分两层**：`IslandCore` 只做纯解析（`AgentActivitySource.completedTasks()` 吃 URL、只读文件，不碰 AppKit）；`Sources/Island/AgentMonitor.swift` 负责定时轮询。新增一个 agent 只需加一个 `AgentActivitySource` 并在 `AgentActivityScanner.standard(home:)` 里注册，UI 不用动
 - Swift 源码 4 空格缩进，格式由 `.swift-format` 定义；`swift-format` 随 Xcode 提供，不额外安装
 - comment / docstring / log 一律英文（见 AGENTS.md § Comments）；菜单项等 UI 字符串同样用英文，保持代码内单一语言
 - 新增 `Sources/Island/` 下的文件后，记得把路径加进 `coverage.config`，否则覆盖率基线（100）会掉
@@ -156,6 +166,9 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - 设置窗口里录快捷键的是 `HotkeyRecorderView`：它成为 first responder 后捕获 `keyDown`，并吞掉 `performKeyEquivalent`，否则 `⌘Q` 之类会被 window/菜单先一步拿走。从 `NSEvent` 到 `HotkeySpec` 的映射在 `HotkeySpec.captured`（IslandCore，有测试）
 - 快捷键 on/off 关闭时 `HotkeySettingsCoordinator.isEnabled == false`，不再注册全局键，但 `current` 与落盘配置都保留；重新打开会重新注册，被系统拒绝则保持关闭并在 UI 提示（不会假装成功）
 - 菜单栏图标有**两处真源**：设计资产在 `hai/reference/icon/menubar-icon.svg`，运行时绘制在 `Sources/Island/IslandGlyph.swift`。改图标必须同时改（AGENTS.md 禁止 reference 被编译或作为运行时依赖，所以不能直接读那个 SVG）
+- **agent 任务只算增量**：`AgentMonitor` 用启动时间卡一个 `completedAt >= startedAt` 过滤（在 `Sources/Island`，不在 IslandCore），所以历史 run 与重开 app 前的 run 一律不显示；`--scan-agents` 相反，故意列出全部已完成 run 供调试
+- **三类 CLI agent 的完成信号**（详见 `hai/reference/agents/README.md`）：Claude Code = `~/.claude/sessions/<pid>.json` 的 `status == idle`；pi = 会话 jsonl 最后一条 assistant 的 `stopReason == stop`；Codex = `~/.codex/session_index.jsonl` 的 `updated_at`。三者都按 `sessionId + completedAt` 去重，所以同一 session 的下一轮会产生新条目
+- **Codex 桌面版的活动未必写进 `session_index.jsonl`**（实测 index 停在旧日期，而 `ChatGPT.app` 常驻）；Claude 桌面版没有可读的任务列表。这两块是 issue `mvp-desktop-agent-sources`
 - 应用内改快捷键立即生效并写 `UserDefaults`（key `IslandHotkeyText`）；开关状态写 `IslandHotkeyEnabled`（缺省开启）。直接用 `defaults write` 改则要重启 app 才生效
 - 检查登录项是否真的注册了：`sfltool dumpbtm | grep -iA6 "Name: island"`（`Disposition: [enabled, ...]` 即已启用）
 - `.app` 是 ad-hoc 签名（`codesign --sign -`）的，本地运行足够；重新构建后必须重新签名，`scripts/build-app.sh` 每次都会重签

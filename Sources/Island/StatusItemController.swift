@@ -17,6 +17,7 @@ final class StatusItemController {
     private var hotkeyDisplay: String
     private var hotkeySourceNote: String
     private var hotkeyEnabled: Bool
+    private var unreadCount = 0
 
     /// Last `SMAppService` failure, surfaced in the menu instead of vanishing
     /// into a log the user cannot see.
@@ -62,9 +63,19 @@ final class StatusItemController {
         rebuildMenu()
     }
 
+    /// Called when the agent monitor sees a new finished run.
+    func setUnreadCount(_ count: Int) {
+        guard count != unreadCount else { return }
+        unreadCount = count
+        installButton()
+    }
+
     private func installButton() {
         guard let button = statusItem.button else { return }
         button.image = IslandGlyph.menuBarImage()
+        button.imagePosition = .imageLeading
+        button.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+        button.title = unreadCount > 0 ? " \(unreadCount)" : ""
         button.toolTip =
             hotkeyEnabled
             ? "island — summon with \(hotkeyDisplay)"

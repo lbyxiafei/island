@@ -2,10 +2,12 @@
 
 监视本机 AI Agent 的运行活动，在 session / task 完成时于屏幕中央上方弹出一个悬浮窗。
 
-> **当前处于 POC 阶段**：只验证「macOS 上做 app 有没有账号/资格门槛」和「global hotkey 召唤悬浮窗是否可行」两件事。Agent 活动的检测与交互尚未实现，详见 `hai/PLAN.md`。
+> **当前处于 MVP 阶段**：POC（app 流程、global hotkey、菜单栏、开机自启、快捷键配置）已完成；MVP 正在做 agent 检测与展示 UX，详见 `hai/PLAN.md`。
 
 ## 现在能做什么
 
+- **检测本机已完成的 agent run**：支持 Claude Code（terminal）、pi（terminal）、Codex，完成信号、任务身份、标题、宿主进程的调研见 `hai/reference/agents/README.md`
+- 菜单栏图标右侧显示**未读任务数**；只统计 island 启动之后完成的 run，不看历史
 - 按 `⌃⌘,` 全局召唤屏幕顶部中央的悬浮窗，**不需要任何系统权限授权**（不弹输入监控 / 辅助功能对话框）；悬浮窗显示期间再按一次即可立即收起（toggle）
 - 悬浮窗 5 秒后自动消失，时长可配置；重复召唤会重置计时
 - 悬浮窗不抢焦点，也不会出现在窗口切换器里
@@ -65,6 +67,13 @@ defaults delete com.binyanli.island.poc IslandHotkeyEnabled
 |---|---|---|
 | `ISLAND_HOTKEY` | `cmd+ctrl+,` | 召唤快捷键 |
 | `ISLAND_OVERLAY_SECONDS` | `5` | 悬浮窗停留秒数 |
+| `ISLAND_TASK_LIMIT` | `10` | 悬浮窗展示的任务条数 |
+
+看一下本机现在检测到哪些已完成 run（不会开窗，纯调试）：
+
+```bash
+./build/Island.app/Contents/MacOS/Island --scan-agents
+```
 
 ## 菜单栏
 
@@ -78,6 +87,8 @@ defaults delete com.binyanli.island.poc IslandHotkeyEnabled
 | `Settings…` | 录制快捷键、开关、清空 |
 | `Launch at login` | 开机自启开关，勾选状态即系统真实状态 |
 | `Quit island` | 退出 |
+
+图标右侧的数字是未读 agent 任务数（同微信那种角标）。
 
 登录项也可以用命令行检查与开关（必须调用 `.app` 包内的可执行文件）：
 

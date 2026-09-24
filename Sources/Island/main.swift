@@ -17,6 +17,7 @@ if arguments.contains("--help") || arguments.contains("-h") {
 
         flags (login-item flags must run from inside the app bundle):
           --print-config                  resolve the environment and exit
+          --scan-agents                   list completed agent tasks and exit
           --login-item-status             report the launch-at-login state
           --login-item-enable             start at login from now on
           --login-item-disable            stop starting at login
@@ -46,6 +47,21 @@ if arguments.contains("--login-item-enable") || arguments.contains("--login-item
         print("launch at login failed: \(error.localizedDescription)")
         exit(EXIT_FAILURE)
     }
+}
+
+if arguments.contains("--scan-agents") {
+    let tasks = AgentActivityScanner.standard().completedTasks()
+    if tasks.isEmpty {
+        print("no completed agent tasks found")
+    } else {
+        let formatter = ISO8601DateFormatter()
+        for task in tasks {
+            print(
+                "\(formatter.string(from: task.completedAt))  \(task.agent.rawValue)  \(task.title)  [\(task.cwd ?? "-")]  \(task.host)  \(task.resumeCommand ?? "-")"
+            )
+        }
+    }
+    exit(EXIT_SUCCESS)
 }
 
 if arguments.contains("--print-config") {

@@ -6,10 +6,12 @@ import IslandCore
 struct ResolvedConfiguration {
     static let hotkeyEnvironmentKey = "ISLAND_HOTKEY"
     static let durationEnvironmentKey = "ISLAND_OVERLAY_SECONDS"
+    static let taskLimitEnvironmentKey = "ISLAND_TASK_LIMIT"
 
     let hotkey: HotkeyConfiguration
     let hotkeyEnabled: Bool
     let duration: OverlayDuration
+    let taskLimit: Int
 
     init(environment: [String: String], store: HotkeyStoring = UserDefaultsHotkeyStore()) {
         hotkey = HotkeyConfiguration.resolve(
@@ -18,12 +20,14 @@ struct ResolvedConfiguration {
         )
         hotkeyEnabled = HotkeySettingsCoordinator.initialEnabled(stored: store.loadHotkeyEnabled())
         duration = OverlayDuration.resolve(environment[Self.durationEnvironmentKey])
+        taskLimit = TaskLimit.resolve(environment[Self.taskLimitEnvironmentKey])
     }
 
     var summary: String {
         var lines = [
             "hotkey            \(hotkey.spec.displayString)  (\(sourceNote)\(hotkeyEnabled ? "" : ", disabled"))",
             "overlay duration  \(Self.secondsText(duration.seconds))s",
+            "task limit        \(taskLimit)",
         ]
         if hotkey.usedFallback {
             lines.append(

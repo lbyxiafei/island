@@ -1,0 +1,93 @@
+import Foundation
+
+/// How many tasks the overlay lists (PLAN § Design: N, configurable, default 10).
+public enum TaskLimit {
+    public static let fallback = 10
+
+    public static func resolve(_ text: String?) -> Int {
+        guard let text, let value = Int(text.trimmingCharacters(in: .whitespaces)), value > 0 else {
+            return fallback
+        }
+        return value
+    }
+}
+
+/// The in-memory list island builds from scanner output. It owns the three rules
+/// PLAN § Design asks for: keep only runs seen live, order unread first then by
+/// completion time, and remember which ones the user already opened.
+public final class AgentInbox {
+    public struct Entry: Equatable, Sendable {
+        public let task: AgentTask
+        public fileprivate(set) var isRead: Bool
+
+        public var id: String { task.id }
+    }
+
+    /// How many entries the overlay shows (PLAN: N, default 10).
+    public let limit: Int
+
+    private let capacity: Int
+    private var entries: [Entry] = []
+    private var known: Set<String> = []
+
+    public init(limit: Int = 10, capacity: Int = 200) {
+        self.limit = max(1, limit)
+        self.capacity = max(self.limit, capacity)
+    }
+
+    /// Adds newly finished runs. Returns true when something was added, so the
+    /// caller can refresh the UI only when it matters.
+    @discardableResult
+    public func ingest(_ tasks: [AgentTask]) -> Bool {
+        var added = false
+        for task in tasks where !known.contains(task.id) {
+            known.insert(task.id)
+            entries.append(Entry(task: task, isRead: false))
+            added = true
+        }
+        if added {
+            sort()
+            trim()
+        }
+        return added
+    }
+
+    public var unreadCount: Int {
+        entries.lazy.filter { !$0.isRead }.count
+    }
+
+    public var allEntries: [Entry] { entries }
+
+    /// What the overlay renders: the newest `limit` entries, unread on top.
+    public var visibleEntries: [Entry] { Array(entries.prefix(limit)) }
+
+    public func markRead(id: String) {
+        guard let index = entries.firstIndex(where: { $0.id == id }), !entries[index].isRead else {
+            return
+        }
+        entries[index].isRead = true
+        sort()
+    }
+
+    private func sort() {
+        entries.sort { lhs, rhs in
+            if lhs.isRead != rhs.isRead { return !lhs.isRead }
+            return lhs.task.completedAt > rhs.task.completedAt
+        }
+    }
+
+    /// Keeps memory bounded by dropping the oldest read entries; unread ones are
+    /// never dropped, and `known` keeps them from being re-added.
+    private func trim() {
+        var excess = entries.count - capacity
+        guard excess > 0 else { return }
+        var index = entries.count - 1
+        while excess > 0 && index >= 0 {
+            if entries[index].isRead {
+                entries.remove(at: index)
+                excess -= 1
+            }
+            index -= 1
+        }
+    }
+}

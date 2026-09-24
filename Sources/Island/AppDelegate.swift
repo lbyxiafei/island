@@ -10,6 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settings: HotkeySettingsCoordinator?
     private var settingsWindow: HotkeySettingsWindow?
     private var statusItem: StatusItemController?
+    private var monitor: AgentMonitor?
+    private var inbox: AgentInbox?
     private var hideTask: Task<Void, Never>?
 
     init(configuration: ResolvedConfiguration) {
@@ -77,8 +79,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         log("menu bar item installed; launch at login: \(LoginItemController().status.rawValue)")
 
+        startAgentMonitor()
+
         // Show once at launch so the POC is visible without hunting for the hotkey.
         showOverlay()
+    }
+
+    /// Watches the local agent session stores and mirrors the unread count into
+    /// the menu bar. PLAN § Design: only runs that finish while island is up are
+    /// surfaced, so no history is ingested here.
+    private func startAgentMonitor() {
+        let inbox = AgentInbox(limit: configuration.taskLimit)
+        self.inbox = inbox
+        let monitor = AgentMonitor(scanner: .standard(), inbox: inbox) { [weak self] in
+            guard let count = self?.inbox?.unreadCount else { return }
+            self?.statusItem?.setUnreadCount(count)
+            self?.log("agent tasks: \(count) unread, \(inbox.allEntries.count) tracked")
+        }
+        self.monitor = monitor
+        monitor.start()
     }
 
     private func showOverlay() {
