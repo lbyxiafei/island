@@ -5,6 +5,7 @@
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
 | chore | [brew-distribution](./issue/2026-09-13-14-20-51-brew-distribution.md) | 调研 brew install 分发路径（等本地 MVP 走通后再做） | new | 2026-09-13T14:20:51-07:00 | 2026-09-24T15:47:33-07:00 |
+| bug | [settings-recorder-steals-keys](./issue/2026-09-25-14-37-03-settings-recorder-steals-keys.md) | 打开 settings 时焦点在快捷键录制框，cmd+w 被录成快捷键 | in-progress | 2026-09-25T14:37:03-07:00 | 2026-09-25T14:37:03-07:00 |
 | feat | [overlay-header-and-hints](./issue/2026-09-25-14-26-45-overlay-header-and-hints.md) | [ux] drop the island label, fix footer spacing, cmd+comma settings, hints toggle | solved | 2026-09-25T14:26:45-07:00 | 2026-09-25T14:29:47-07:00 |
 | feat | [island-capsule-look](./issue/2026-09-25-13-09-21-island-capsule-look.md) | [ux] overlay looks too much like alfred; switch to an island capsule look | solved | 2026-09-25T13:09:21-07:00 | 2026-09-25T13:13:45-07:00 |
 | feat | [dropdown-alfred-ux](./issue/2026-09-25-12-39-11-dropdown-alfred-ux.md) | [ux] improve dropdown ux in alfred way | solved | 2026-09-25T12:39:11-07:00 | 2026-09-25T12:57:05-07:00 |
