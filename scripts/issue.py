@@ -21,6 +21,7 @@ from pathlib import Path
 
 TYPES = ("feat", "bug", "chore", "style", "refactor", "test", "docs")
 STATUSES = ("new", "open", "in-progress", "solved", "closed")
+ACTIVE_STATUSES = ("new", "open", "in-progress")
 FIELDS = ("type", "name", "title", "status", "created_ts", "updated_ts")
 
 TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S%z"
@@ -40,7 +41,7 @@ BACKLINK = "> 总纲：[ISSUES.md](../ISSUES.md)"
 INDEX_PREAMBLE = """\
 # ISSUES
 
-> 本文件由 `make sync-issue` 从 `./issue/*.md` 的 frontmatter 全量重建，请勿手工编辑。
+> 本文件由 `make issue-sync` 从 `./issue/*.md` 的 frontmatter 全量重建，请勿手工编辑。
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
@@ -300,7 +301,7 @@ def cmd_list(args: argparse.Namespace) -> int:
     if args.status:
         issues = [issue for issue in issues if issue["status"] == validate_status(args.status)]
     elif not args.all:
-        issues = [issue for issue in issues if issue["status"] != "closed"]
+        issues = [issue for issue in issues if issue["status"] in ACTIVE_STATUSES]
     if not issues:
         print("no issues")
         return 0
@@ -321,9 +322,9 @@ def cmd_check(args: argparse.Namespace) -> int:
         if not issues:
             print("ok: no issues yet")
             return 0
-        raise IndexDrift(f"{path} is missing, run `make sync-issue`")
+        raise IndexDrift(f"{path} is missing, run `make issue-sync`")
     if path.read_text(encoding="utf-8") != render_index(issues):
-        raise IndexDrift(f"{path} disagrees with the detail pages, run `make sync-issue`")
+        raise IndexDrift(f"{path} disagrees with the detail pages, run `make issue-sync`")
     print(f"ok: {len(issues)} issue(s) consistent")
     return 0
 
@@ -355,9 +356,9 @@ def build_parser() -> argparse.ArgumentParser:
     sync = commands.add_parser("sync", help="rebuild ISSUES.md from the detail pages")
     sync.set_defaults(func=cmd_sync)
 
-    list_ = commands.add_parser("list", help="print issues, closed ones hidden unless --all")
+    list_ = commands.add_parser("list", help="print active issues (new/open/in-progress); --all for every one")
     list_.add_argument("--status", choices=STATUSES, help="only this status")
-    list_.add_argument("--all", action="store_true", help="include closed issues")
+    list_.add_argument("--all", action="store_true", help="include solved and closed issues")
     list_.set_defaults(func=cmd_list)
 
     check = commands.add_parser("check", help="fail when ISSUES.md drifted")

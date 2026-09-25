@@ -28,7 +28,7 @@ scripts/
 hai/
   PLAN.md
   CONTEXT.md
-  ISSUES.md              # 派生文件，由 `make sync-issue` 重建，不要手改
+  ISSUES.md              # 派生文件，由 `make issue-sync` 重建，不要手改
   issue/{YYYY-MM-DD-HH-MM-SS}-{slug}.md
   reference/
 {code folder}/
@@ -77,7 +77,7 @@ Issue type 与 status 的合法取值，唯一真源是 `scripts/issue.py` 里�
 1. `./hai/ISSUES.md`：issue 的 summary，以 table 呈现。
    - 列：`type`, `name`（hyperlink，显示文本为 `name`，链接到 `./issue/{...}.md`）, `title`, `status`, `created_ts`, `updated_ts`
    - 排序固定：先按 status（`new → open → in-progress → solved → closed`），再按 `updated_ts` 倒序
-   - **派生文件**。唯一数据源是各详情页的 frontmatter；`make sync-issue` 从 frontmatter 全量重建，`make issue-check` 在两者不一致时报错，冲突时以重建结果为准。不要手工编辑它
+   - **派生文件**。唯一数据源是各详情页的 frontmatter；`make issue-sync` 从 frontmatter 全量重建，`make issue-check` 在两者不一致时报错，冲突时以重建结果为准。不要手工编辑它
 2. `./hai/issue/{YYYY-MM-DD-HH-MM-SS}-{slug}.md`：issue 详情页，创建方式有两种：
    - `make issue type=<type> slug=<slug> title="<title>"`（推荐，骨架与 frontmatter 由工具生成）
    - Agent 在与用户的交互过程（brainstorm、grill 或用户主动提出）中主动创建；或 Agent 在代码改动过程中发现任何无法当场解决的问题，主动创建 issue 记录追踪。手工创建时 frontmatter 必须逐字符符合下面的格式
@@ -101,7 +101,7 @@ updated_ts: 2026-09-12T14:30:05-07:00
 - `title` 一律用双引号包裹，避免冒号等字符破坏 YAML
 - `created_ts` / `updated_ts` 为 RFC 3339 带时区；`created_ts` 创建后不再改动
 - 正文第一行是回到总纲的链接 `> 总纲：[ISSUES.md](../ISSUES.md)`，`make issue` 自动写入，手工创建时照抄
-- `updated_ts` 只在**正文或字段发生实质变化**时更新；`make sync-issue` 重建表格不算变化，`make issue-touch` 与 `make issue-status` 会自动更新它
+- `updated_ts` 只在**正文或字段发生实质变化**时更新；`make issue-sync` 重建表格不算变化，`make issue-touch` 与 `make issue-status` 会自动更新它
 
 **授权台账**：Ask first 得到同意后，把结论写进关联 issue 正文的 `## Decision` 节——日期、同意人、同意的具体范围。后续 Agent 以这一节为授权依据，不必重复询问；没有这一节的，视为未授权。
 
@@ -230,7 +230,7 @@ repo authors 和 Agent 之间的交流中英文皆可，但 Agent 生成的**代
 每次 `ship` 之前，结合本次改动与 repo 现状，依次同步、矫正：
 
 1. 相关 `./hai/issue/*.md` 的 `status` 与 `updated_ts`（用 `make issue-status` / `make issue-touch`）
-2. `./hai/ISSUES.md`，用 `make sync-issue` 重建，不要手改
+2. `./hai/ISSUES.md`，用 `make issue-sync` 重建，不要手改
 3. `./hai/CONTEXT.md`，仅当本次改动影响其内容时
 4. `./README.md`，仅当本次改动影响其内容时，禁止纯措辞润色
 
@@ -252,7 +252,7 @@ git worktree add ../.worktree/<repo>-<slug> -b <slug>
 合回 master 前必须跑一次全量 regression，而且测的必须正好是即将进 master 的那份代码：
 
 1. 在 worktree 里把改动合成**一个** commit（有多个就 `git reset --soft $(git merge-base master HEAD)` 后重新提交），message 规则见下
-2. 在 worktree 里 `git rebase master`。功能分支没推过，rebase 不违反 Never 第 1 条。`hai/ISSUES.md` 冲突时不要手工合，跑 `make sync-issue` 重建后 `git add` 继续
+2. 在 worktree 里 `git rebase master`。功能分支没推过，rebase 不违反 Never 第 1 条。`hai/ISSUES.md` 冲突时不要手工合，跑 `make issue-sync` 重建后 `git add` 继续
 3. 在 worktree 里跑 `make verify`，**全部 gate 通过**才往下走；没过就在 worktree 里修（`git commit --amend` 保持一个 commit），修完回到第 2 步
 4. 回到主 checkout：`git merge --ff-only <slug>`。失败说明 master 在这期间前进了，回到第 2 步，**不允许**改用普通 merge 绕过
 5. 在主 checkout `git push`；`make hooks` 启用后 pre-push 会对合并结果再跑一遍 `make verify`。不要在 worktree 里用 `skill:ship`——它会把功能分支推上远程

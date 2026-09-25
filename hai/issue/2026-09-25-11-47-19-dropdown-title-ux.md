@@ -7,6 +7,8 @@ created_ts: 2026-09-25T11:47:19-07:00
 updated_ts: 2026-09-25T11:47:19-07:00
 ---
 
+> 总纲：[ISSUES.md](../ISSUES.md)
+
 ## 背景
 
 
@@ -14,3 +16,5 @@ updated_ts: 2026-09-25T11:47:19-07:00
 ## 期望结果
 
 ## 备注
+
+- 全程在独立 worktree（`../.worktree/<repo>-<slug>`）中完成，合回 master 前 `make verify` 全过，流程见 AGENTS.md / Workflow / Worktree 与 Ship

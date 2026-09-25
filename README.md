@@ -131,6 +131,6 @@ swift test         # 只跑测试
 |---|---|---|
 | `hai/PLAN.md` | goal / non-goal / scope / design / key decisions | 人 |
 | `hai/CONTEXT.md` | setup / test / layout / conventions / gotchas，面向 AI Agent | Agent |
-| `hai/ISSUES.md` | issue 索引，由 `make sync-issue` 生成 | 工具 |
+| `hai/ISSUES.md` | issue 索引，由 `make issue-sync` 生成 | 工具 |
 
 代码分两层：`Sources/IslandCore`（纯逻辑，不与 UI 框架耦合，测试完整覆盖）与 `Sources/Island`（AppKit / Carbon 装配）。

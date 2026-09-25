@@ -25,7 +25,7 @@ COVERAGE_BASELINE ?= coverage-baseline.txt
 GATES := BUILD_CMD FMT_CMD LINT_CMD TEST_CMD COVER_CMD CYC_CMD
 
 .PHONY: help verify verify-strict build fmt lint test coverage coverage-check cycles \
-        issue issue-list sync-issue issue-check issue-touch issue-status hooks
+        issue issue-list issue-sync issue-check issue-touch issue-status hooks
 
 # Gate recipes dispatch while make parses: an unconfigured gate expands to a
 # skip line only, so an empty command string never reaches the shell.
@@ -100,11 +100,11 @@ issue: ## create an issue: make issue type=feat slug=add-login title="..."
 	@$(PYTHON) scripts/issue.py --root $(HAI) create \
 		--type $(type) --slug $(slug) --title "$(title)"
 
-issue-list: ## list issues (closed hidden): make issue-list [status=<status>] [all=1]
+issue-list: ## list active issues: make issue-list [status=<status>] [all=1]
 	@$(PYTHON) scripts/issue.py --root $(HAI) list \
 		$(if $(status),--status $(status)) $(if $(all),--all)
 
-sync-issue: ## rebuild $(HAI)/ISSUES.md from the detail pages
+issue-sync: ## rebuild $(HAI)/ISSUES.md from the detail pages
 	@$(PYTHON) scripts/issue.py --root $(HAI) sync
 
 issue-check: ## fail when $(HAI)/ISSUES.md drifted from the detail pages
