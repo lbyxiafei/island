@@ -6,7 +6,7 @@
 
 ## 现在能做什么
 
-- **检测本机已完成的 agent run**：支持 Claude Code（terminal）、pi（terminal）、Codex（CLI + 桌面）；完成信号、任务身份、标题、宿主进程的调研见 `hai/reference/agents/README.md`
+- **检测本机已完成的 agent run**：支持 Claude Code（terminal）、Claude 桌面版（聊天）、pi（terminal）、Codex（CLI + 桌面）；完成信号、任务身份、标题、宿主进程的调研见 `hai/reference/agents/README.md`
 - 任务完成时自动弹出悬浮窗，里面是任务列表（未读优先，未读左侧有红点）；hover 会暂停自动隐藏
 - 任务标题优先用 agent 自己的 title，没有就显示**最后一条消息**，再没有才回退到目录名
 - 点击任务后**悬浮窗随即收起**，并跳回它：tmux 就选中对应 window/pane 并激活终端，VS Code 就聚焦对应文件夹的窗口，桌面 app 就激活对应应用，无法精确定位时把 resume 命令（如 `claude --resume <id>`）贴到剪贴板；点过后红点消失但条目保留

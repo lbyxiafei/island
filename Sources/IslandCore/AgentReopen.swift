@@ -76,6 +76,8 @@ public enum AgentReopenAction: Equatable, Sendable {
     /// pid to the GUI app showing it (VS Code, Ghostty, …) and brings it forward.
     case focusHostApp(processID: Int32, cwd: String?)
     case activateApp(bundleID: String)
+    /// Open a deep link into the task; activate the app if the link fails.
+    case openURL(String, fallbackBundleID: String)
     case copyToClipboard(String)
     case nothing
 }
@@ -147,6 +149,9 @@ public enum AgentReopen {
             }
             return .focusHostApp(processID: pid, cwd: task.cwd)
         case .desktop(let bundleID):
+            if let link = task.deepLink, !link.isEmpty {
+                return .openURL(link, fallbackBundleID: bundleID)
+            }
             return .activateApp(bundleID: bundleID)
         case .unknown:
             guard let command = task.resumeCommand, !command.isEmpty else { return .nothing }

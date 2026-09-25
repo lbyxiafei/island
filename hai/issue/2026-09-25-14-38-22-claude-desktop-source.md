@@ -2,9 +2,9 @@
 type: feat
 name: claude-desktop-source
 title: "Claude 桌面版（聊天）完成后不弹 island：尚无数据源"
-status: new
+status: solved
 created_ts: 2026-09-25T14:38:22-07:00
-updated_ts: 2026-09-25T14:49:43-07:00
+updated_ts: 2026-09-25T15:02:31-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -78,3 +78,23 @@ spike 脚本（一次性，不进 repo）：解析 leveldb log/ldb + snappy + V8
 - 全程在独立 worktree（`../.worktree/<repo>-<slug>`）中完成，合回 master 前 `make verify` 全过，流程见 AGENTS.md / Workflow / Worktree 与 Ship
 
 # History
+
+## 2026-09-25T14:56:02-07:00: new -> in-progress
+
+## 处理结果
+
+Scope-check: PLAN § Scope 负责 Agents 范围 #1，以及 ## Decision 中用户对聊天的确认。
+
+- 新增 `ClaudeDesktopActivitySource`：读 IndexedDB blob 目录里最新的文件，用自写的 `Snappy` 解压、`V8Value` 反序列化，取每个 `hub_transcript` 的最后一条消息；`assistant` + `end_turn` 才算完成（`user_canceled` 过滤掉）。标题取 `chat_conversation_list` 的 `name`，没有就用最后一条用户消息
+- `AgentKind.claudeDesktop`（显示为 "Claude"，图标用桌面版 app 的图标）
+- 点击：`AgentTask.deepLink` = `claude://claude.ai/chat/<uuid>`，reopen 新增 `.openURL` 动作，打不开再激活 app
+- 真实数据验证：`--scan-agents` 列出 `claude-desktop  N8n与其他AI工作流工具的对比`；release 构建下缓存变化时解码约 37ms，没变化时约 5ms
+- 测试用自带的 V8 / snappy 编码器生成合成 fixture，repo 里没有真实聊天内容
+
+待人验收 / 未覆盖：
+
+- `claude://claude.ai/chat/<uuid>` 是否真的跳到对应对话（从命令行看不到窗口内容）
+- 桌面版 Code 标签页：本机没有使用记录，推测走 `~/.claude` 被 Claude Code 数据源覆盖，需要跑一个任务验证
+- 回复期间切到别的对话：那个对话的 transcript 可能不再更新，会漏报
+
+## 2026-09-25T15:02:31-07:00: in-progress -> solved

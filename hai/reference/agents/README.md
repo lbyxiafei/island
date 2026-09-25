@@ -92,8 +92,19 @@ order by completed_at desc limit 100;
 
 ## 4. Claude 桌面版
 
-`~/Library/Application Support/Claude/`（Electron）。目前只看到 `IndexedDB/`、`Local Storage/`、`Session Storage/`，**没有可读的结构化任务列表**。
-属最难的一档：需要 `computer use` / AppleScript UI 抓取，或逆向 Electron 的 IndexedDB。**MVP 建议先只做「检测到窗口 + 激活」，不做任务级解析。**
+`~/Library/Application Support/Claude/`（Electron）。聊天在服务端，本地没有 JSON / sqlite 形式的会话列表。
+
+**已解决（2026-09-25，issue `claude-desktop-source`）**：claude.ai 前端把 react-query 缓存持久化进 IndexedDB 的外部 blob：
+
+- 路径：`IndexedDB/https_claude.ai_0.indexeddb.blob/<db>/<xx>/<blob id>`。每次持久化都**写一个新文件**（id 递增），旧的会被回收，所以取 mtime 最新的那个
+- 编码：`ff 11 02`（Blink 的 snappy 包装）+ snappy 原始流；解压后是 Blink envelope `ff 15 fe …`，再后面是 `ff 10` + V8 structured clone。顶层是 `{buster: "conversations_v2:…", timestamp, clientState: {queries: [...]}}`；V8 数组基本是 sparse（`a … @`）
+- 用得上的 query：
+  - `["hub_transcript", {orgUuid}, {uuid}]` → `state.data.messages`：最后一条 `sender == "assistant"` 且 `stop_reason == "end_turn"` 即回复完成（点停止是 `user_canceled`）；时间取 `updated_at`
+  - `["chat_conversation_list", …]` → `state.data.pages[].data[]`（或 `state.data.data[]`）：`uuid` → `name`（对话标题）
+  - `sessions_api_list_sessions`：看到的是 CLI 会话的 remote-control 镜像（`origin: claude_code_cli`、`environment_kind: bridge`），不作为数据源，避免与 Claude Code CLI 重复
+- 实测写盘延迟约 5s；生成中不会写入半截回复
+- 回到对话：`claude://claude.ai/chat/<uuid>`（app 注册了 `claude` scheme）
+- 局限：只有**当前打开 / 最近打开**的对话才有 `hub_transcript`；格式无公开文档，桌面版升级可能改动
 
 ## 5. 回到任务的可行手段（按可靠性排序）
 
@@ -105,6 +116,7 @@ order by completed_at desc limit 100;
 ## 6. 未决问题（下一轮调研）
 
 - ~~Codex 桌面版的活动到底落在哪张 sqlite~~ → 已解决，见 § 3
-- Claude 桌面版有没有可读的本地任务状态（目前结论：没有，只能 computer use）
+- ~~Claude 桌面版有没有可读的本地任务状态~~ → 已解决，见 § 4
+- Claude 桌面版的 Code 标签页：自带一份 Claude Code（`Claude/claude-code/<ver>/claude.app`），推测也写 `~/.claude/sessions`，待真实数据验证
 - 非 tmux 终端窗口的定位手段（iTerm2 AppleScript 的 session 匹配、Ghostty 未来是否有 CLI）
 - 一个 agent 在 VS Code 内运行时，如何把焦点给到正确 terminal 面板

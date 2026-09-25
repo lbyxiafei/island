@@ -3,12 +3,14 @@ import Foundation
 /// The AI agents island knows how to watch.
 public enum AgentKind: String, Sendable, CaseIterable {
     case claudeCode = "claude-code"
+    case claudeDesktop = "claude-desktop"
     case pi
     case codex
 
     public var displayName: String {
         switch self {
         case .claudeCode: return "Claude Code"
+        case .claudeDesktop: return "Claude"
         case .pi: return "pi"
         case .codex: return "Codex"
         }
@@ -18,6 +20,7 @@ public enum AgentKind: String, Sendable, CaseIterable {
     public var processNames: [String] {
         switch self {
         case .claudeCode: return ["claude"]
+        case .claudeDesktop: return ["Claude"]
         case .pi: return ["pi"]
         case .codex: return ["codex"]
         }
@@ -45,6 +48,9 @@ public struct AgentTask: Equatable, Sendable {
     /// Command that resumes the session; island copies it when it cannot focus
     /// the original window (PLAN § Design, second best path).
     public let resumeCommand: String?
+    /// A URL that opens this exact task in its app (Claude Desktop's
+    /// `claude://` links), tried before merely activating the app.
+    public let deepLink: String?
 
     public init(
         agent: AgentKind,
@@ -53,7 +59,8 @@ public struct AgentTask: Equatable, Sendable {
         cwd: String?,
         completedAt: Date,
         host: AgentHost,
-        resumeCommand: String?
+        resumeCommand: String?,
+        deepLink: String? = nil
     ) {
         self.agent = agent
         self.sessionID = sessionID
@@ -62,6 +69,7 @@ public struct AgentTask: Equatable, Sendable {
         self.completedAt = completedAt
         self.host = host
         self.resumeCommand = resumeCommand
+        self.deepLink = deepLink
     }
 
     /// Identity of one *run*, not of the session: the same Claude Code session
@@ -83,7 +91,8 @@ public struct AgentTask: Equatable, Sendable {
             cwd: cwd,
             completedAt: completedAt,
             host: host,
-            resumeCommand: resumeCommand
+            resumeCommand: resumeCommand,
+            deepLink: deepLink
         )
     }
 

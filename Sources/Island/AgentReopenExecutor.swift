@@ -50,6 +50,12 @@ final class AgentReopenExecutor {
             }
         case .activateApp(let bundleID):
             activate(bundleID: bundleID)
+        case .openURL(let link, let fallbackBundleID):
+            if let url = URL(string: link), NSWorkspace.shared.open(url) {
+                log("opened \(link)")
+            } else {
+                activate(bundleID: fallbackBundleID)
+            }
         case .copyToClipboard(let command):
             copy(command)
         case .nothing:

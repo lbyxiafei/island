@@ -6,7 +6,7 @@
 
 island —— 一个 macOS 常驻小工具：监视本机 AI AGENT 的运行活动，session/task 完成时在屏幕中央上方弹出悬浮窗。
 
-当前处于 **MVP 阶段**（见 `hai/PLAN.md` § Scope / VERSION — MVP）：已经能检测本机 Claude Code / pi / Codex 的**已完成 agent run**，并在菜单栏显示未读数；悬浮窗列表、回到宿主窗口等 UX 仍在做。POC 阶段已完成的悬浮窗、global hotkey、菜单栏、开机自启继续沿用。
+当前处于 **MVP 阶段**（见 `hai/PLAN.md` § Scope / VERSION — MVP）：已经能检测本机 Claude Code / Claude 桌面版聊天 / pi / Codex 的**已完成 agent run**，并在菜单栏显示未读数；悬浮窗列表、回到宿主窗口等 UX 仍在做。POC 阶段已完成的悬浮窗、global hotkey、菜单栏、开机自启继续沿用。
 
 实现形态：SwiftPM 工程 + AppKit。accessory app（无 Dock 图标），菜单栏有一个 status item 常驻；global hotkey 用 Carbon `RegisterEventHotKey`，悬浮窗是 `NSPanel`，开机自启用 `SMAppService.mainApp`。**零第三方依赖**。
 
@@ -107,6 +107,9 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   HotkeySettings.swift         #   换绑协调器（失败回滚）+ on/off 开关 + UserDefaults 存储
   AgentTask.swift              #   统一任务模型（agent / sessionID / title / cwd / completedAt / host / resume）+ TaskTitle 标题兑底
   AgentActivity.swift          #   Claude Code / pi 的落盘解析 + AgentActivityScanner
+  ClaudeDesktopActivity.swift  #   Claude 桌面版：IndexedDB blob（react-query 缓存）-> 已完成的聊天
+  Snappy.swift                 #   snappy 原始流解压 + ByteReader
+  V8Value.swift                #   V8 structured clone 反序列化（只覆盖 island 用到的类型）
   CodexTurns.swift             #   Codex：turn 历史（sqlite，注入 runner）+ session_index 兑底
   AgentReopen.swift            #   点击任务后“回到它”的决策（ps 父链 + tmux pane → action）
   AgentInbox.swift             #   增量入库 + 已读/未读 + 排序 + 条数上限（N）
@@ -183,7 +186,8 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - **点任务后悬浮窗会立刻收起**（PLAN § Design / 下拉框 UX #2）：`selectTask` 先 `markRead` + `refreshAgentUI`，再 `hideOverlay(reason:)`，最后才 focus/跳转（顺序重要，否则聚焦那一刻悬浮窗还会闪）
 - **pi 没有 host pid 落盘**，`AgentReopenExecutor.resolveHost` 在点击时才反查：`ps -axo pid=,comm=` 筛命令名 `pi`，再 `lsof -a -p <pids> -d cwd -Fpn` 取 cwd，按 session 的 cwd 匹配。**`lsof -c pi` 不好使**——pi 是 node 脚本，lsof 看到的命令名是 node，必须先用 ps 拿到 pid 再 `lsof -p`
 - **悬浮窗两种模式**（issue `dropdown-alfred-ux`）：键盘模式（召唤）下标题行整行是搜索框，↑↓ / ↩ / ⌘1–9 / esc 由 `OverlayContentView` 转给 `OverlaySelection`（IslandCore，有测试），`⌘,` 收起悬浮窗并打开 settings（`onOpenSettings`）；底部提示可在 settings 关掉（`Show keyboard hints`，`UserDefaults` key `IslandOverlayShowsHints`，缺省开，存取在 `UserDefaultsOverlayStore`）；没有自动隐藏计时，失焦（点别处）即收起（`OverlayPanel.onResignKey`）；被动模式（自动弹出）下标题行是 `● N new` / `All caught up`（`OverlayStatus`）+ 右侧快捷键键帽，**不显示 island 品牌字样**（用户明确认为无信息量），行用 `OverlayTaskRowView.mouseUp` 自己处理点击（不依赖窗口变 key），hover 时 `AppDelegate.setOverlayHovered` 取消自动隐藏，离开后重新计时。自动弹出不会把正在打字的键盘模式降级。`hideOverlay` 先清 `acceptsKeyboard` 再 `orderOut`，否则 `resignKey` 回调会重入。如果鼠标事件在非 key 窗口下有意外行为，菜单栏里同一份任务列表是保底入口（`StatusItemController.setTasks`）
-- **Codex 桌面版与 CLI 共用 `state_5.sqlite` / `thread_history_1.sqlite`**，桌面线程只是 `threads.source` 不同；本机调研时最新线程停在 2026-09-11（`source='vscode'`），即桌面路径尚无真实数据验证。Claude 桌面版没有可读的任务列表，目前不支持
+- **Codex 桌面版与 CLI 共用 `state_5.sqlite` / `thread_history_1.sqlite`**，桌面线程只是 `threads.source` 不同；本机调研时最新线程停在 2026-09-11（`source='vscode'`），即桌面路径尚无真实数据验证
+- **Claude 桌面版（聊天）读的是 claude.ai 前端的 IndexedDB 缓存**（`ClaudeDesktopActivitySource`，格式与判据见 `hai/reference/agents/README.md` § 4）：取 blob 目录下最新的文件，`Snappy` 解压，`V8Value` 反序列化，最后一条 assistant 消息 `stop_reason == end_turn` 才算完成。两个解码器都是本 repo 自写的（零依赖），格式没有公开文档，**桌面版升级后要先用 `--scan-agents` 看 `claude-desktop` 行是否还在**。只有当前或最近打开的对话才有 transcript。点击任务走 `AgentReopenAction.openURL`（`claude://claude.ai/chat/<uuid>`），打不开再激活 app
 - **主题**：`Settings…` 里的 `Overlay theme` 选 System / Lagoon / Coral / Sand / Midnight，立即生效并弹出被动预览，存在 `UserDefaults` key `IslandOverlayTheme`（缺省 `system`：浅色 Sand、深色 Lagoon，由 `OverlayContentView.viewDidChangeEffectiveAppearance` 重新取色）。配色是 IslandCore 里的纯数据（`ThemeColor` 为 sRGB），AppKit 侧只做 `NSColor(ThemeColor)` 转换。**刻意不像 Alfred**（issue `island-capsule-look`，用户同时在用 Alfred）：不要再引入顶部大搜索框、整行实色高亮、右侧 ⌘N 或 Alfred 原版配色。旧的主题存值（`light` / `dark` / `modern-dark` / `frosty`）由 `OverlayTheme.resolve` 迁移到新主题
 - 面板形状：`OverlayPanel.positionNearTopOfScreen` 让面板上沿贴着 `visibleFrame.maxY`（菜单栏下沿）；`CapsuleShapeView` 画平顶、底部 26pt 圆角的形状，描边不画上沿；毛玻璃用 `NSVisualEffectView.maskImage` 裁形（layer mask 裁不住 behind-window 的 vibrancy）
 - 行图标：`AgentIcon.bundleIDs` 找已安装的 app 图标（Claude → `com.anthropic.claudefordesktop`，Codex → `com.openai.codex`，即 ChatGPT.app），找不到用 SF Symbol（pi 固定是 `terminal`）

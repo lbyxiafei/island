@@ -121,6 +121,9 @@ final class AgentIconTests: XCTestCase {
         XCTAssertEqual(
             AgentIcon.bundleIDs(for: .claudeCode).first, "com.anthropic.claudefordesktop")
         XCTAssertEqual(AgentIcon.bundleIDs(for: .codex).first, "com.openai.codex")
+        XCTAssertEqual(
+            AgentIcon.bundleIDs(for: .claudeDesktop).first, "com.anthropic.claudefordesktop")
+        XCTAssertEqual(AgentIcon.symbolName(for: .claudeDesktop), "bubble.left")
     }
 
     func testPiHasNoAppAndFallsBackToASymbol() {
