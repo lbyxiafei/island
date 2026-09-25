@@ -29,6 +29,8 @@
 3. pi terminal 版本（hosts 同#2）
 4. codex 桌面版
 
+> 注： claude code、codex桌面版，包括聊天、work等任何 ai agent 相关的活动
+
 我们要在对这些进行支持的同时，考虑未来的可扩展性 — 每一个本地 agent 的情况各不相同，我们一定会针对每种 agents 的情况，创建对应的 `computer use` 的 tool 进行信息读取（甚至 msg 传入，作为一个未来支持的方向），因此必然会创建一个通用中间层，来处理 tools 的交互，并将内容合理的展示在 island app 上。
 
 
