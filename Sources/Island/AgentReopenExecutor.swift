@@ -16,9 +16,9 @@ final class AgentReopenExecutor {
         "/usr/bin/tmux",
     ]
 
-    /// Apps that can host an agent's terminal. Found by walking the agent's
-    /// ancestor chain, so island never guesses "some terminal".
+    /// Terminals to fall back on when tmux has no attached client to trace.
     private static let hostingBundleIDs = [
+        "com.cmuxterm.app",
         "com.microsoft.VSCode",
         "com.mitchellh.ghostty",
         "com.apple.Terminal",
@@ -114,27 +114,30 @@ final class AgentReopenExecutor {
         log("could not find the terminal hosting tmux")
     }
 
-    /// Walks the ancestor chain looking for one of the known terminal apps.
-    /// Returns false when the agent is not running under any of them.
+    /// Walks the ancestor chain up to the GUI app showing the process. Returns
+    /// false when the process is not running under any app.
     private func focusHostApp(processID: Int32, cwd: String?) -> Bool {
         let nodes = ProcessTree.parse(run(["/bin/ps", "-axo", "pid=,ppid="]) ?? "")
-        let chain = Set(ProcessTree.ancestors(of: processID, in: nodes))
-
-        for bundleID in Self.hostingBundleIDs {
-            let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
-            guard let app = apps.first(where: { chain.contains($0.processIdentifier) }) else {
-                continue
-            }
-            if bundleID == Self.vscodeBundleID, let cwd, !cwd.isEmpty {
-                // Focuses the VS Code window showing that folder.
-                _ = run(["/usr/bin/open", "-b", bundleID, cwd])
-            } else {
-                app.activate()
-            }
-            log("focused \(bundleID) for pid \(processID)")
-            return true
+        let chain = ProcessTree.ancestors(of: processID, in: nodes)
+        let running = NSWorkspace.shared.runningApplications.filter {
+            $0.activationPolicy == .regular
         }
-        return false
+        let apps = running.map {
+            RunningApp(pid: $0.processIdentifier, bundleID: $0.bundleIdentifier)
+        }
+        guard let host = HostApp.nearest(in: chain, among: apps),
+            let app = running.first(where: { $0.processIdentifier == host.pid })
+        else { return false }
+
+        let bundleID = host.bundleID ?? "pid \(host.pid)"
+        if host.bundleID == Self.vscodeBundleID, let cwd, !cwd.isEmpty {
+            // Focuses the VS Code window showing that folder.
+            _ = run(["/usr/bin/open", "-b", Self.vscodeBundleID, cwd])
+        } else {
+            app.activate()
+        }
+        log("focused \(bundleID) for pid \(processID)")
+        return true
     }
 
     private func activate(bundleID: String) {

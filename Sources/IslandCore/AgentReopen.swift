@@ -43,6 +43,29 @@ public enum ProcessTree {
     }
 }
 
+/// A GUI app that is running, as `NSRunningApplication` reports it.
+public struct RunningApp: Equatable, Sendable {
+    public let pid: Int32
+    public let bundleID: String?
+
+    public init(pid: Int32, bundleID: String?) {
+        self.pid = pid
+        self.bundleID = bundleID
+    }
+}
+
+/// Finds the GUI app showing a terminal process. Matching on the ancestor chain
+/// instead of a list of known terminals means any terminal (cmux, kitty, …)
+/// works, and island never brings up an unrelated app.
+public enum HostApp {
+    /// The app closest to the process in `chain` (`ProcessTree.ancestors` order).
+    public static func nearest(in chain: [Int32], among apps: [RunningApp]) -> RunningApp? {
+        var appByPID: [Int32: RunningApp] = [:]
+        for app in apps { appByPID[app.pid] = app }
+        return chain.lazy.compactMap { appByPID[$0] }.first
+    }
+}
+
 /// One pane from `tmux list-panes -a`. `pane_pid` is the shell running inside
 /// the pane, which is what the agent's ancestor chain points at.
 public struct TmuxPane: Equatable, Sendable {
