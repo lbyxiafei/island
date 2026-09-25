@@ -100,7 +100,8 @@ public struct CodexTurnActivitySource: AgentActivitySource {
                 cwd: cwd,
                 completedAt: Date(timeIntervalSince1970: seconds),
                 host: .desktop(bundleID: "com.openai.codex"),
-                resumeCommand: "codex resume \(id)"
+                resumeCommand: "codex resume \(id)",
+                deepLink: "codex://threads/\(id)"
             )
         }
     }
@@ -146,7 +147,8 @@ public struct CodexIndexActivitySource: AgentActivitySource {
                 cwd: nil,
                 completedAt: updatedAt,
                 host: .desktop(bundleID: "com.openai.codex"),
-                resumeCommand: "codex resume \(id)"
+                resumeCommand: "codex resume \(id)",
+                deepLink: "codex://threads/\(id)"
             )
         }
     }

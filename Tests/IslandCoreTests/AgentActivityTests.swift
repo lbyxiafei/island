@@ -569,6 +569,7 @@ final class CodexActivitySourceTests: XCTestCase {
         XCTAssertEqual(tasks.first?.title, "评估 AI 玩游戏")
         XCTAssertEqual(tasks.first?.host, .desktop(bundleID: "com.openai.codex"))
         XCTAssertEqual(tasks.first?.resumeCommand, "codex resume 01a")
+        XCTAssertEqual(tasks.first?.deepLink, "codex://threads/01a")
         XCTAssertEqual(tasks.last?.title, "(untitled)")
     }
 
@@ -615,6 +616,7 @@ final class CodexActivitySourceTests: XCTestCase {
             ["评估 AI 玩游戏", "raw first message", "user asked this last", "(untitled)"])
         XCTAssertEqual(tasks.first?.cwd, "/Users/x/Repos/compounding")
         XCTAssertEqual(tasks.first?.resumeCommand, "codex resume 01a")
+        XCTAssertEqual(tasks.first?.deepLink, "codex://threads/01a")
         XCTAssertEqual(
             tasks.first?.completedAt, Date(timeIntervalSince1970: 1_789_162_387))
     }
