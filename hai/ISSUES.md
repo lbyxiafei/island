@@ -4,8 +4,8 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
-| feat | [dropdown-alfred-ux](./issue/2026-09-25-12-39-11-dropdown-alfred-ux.md) | [ux] improve dropdown ux in alfred way | new | 2026-09-25T12:39:11-07:00 | 2026-09-25T12:39:11-07:00 |
 | chore | [brew-distribution](./issue/2026-09-13-14-20-51-brew-distribution.md) | 调研 brew install 分发路径（等本地 MVP 走通后再做） | new | 2026-09-13T14:20:51-07:00 | 2026-09-24T15:47:33-07:00 |
+| feat | [dropdown-alfred-ux](./issue/2026-09-25-12-39-11-dropdown-alfred-ux.md) | [ux] improve dropdown ux in alfred way | in-progress | 2026-09-25T12:39:11-07:00 | 2026-09-25T12:50:41-07:00 |
 | bug | [dropdown-title-ux](./issue/2026-09-25-11-47-19-dropdown-title-ux.md) | [ux] title at island dropdown not meeting expectation | solved | 2026-09-25T11:47:19-07:00 | 2026-09-25T12:44:54-07:00 |
 | feat | [dropdown-task-title-and-dismiss](./issue/2026-09-24-16-00-27-dropdown-task-title-and-dismiss.md) | 下拉框 task 标题兜底 last msg，点击后随即消失 | solved | 2026-09-24T16:00:27-07:00 | 2026-09-24T16:04:00-07:00 |
 | bug | [pi-task-cannot-reopen](./issue/2026-09-24-15-53-00-pi-task-cannot-reopen.md) | 点击 pi 任务无法回到宿主（pi 无 tmux 且无 host pid） | solved | 2026-09-24T15:53:00-07:00 | 2026-09-24T15:57:00-07:00 |
