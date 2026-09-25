@@ -4,7 +4,7 @@ name: claude-desktop-source
 title: "Claude 桌面版（聊天）完成后不弹 island：尚无数据源"
 status: new
 created_ts: 2026-09-25T14:38:22-07:00
-updated_ts: 2026-09-25T14:46:11-07:00
+updated_ts: 2026-09-25T14:49:43-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -49,6 +49,22 @@ spike 脚本（一次性，不进 repo）：解析 leveldb log/ldb + snappy + V8
   - `sessions_api_list_sessions`：桌面版 Claude Code 会话，带 `title`、`worker_status`、`status_bucket`（`completed`）、`unread`、`updated_at`
 - 零依赖实现需要：snappy 解压（约 40 行）+ V8 反序列化子集（object / array / map / set / string / number / bool / null / date），不需要解析 leveldb 本身（直接挑 blob 目录里最新的文件）
 - 风险：格式无公开文档；`hub_transcript` 只覆盖**当前打开**的对话；写盘时机待实测
+
+#### 实测（2026-09-25 14:45–14:49，用户在桌面版发消息 + 中途停止）
+
+| 事件 | 最后一条 assistant | 写盘时刻 | 延迟 |
+|---|---|---|---|
+| 正常回复完成 | `stop_reason: end_turn`，`updated_at` 21:47:52.937Z | 14:47:58 | 约 5s |
+| 回复中途点停止 | `stop_reason: user_canceled`，`updated_at` 21:49:11.167Z | 14:49:16 | 约 5s |
+
+- 每次持久化都会写一个**新的 blob 文件**（id 递增：1944f → 19450 → … → 19458），旧文件会被回收（目录里始终只有少量文件）；取 mtime 最新的那个即可
+- 生成过程中持久化的仍是上一轮的最后一条消息，没有半截状态；**完成判据 = 最后一条 assistant 的 `stop_reason == end_turn`，`user_canceled` 过滤掉**（与 CLI 的 esc 规则一致）
+- 5 秒延迟加上 3 秒轮询，在可接受范围内
+
+未验证 / 已知缺口：
+
+- `hub_transcript` 只有**当前打开**的对话。回复期间切到别的对话，这条完成信号就看不到了；需要再验证 `chat_conversation_list` 的 `updated_at` 能否兜底
+- 桌面版 Claude Code 会话（`sessions_api_list_sessions`）的完成判据（`worker_status` / `status_bucket` / `unread` 的变化）还没实测
 
 ### 方案 2：系统通知中心（2026-09-25，受限）
 
