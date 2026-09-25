@@ -65,7 +65,7 @@ Issue type 与 status 的合法取值，唯一真源是 `scripts/issue.py` 里�
 | `solved` | Agent 认为已完成并已 ship，等人验收 | Agent |
 | `closed` | 人验收通过；或明确决定不做，理由写在正文里 | 人 |
 
-流转默认单向 `new → open → in-progress → solved → closed`。只允许 `closed → open` 重开，理由写在正文里。状态由人来确认 scope，因此 `open` 这一步通常由人推进；但当 Agent 判断该 issue **明确落在 PLAN 的 scope 之内且不触发 Ask first** 时，可以在同一轮里自己推到 `in-progress`，并在正文写下依据（`Scope-check: PLAN §<节>`）。判断不了就停在 `new`。
+流转默认单向 `new → open → in-progress → solved → closed`。只允许 `closed → open` 重开，理由写在这次流转的 History 条目里。状态由人来确认 scope，因此 `open` 这一步通常由人推进；但当 Agent 判断该 issue **明确落在 PLAN 的 scope 之内且不触发 Ask first** 时，可以在同一轮里自己推到 `in-progress`，并在正文写下依据（`Scope-check: PLAN §<节>`）。判断不了就停在 `new`。
 
 **什么时候必须有 issue**：
 
@@ -102,6 +102,20 @@ updated_ts: 2026-09-12T14:30:05-07:00
 - `created_ts` / `updated_ts` 为 RFC 3339 带时区；`created_ts` 创建后不再改动
 - 正文第一行是回到总纲的链接 `> 总纲：[ISSUES.md](../ISSUES.md)`，`make issue` 自动写入，手工创建时照抄
 - `updated_ts` 只在**正文或字段发生实质变化**时更新；`make issue-sync` 重建表格不算变化，`make issue-touch` 与 `make issue-status` 会自动更新它
+
+**History**：正文最后一节固定是 `# History`，记录每一次状态变化，取代单独的「处理结果」「结论」之类的节。
+
+```markdown
+# History
+
+## 2026-09-25T14:02:11-07:00: in-progress -> solved
+
+一小段处理结果：做了什么、根因（bug）、怎么验证的、还剩什么没覆盖。
+```
+
+- 改状态一律用 `make issue-status name=<slug> status=<status> note="..."`，多行内容写进文件再用 `note_file=<path>`。工具负责写 `## <ts>: <old> -> <new>` 这一行和 `updated_ts`，时间戳不要手敲
+- 条目只追加、不改写；`# History` 之后不要再加别的节
+- 过程中的调研、设计取舍仍写在上面的正文节里，History 条目只写这一步的结果，篇幅控制在一小段
 
 **授权台账**：Ask first 得到同意后，把结论写进关联 issue 正文的 `## Decision` 节——日期、同意人、同意的具体范围。后续 Agent 以这一节为授权依据，不必重复询问；没有这一节的，视为未授权。
 

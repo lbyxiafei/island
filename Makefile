@@ -113,5 +113,6 @@ issue-check: ## fail when $(HAI)/ISSUES.md drifted from the detail pages
 issue-touch: ## bump updated_ts: make issue-touch name=<slug>
 	@$(PYTHON) scripts/issue.py --root $(HAI) touch --name $(name)
 
-issue-status: ## move an issue: make issue-status name=<slug> status=<status>
-	@$(PYTHON) scripts/issue.py --root $(HAI) set-status --name $(name) --status $(status)
+issue-status: ## move an issue + History entry: make issue-status name=<slug> status=<status> [note="..."] [note_file=<path>]
+	@$(PYTHON) scripts/issue.py --root $(HAI) set-status --name $(name) --status $(status) \
+		$(if $(note),--note "$(note)") $(if $(note_file),--note-file $(note_file))

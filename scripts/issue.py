@@ -32,11 +32,15 @@ MAX_SLUG_WORDS = 5
 DEFAULT_BODY = (
     "## 背景\n\n## 期望结果\n\n## 备注\n\n"
     "- 全程在独立 worktree（`../.worktree/<repo>-<slug>`）中完成，合回 master 前 `make verify` 全过，"
-    "流程见 AGENTS.md / Workflow / Worktree 与 Ship\n"
+    "流程见 AGENTS.md / Workflow / Worktree 与 Ship\n\n"
+    "# History\n"
 )
 # First body line of every created page, so a reader landing on one issue can
 # always get back to the full list.
 BACKLINK = "> 总纲：[ISSUES.md](../ISSUES.md)"
+# Last section of every page. Each status change appends
+# "## <ts>: <old> -> <new>" plus a short note of what was done.
+HISTORY_HEADING = "# History"
 
 INDEX_PREAMBLE = """\
 # ISSUES
@@ -277,12 +281,27 @@ def cmd_touch(args: argparse.Namespace) -> int:
     return 0
 
 
+def append_history(body: str, timestamp: str, old: str, new: str, note: str = "") -> str:
+    lines = body.rstrip("\n").split("\n")
+    if HISTORY_HEADING not in lines:
+        lines += ["", HISTORY_HEADING]
+    lines += ["", f"## {timestamp}: {old} -> {new}"]
+    if note.strip():
+        lines += ["", note.strip()]
+    return "\n".join(lines)
+
+
 def cmd_set_status(args: argparse.Namespace) -> int:
     root = Path(args.root)
     validate_status(args.status)
     issue = find_issue(root, args.name)
+    if issue["status"] == args.status:
+        raise IssueError(f"issue {args.name!r} is already {args.status!r}")
+    note = Path(args.note_file).read_text(encoding="utf-8") if args.note_file else (args.note or "")
+    timestamp = now_ts()
+    issue["body"] = append_history(issue["body"], timestamp, issue["status"], args.status, note)
     issue["status"] = args.status
-    issue["updated_ts"] = now_ts()
+    issue["updated_ts"] = timestamp
     write_issue(root, issue)
     sync_index(root)
     print(f"{issue['filename']}: status -> {args.status}")
@@ -348,9 +367,14 @@ def build_parser() -> argparse.ArgumentParser:
     touch.add_argument("--name", required=True)
     touch.set_defaults(func=cmd_touch)
 
-    set_status = commands.add_parser("set-status", help="change status and bump updated_ts")
+    set_status = commands.add_parser(
+        "set-status", help="change status, append a History entry and bump updated_ts"
+    )
     set_status.add_argument("--name", required=True)
     set_status.add_argument("--status", required=True, choices=STATUSES)
+    note = set_status.add_mutually_exclusive_group()
+    note.add_argument("--note", help="what was done, written under the History entry")
+    note.add_argument("--note-file", help="file holding the note, for multi-line text")
     set_status.set_defaults(func=cmd_set_status)
 
     sync = commands.add_parser("sync", help="rebuild ISSUES.md from the detail pages")

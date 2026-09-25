@@ -27,7 +27,9 @@ updated_ts: 2026-09-25T12:44:54-07:00
 
 - 全程在独立 worktree（`../.worktree/<repo>-<slug>`）中完成，合回 master 前 `make verify` 全过，流程见 AGENTS.md / Workflow / Worktree 与 Ship
 
-## 处理结果
+# History
+
+## 2026-09-25T12:44:54-07:00: new -> solved
 
 Scope-check: PLAN § Design / Island 下拉框 UX #1、Island 展示 UX（只提醒新完成的任务）
 
