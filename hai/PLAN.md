@@ -62,6 +62,14 @@
 1. 未读/未打开 -> 已读/已打开
 2. 按 last update ts 倒叙
 
+### Island 下拉框 UX
+
+1. 下拉框的task，有title显示title，没有title显示last msg（现在似乎也是这么实现的？）
+2. 当我点击下拉框的title后，下拉框随即消失/toggle off
+
+### Menu bar UX
+
+
 
 ## Key Decisions
 
@@ -69,22 +77,3 @@
 |---|---|---|---|
 | | | | |
 
-
-# Versions
-
-## VERSION — MVP
-
-帮我按照 design 和 scope 的描述，进行 调研、试验性改动、验证。
- 
-
-## VERSION — POC
-
-1. 当前，我们首先要验证方案是否可行，AI AGENT 的交互部分先暂时不做研究。 —— 已验证可行
-    > a. 验看 MAC OS 上做 app 的流程； 
-    > b. 如果可行，即没有手续、账号、资格的限制，我们就做一个用 global hot key 调用的悬浮窗（暂定： `cmd + ctr + e`），悬浮窗调出后自动显示 5 秒后消失。
-2. 接下来，帮我验证：这个可否做成app，并发布，即其他人可以通过brew install安装？同时，帮我做一个menubar上的图标 —— 已验证
-3. 帮我做一个 menubar 的图标，图标你来定，做好了放到 reference 里面，打开图标后可以有设置，设置目前就设置快捷键，以及退出选项。 —— done
-4. 关于开机启动，帮我调研下可否在 mac os 的setting里面进行注册：launch item on 开机这个选项。 —— done
-5. 关于快捷键，新增功能：
-   - 设置好的悬浮窗快捷键，可以toggle on，也可以toggle off
-   - 快捷键配置的时候，现在是text输入模式，改成监听键盘组合，并增加清空按钮
