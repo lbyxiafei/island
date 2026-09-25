@@ -3,7 +3,7 @@ import IslandCore
 
 /// The settings window behind the menu's `Settings…` item. Scope is deliberately
 /// minimal (PLAN § Scope #3, #5): record the summon hotkey by pressing it,
-/// switch it on or off, or clear it.
+/// switch it on or off, or clear it; and pick the overlay theme.
 ///
 /// It is a regular, key-capable window — unlike the overlay — because the user
 /// has to be able to press keys into it.
@@ -11,6 +11,8 @@ import IslandCore
 final class HotkeySettingsWindow: NSObject {
     private let coordinator: HotkeySettingsCoordinator
     private let onHotkeyChanged: (HotkeySpec, Bool) -> Void
+    private let onThemeChanged: (OverlayTheme) -> Void
+    private let themePicker = NSPopUpButton()
     private let window: NSWindow
     private let recorder: HotkeyRecorderView
     private let enabledToggle: NSButton
@@ -18,15 +20,18 @@ final class HotkeySettingsWindow: NSObject {
 
     init(
         coordinator: HotkeySettingsCoordinator,
-        onHotkeyChanged: @escaping (HotkeySpec, Bool) -> Void
+        theme: OverlayTheme,
+        onHotkeyChanged: @escaping (HotkeySpec, Bool) -> Void,
+        onThemeChanged: @escaping (OverlayTheme) -> Void
     ) {
         self.coordinator = coordinator
         self.onHotkeyChanged = onHotkeyChanged
+        self.onThemeChanged = onThemeChanged
         recorder = HotkeyRecorderView()
         enabledToggle = NSButton(checkboxWithTitle: "Enabled", target: nil, action: nil)
         feedback = NSTextField(labelWithString: "")
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 230),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 320),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -45,6 +50,10 @@ final class HotkeySettingsWindow: NSObject {
         }
         enabledToggle.target = self
         enabledToggle.action = #selector(enabledToggled)
+        themePicker.addItems(withTitles: OverlayTheme.allCases.map(\.displayName))
+        themePicker.selectItem(at: OverlayTheme.allCases.firstIndex(of: theme) ?? 0)
+        themePicker.target = self
+        themePicker.action = #selector(themePicked)
         refreshFromCoordinator()
     }
 
@@ -79,7 +88,18 @@ final class HotkeySettingsWindow: NSObject {
         buttons.orientation = .horizontal
         buttons.spacing = 8
 
-        let stack = NSStackView(views: [title, recorder, help, enabledToggle, feedback, buttons])
+        let themeTitle = label("Overlay theme", font: .systemFont(ofSize: 13, weight: .semibold))
+        let themeHelp = label(
+            "Applies immediately; the overlay shows a preview.",
+            font: .systemFont(ofSize: 11),
+            color: .secondaryLabelColor
+        )
+
+        let stack = NSStackView(views: [
+            title, recorder, help, enabledToggle, feedback, buttons, themeTitle, themePicker,
+            themeHelp,
+        ])
+        stack.setCustomSpacing(20, after: buttons)
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
@@ -178,6 +198,12 @@ final class HotkeySettingsWindow: NSObject {
     @objc private func resetTapped() {
         recorder.setSpec(HotkeyConfiguration.fallbackSpec)
         applyTapped()
+    }
+
+    @objc private func themePicked() {
+        let index = themePicker.indexOfSelectedItem
+        guard OverlayTheme.allCases.indices.contains(index) else { return }
+        onThemeChanged(OverlayTheme.allCases[index])
     }
 
     @objc private func enabledToggled() {

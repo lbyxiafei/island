@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var inbox: AgentInbox?
     private var overlayContent: OverlayContentView?
     private let reopenExecutor = AgentReopenExecutor()
+    private let themeStore = UserDefaultsThemeStore()
     private var hideTask: Task<Void, Never>?
 
     init(configuration: ResolvedConfiguration) {
@@ -28,13 +29,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             frame: NSRect(
                 x: 0, y: 0,
                 width: OverlayContentView.width,
-                height: OverlayContentView.emptyHeight
+                height: 120
             )
         )
+        content.setTheme(themeStore.load())
         content.onSelect = { [weak self] entry in self?.selectTask(entry) }
         content.onHoverChange = { [weak self] hovering in self?.setOverlayHovered(hovering) }
+        content.onDismiss = { [weak self] in self?.hideOverlay(reason: "overlay dismissed") }
+        content.onHeightChange = { [weak self] height in
+            self?.panel?.setContentSize(width: OverlayContentView.width, height: height)
+        }
         overlayContent = content
-        self.panel = OverlayPanel(contentView: content)
+        let panel = OverlayPanel(contentView: content)
+        panel.setContentSize(width: OverlayContentView.width, height: content.preferredHeight)
+        // Alfred-style: clicking anywhere else dismisses a summoned overlay.
+        panel.onResignKey = { [weak self] in
+            // Hiding clears acceptsKeyboard first, so this does not re-enter.
+            guard self?.panel?.acceptsKeyboard == true else { return }
+            self?.hideOverlay(reason: "overlay hidden after losing focus")
+        }
+        self.panel = panel
 
         let registrar = HotkeyRegistrar { [weak self] in
             MainActor.assumeIsolated {
@@ -64,12 +78,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
-        let settingsWindow = HotkeySettingsWindow(coordinator: settings) {
-            [weak self] spec, enabled in
-            self?.log("hotkey changed to \(spec.displayString) (enabled: \(enabled))")
-            self?.statusItem?.setHotkey(spec, source: .menu)
-            self?.statusItem?.setHotkeyEnabled(enabled)
-        }
+        let settingsWindow = HotkeySettingsWindow(
+            coordinator: settings,
+            theme: content.theme,
+            onHotkeyChanged: { [weak self] spec, enabled in
+                self?.log("hotkey changed to \(spec.displayString) (enabled: \(enabled))")
+                self?.statusItem?.setHotkey(spec, source: .menu)
+                self?.statusItem?.setHotkeyEnabled(enabled)
+            },
+            onThemeChanged: { [weak self] theme in self?.setTheme(theme) }
+        )
         self.settingsWindow = settingsWindow
 
         statusItem = StatusItemController(
@@ -78,7 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotkeyEnabled: settings.isEnabled,
             durationSeconds: configuration.duration.seconds,
             loginItem: LoginItemController(),
-            onSummon: { [weak self] in self?.showOverlay() },
+            onSummon: { [weak self] in self?.showOverlay(interactive: true) },
             onToggleHotkey: { [weak self] enabled in self?.setHotkeyEnabled(enabled) },
             onSelectTask: { [weak self] id in self?.selectTask(id: id) },
             onOpenSettings: { [weak self] in self?.settingsWindow?.show() },
@@ -120,12 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlayContent?.update(
             entries: entries,
             unread: inbox.unreadCount,
-            limit: inbox.limit,
-            hotkey: configuration.hotkey.spec
-        )
-        panel?.setContentSize(
-            width: OverlayContentView.width,
-            height: OverlayContentView.height(forEntryCount: entries.count, limit: inbox.limit)
+            hotkey: settings?.current ?? configuration.hotkey.spec
         )
         log("agent tasks: \(inbox.unreadCount) unread, \(inbox.allEntries.count) tracked")
     }
@@ -149,17 +162,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         log("selected \(entry.task.title) -> \(action)")
     }
 
-    private func showOverlay() {
-        guard let panel else { return }
-        panel.positionNearTopOfScreen()
-        panel.orderFrontRegardless()
-        log("overlay shown, hiding in \(configuration.duration.seconds)s")
-        scheduleHide()
+    /// `interactive` (hotkey, menu): the panel takes the keyboard and stays until
+    /// dismissed. Otherwise (a run just finished) it never takes focus and
+    /// hides itself after the configured duration. A pop-up never downgrades an
+    /// overlay the user is already typing into.
+    private func showOverlay(interactive: Bool = false) {
+        guard let panel, let content = overlayContent else { return }
+        if panel.isKeyWindow && !interactive { return }
+
+        hideTask?.cancel()
+        hideTask = nil
+        panel.acceptsKeyboard = interactive
+        content.setKeyboardMode(interactive)
+        panel.setContentSize(width: OverlayContentView.width, height: content.preferredHeight)
+        if interactive {
+            panel.makeKeyAndOrderFront(nil)
+            content.focusQuery()
+            log("overlay summoned for keyboard use")
+        } else {
+            panel.orderFrontRegardless()
+            log("overlay shown, hiding in \(configuration.duration.seconds)s")
+            scheduleHide()
+        }
     }
 
-    /// Hovering the overlay pauses the auto-hide so the list stays clickable;
-    /// leaving restarts it.
+    /// Settings picked a new theme: apply, remember, and show a preview.
+    private func setTheme(_ theme: OverlayTheme) {
+        themeStore.save(theme)
+        overlayContent?.setTheme(theme)
+        log("overlay theme: \(theme.rawValue)")
+        showOverlay()
+    }
+
+    /// Hovering a passive overlay pauses the auto-hide so the list stays
+    /// clickable; leaving restarts it. A summoned overlay has no timer.
     private func setOverlayHovered(_ hovering: Bool) {
+        guard panel?.acceptsKeyboard == false else { return }
         if hovering {
             hideTask?.cancel()
             hideTask = nil
@@ -184,7 +222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func toggleOverlay() {
         switch OverlayToggle.hotkeyPress(isOverlayVisible: panel?.isVisible ?? false) {
         case .show:
-            showOverlay()
+            showOverlay(interactive: true)
         case .hide:
             hideOverlay(reason: "overlay hidden by hotkey")
         }
@@ -193,7 +231,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func hideOverlay(reason: String = "overlay hidden") {
         hideTask?.cancel()
         hideTask = nil
-        panel?.orderOut(nil)
+        guard let panel, panel.isVisible else { return }
+        panel.acceptsKeyboard = false
+        panel.orderOut(nil)
         log(reason)
     }
 
