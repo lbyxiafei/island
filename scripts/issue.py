@@ -28,7 +28,14 @@ FILENAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})-(.+)$")
 SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 MAX_SLUG_WORDS = 5
 
-DEFAULT_BODY = "## 背景\n\n## 期望结果\n\n## 备注\n"
+DEFAULT_BODY = (
+    "## 背景\n\n## 期望结果\n\n## 备注\n\n"
+    "- 全程在独立 worktree（`../.worktree/<repo>-<slug>`）中完成，合回 master 前 `make verify` 全过，"
+    "流程见 AGENTS.md / Workflow / Worktree 与 Ship\n"
+)
+# First body line of every created page, so a reader landing on one issue can
+# always get back to the full list.
+BACKLINK = "> 总纲：[ISSUES.md](../ISSUES.md)"
 
 INDEX_PREAMBLE = """\
 # ISSUES
@@ -73,7 +80,10 @@ def validate_slug(slug: str) -> str:
 
 def _validate_ts(value: str, field: str) -> str:
     try:
-        dt.datetime.strptime(value, TIMESTAMP_FMT)
+        # ``%z`` inside TIMESTAMP_FMT makes the parse tz-aware, and a value without
+        # an offset raises ValueError instead of yielding a naive datetime. DTZ007
+        # is a false positive: ruff cannot see the ``%z`` hidden behind the constant.
+        dt.datetime.strptime(value, TIMESTAMP_FMT)  # noqa: DTZ007
     except ValueError as exc:
         raise IssueError(f"{field} must be RFC 3339 with offset, got {value!r}") from exc
     return value
@@ -196,8 +206,10 @@ def write_issue(root: Path, issue: dict[str, str]) -> Path:
 
 
 def sort_key(issue: dict[str, str]) -> tuple[int, float]:
-    updated = dt.datetime.strptime(issue["updated_ts"], TIMESTAMP_FMT).timestamp()
-    return STATUSES.index(issue["status"]), -updated
+    # Same DTZ007 false positive as in _validate_ts: %z in TIMESTAMP_FMT guarantees
+    # an offset, so the parsed value is never naive.
+    updated = dt.datetime.strptime(issue["updated_ts"], TIMESTAMP_FMT)  # noqa: DTZ007
+    return STATUSES.index(issue["status"]), -updated.timestamp()
 
 
 def render_index(issues: list[dict[str, str]]) -> str:
@@ -222,6 +234,12 @@ def sync_index(root: Path) -> Path:
 # --- commands -----------------------------------------------------------------
 
 
+def with_backlink(body: str) -> str:
+    if BACKLINK in body:
+        return body
+    return f"{BACKLINK}\n\n{body}"
+
+
 def cmd_create(args: argparse.Namespace) -> int:
     root = Path(args.root)
     validate_type(args.type)
@@ -238,7 +256,9 @@ def cmd_create(args: argparse.Namespace) -> int:
         "created_ts": timestamp,
         "updated_ts": timestamp,
         "filename": f"{filename_timestamp(timestamp)}-{args.slug}.md",
-        "body": Path(args.body_file).read_text(encoding="utf-8") if args.body_file else DEFAULT_BODY,
+        "body": with_backlink(
+            Path(args.body_file).read_text(encoding="utf-8") if args.body_file else DEFAULT_BODY
+        ),
     }
     path = write_issue(root, issue)
     sync_index(root)
@@ -272,6 +292,24 @@ def cmd_sync(args: argparse.Namespace) -> int:
     root = Path(args.root)
     issues = load_issues(root)
     print(f"{sync_index(root)}: {len(issues)} issue(s)")
+    return 0
+
+
+def cmd_list(args: argparse.Namespace) -> int:
+    issues = load_issues(Path(args.root))
+    if args.status:
+        issues = [issue for issue in issues if issue["status"] == validate_status(args.status)]
+    elif not args.all:
+        issues = [issue for issue in issues if issue["status"] != "closed"]
+    if not issues:
+        print("no issues")
+        return 0
+
+    columns = ("status", "type", "name", "updated_ts", "title")
+    rows = [[issue[column] for column in columns] for issue in sorted(issues, key=sort_key)]
+    widths = [max(len(row[i]) for row in [list(columns), *rows]) for i in range(len(columns) - 1)]
+    for row in [list(columns), *rows]:
+        print("  ".join(cell.ljust(width) for cell, width in zip(row, widths)) + "  " + row[-1])
     return 0
 
 
@@ -316,6 +354,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     sync = commands.add_parser("sync", help="rebuild ISSUES.md from the detail pages")
     sync.set_defaults(func=cmd_sync)
+
+    list_ = commands.add_parser("list", help="print issues, closed ones hidden unless --all")
+    list_.add_argument("--status", choices=STATUSES, help="only this status")
+    list_.add_argument("--all", action="store_true", help="include closed issues")
+    list_.set_defaults(func=cmd_list)
 
     check = commands.add_parser("check", help="fail when ISSUES.md drifted")
     check.set_defaults(func=cmd_check)

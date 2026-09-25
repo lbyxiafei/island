@@ -7,6 +7,8 @@ created_ts: 2026-09-24T15:53:00-07:00
 updated_ts: 2026-09-24T15:57:00-07:00
 ---
 
+> 总纲：[ISSUES.md](../ISSUES.md)
+
 Scope-check: PLAN § Design / Agents 交互 interface 第 3 条（「尽量打开到指定窗口」）。授权来源：用户会话中报障「我点击这个，没有帮我回到 pi（vscode？）」，属 MVP 范围内 bug。
 
 ## 现象

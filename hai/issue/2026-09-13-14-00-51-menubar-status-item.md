@@ -7,6 +7,8 @@ created_ts: 2026-09-13T14:00:51-07:00
 updated_ts: 2026-09-13T14:12:26-07:00
 ---
 
+> 总纲：[ISSUES.md](../ISSUES.md)
+
 ## 背景
 
 当前 app 是 accessory（`LSUIElement=true` + `setActivationPolicy(.accessory)`）：没有 Dock 图标、没有菜单栏、没有 status item。好处是绝不打扰用户，代价是**用户无法判断进程是否在运行**。

@@ -7,6 +7,8 @@ created_ts: 2026-09-24T15:28:57-07:00
 updated_ts: 2026-09-24T15:48:00-07:00
 ---
 
+> 总纲：[ISSUES.md](../ISSUES.md)
+
 Scope-check: PLAN § Scope / 负责 Agents 范围（明确列出「claude code 桌面版」「codex 桌面版」）。授权来源：用户会话指令「把未完成的 issues 都自主处理了」。
 
 ## 结论：Codex 桌面版有解，Claude 桌面版没有

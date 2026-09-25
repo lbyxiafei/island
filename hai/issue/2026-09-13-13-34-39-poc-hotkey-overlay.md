@@ -7,6 +7,8 @@ created_ts: 2026-09-13T13:34:39-07:00
 updated_ts: 2026-09-13T13:49:41-07:00
 ---
 
+> 总纲：[ISSUES.md](../ISSUES.md)
+
 Scope-check: PLAN § Scope / VERSION — POC。以下改动全部落在该节范围内（验证 macOS 做 app 的流程 + hotkey 悬浮窗），不涉及 agent 检测与交互。
 
 ## 背景

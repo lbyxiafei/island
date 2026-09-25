@@ -7,6 +7,8 @@ created_ts: 2026-09-24T13:58:41-07:00
 updated_ts: 2026-09-24T14:00:00-07:00
 ---
 
+> 总纲：[ISSUES.md](../ISSUES.md)
+
 Scope-check: PLAN § Scope / VERSION — POC #5 第一条「设置好的悬浮窗快捷键，可以 toggle on，也可以 toggle off」。授权来源：用户在会话中明确指令「version poc 5去实现下」及后续「还是没有 toggle off 的功能 / 继续」。不触发 Ask first。
 
 ## 背景

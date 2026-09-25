@@ -7,6 +7,8 @@ created_ts: 2026-09-13T14:13:40-07:00
 updated_ts: 2026-09-13T14:16:49-07:00
 ---
 
+> 总纲：[ISSUES.md](../ISSUES.md)
+
 Scope-check: PLAN § Scope / VERSION — POC #3（「打开图标后可以有设置，设置目前就设置快捷键，以及退出选项」）。授权来源：用户在会话中明确指令「poc3、4 go」。
 
 ## 背景

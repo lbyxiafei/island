@@ -7,6 +7,8 @@ created_ts: 2026-09-24T16:00:27-07:00
 updated_ts: 2026-09-24T16:04:00-07:00
 ---
 
+> 总纲：[ISSUES.md](../ISSUES.md)
+
 Scope-check: PLAN § Design / Island 下拉框 UX 第 1、2 条。授权来源：用户会话指令「更新了下拉框ux新需求，帮忙实现下」。PLAN 里该节由人填写，属 MVP 范围内的 UI 细化。
 
 ## 需求（PLAN 原文）

@@ -7,6 +7,8 @@ created_ts: 2026-09-13T14:20:51-07:00
 updated_ts: 2026-09-24T15:47:33-07:00
 ---
 
+> 总纲：[ISSUES.md](../ISSUES.md)
+
 ## 背景
 
 `PLAN.md` § Scope / VERSION — POC #2 原文：「这个可否做成 app，并发布，即其他人可以通过 `brew install` 安装？」该条目前被人标注为「已验证」，但**实际只完成了「做成 app」**（ad-hoc 签名、本机可运行），brew 分发从未调研，也从未做过。
@@ -30,6 +32,7 @@ updated_ts: 2026-09-24T15:47:33-07:00
 
 ## 备注
 
+- 全程在独立 worktree（`../.worktree/<repo>-<slug>`）中完成，合回 master 前 `make verify` 全过，流程见 AGENTS.md / Workflow / Worktree 与 Ship
 - 依赖前置：先有本地 MVP（agent 活动检测 + 悬浮窗真实内容），发布才有意义 —— **前置已具备（2026-09-24 MVP 走通）**
 - 相关但独立：`launch-at-login`、`menubar-status-item`
 

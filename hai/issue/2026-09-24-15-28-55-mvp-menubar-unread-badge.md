@@ -7,6 +7,8 @@ created_ts: 2026-09-24T15:28:55-07:00
 updated_ts: 2026-09-24T15:34:10-07:00
 ---
 
+> 总纲：[ISSUES.md](../ISSUES.md)
+
 Scope-check: PLAN § Scope / VERSION — MVP；PLAN § Design / Island 展示 UX（「island 需要在 menu bar 上展示一个数字，例如微信这种」）。授权来源：用户会话指令「我新增了version mvp，你去执行下」。
 
 ## 实现

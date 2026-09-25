@@ -7,6 +7,8 @@ created_ts: 2026-09-24T15:28:55-07:00
 updated_ts: 2026-09-24T15:48:00-07:00
 ---
 
+> 总纲：[ISSUES.md](../ISSUES.md)
+
 Scope-check: PLAN § Scope / VERSION — MVP；PLAN § Design / Island 展示 UX。授权来源：用户会话指令「把未完成的 issues 都自主处理了」。
 
 ## 实现

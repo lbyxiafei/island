@@ -7,6 +7,8 @@ created_ts: 2026-09-24T15:28:55-07:00
 updated_ts: 2026-09-24T15:34:10-07:00
 ---
 
+> 总纲：[ISSUES.md](../ISSUES.md)
+
 Scope-check: PLAN § Scope / VERSION — MVP（「帮我按照 design 和 scope 的描述，进行 调研、试验性改动、验证」）。授权来源：用户在会话中明确指令「我新增了version mvp，你去执行下」。不触发 Ask first（零新依赖）。
 
 ## 调研结论

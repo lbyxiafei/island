@@ -100,6 +100,7 @@ updated_ts: 2026-09-12T14:30:05-07:00
 - `name` 必须与文件名中的 slug 完全一致
 - `title` 一律用双引号包裹，避免冒号等字符破坏 YAML
 - `created_ts` / `updated_ts` 为 RFC 3339 带时区；`created_ts` 创建后不再改动
+- 正文第一行是回到总纲的链接 `> 总纲：[ISSUES.md](../ISSUES.md)`，`make issue` 自动写入，手工创建时照抄
 - `updated_ts` 只在**正文或字段发生实质变化**时更新；`make sync-issue` 重建表格不算变化，`make issue-touch` 与 `make issue-status` 会自动更新它
 
 **授权台账**：Ask first 得到同意后，把结论写进关联 issue 正文的 `## Decision` 节——日期、同意人、同意的具体范围。后续 Agent 以这一节为授权依据，不必重复询问；没有这一节的，视为未授权。
@@ -233,12 +234,33 @@ repo authors 和 Agent 之间的交流中英文皆可，但 Agent 生成的**代
 3. `./hai/CONTEXT.md`，仅当本次改动影响其内容时
 4. `./README.md`，仅当本次改动影响其内容时，禁止纯措辞润色
 
+## Worktree
+
+所有代码改动都在独立的 git worktree 里做，一个 issue 一个 worktree。这样多个 Agent 可以并行，各改各的，不会互相踩工作区。主 checkout 始终停在 master，保持干净，只用来合并和 push。
+
+```bash
+# 在主 checkout 里执行；<repo> 是仓库目录名，<slug> 是 issue 的 name
+git worktree add ../.worktree/<repo>-<slug> -b <slug>
+```
+
+1. 开工前先 `git worktree list`，确认没有别的 Agent 正在用同一个 slug
+2. 在 worktree 里改代码、改相关 issue，按 Code Change / Context Update 执行。**只 commit，不 push**：功能分支不上远程
+3. 纯 issue 记账（只动 `hai/`，不碰代码）可以直接在主 checkout 的 master 上提交，不必开 worktree
+
 ## Ship
 
-使用 `skill:ship` 将本次所有改动合成一个 commit，直接 push 到 master。当前阶段不做分支管理。
+合回 master 前必须跑一次全量 regression，而且测的必须正好是即将进 master 的那份代码：
 
-1. push 前 `make verify` 必须是绿的（`make hooks` 启用后 pre-push 会再跑一遍）
-2. 扫一眼 untracked 文件，命中 secrets 类文件一律停下问人——见 Boundaries / Never 第 2 条
-3. commit message 格式 `{type}: {description}`，type 取关联 issue 的 type；没有关联 issue 时按改动内容判定（见 Issue / 什么时候必须有 issue）
-4. 关联了 issue 的，在 body 里写 `Ref: hai/issue/{filename}`
-5. 禁止 force push（见 Boundaries / Never 第 1 条）
+1. 在 worktree 里把改动合成**一个** commit（有多个就 `git reset --soft $(git merge-base master HEAD)` 后重新提交），message 规则见下
+2. 在 worktree 里 `git rebase master`。功能分支没推过，rebase 不违反 Never 第 1 条。`hai/ISSUES.md` 冲突时不要手工合，跑 `make sync-issue` 重建后 `git add` 继续
+3. 在 worktree 里跑 `make verify`，**全部 gate 通过**才往下走；没过就在 worktree 里修（`git commit --amend` 保持一个 commit），修完回到第 2 步
+4. 回到主 checkout：`git merge --ff-only <slug>`。失败说明 master 在这期间前进了，回到第 2 步，**不允许**改用普通 merge 绕过
+5. 在主 checkout `git push`；`make hooks` 启用后 pre-push 会对合并结果再跑一遍 `make verify`。不要在 worktree 里用 `skill:ship`——它会把功能分支推上远程
+6. 清理：`git worktree remove ../.worktree/<repo>-<slug>`，`git branch -d <slug>`
+
+Commit 与 push 的约束：
+
+1. 扫一眼 untracked 文件，命中 secrets 类文件一律停下问人——见 Boundaries / Never 第 2 条
+2. commit message 格式 `{type}: {description}`，type 取关联 issue 的 type；没有关联 issue 时按改动内容判定（见 Issue / 什么时候必须有 issue）
+3. 关联了 issue 的，在 body 里写 `Ref: hai/issue/{filename}`
+4. 禁止 force push（见 Boundaries / Never 第 1 条）

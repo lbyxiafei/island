@@ -7,6 +7,8 @@ created_ts: 2026-09-24T13:33:42-07:00
 updated_ts: 2026-09-24T13:36:36-07:00
 ---
 
+> 总纲：[ISSUES.md](../ISSUES.md)
+
 Scope-check: PLAN § Scope / VERSION — POC #5（「设置好的悬浮窗快捷键，可以 toggle on，也可以 toggle off」+「快捷键配置的时候，现在是 text 输入模式，改成监听键盘组合，并增加清空按钮」）。授权来源：用户在会话中明确指令「version poc 5去实现下」，且该范围已由人写进 `hai/PLAN.md` § Scope / VERSION — POC #5（commit `bba59d4`）。不触发 Ask first。
 
 ## 背景
