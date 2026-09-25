@@ -14,7 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var inbox: AgentInbox?
     private var overlayContent: OverlayContentView?
     private let reopenExecutor = AgentReopenExecutor()
-    private let themeStore = UserDefaultsThemeStore()
+    private let overlayStore = UserDefaultsOverlayStore()
     private var hideTask: Task<Void, Never>?
 
     init(configuration: ResolvedConfiguration) {
@@ -32,7 +32,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 height: 120
             )
         )
-        content.setTheme(themeStore.load())
+        content.setTheme(overlayStore.load())
+        content.setShowsHints(overlayStore.loadShowsHints())
+        content.onOpenSettings = { [weak self] in
+            self?.hideOverlay(reason: "overlay hidden to open settings")
+            self?.settingsWindow?.show()
+        }
         content.onSelect = { [weak self] entry in self?.selectTask(entry) }
         content.onHoverChange = { [weak self] hovering in self?.setOverlayHovered(hovering) }
         content.onDismiss = { [weak self] in self?.hideOverlay(reason: "overlay dismissed") }
@@ -81,12 +86,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let settingsWindow = HotkeySettingsWindow(
             coordinator: settings,
             theme: content.theme,
+            showsHints: content.showsHints,
             onHotkeyChanged: { [weak self] spec, enabled in
                 self?.log("hotkey changed to \(spec.displayString) (enabled: \(enabled))")
                 self?.statusItem?.setHotkey(spec, source: .menu)
                 self?.statusItem?.setHotkeyEnabled(enabled)
             },
-            onThemeChanged: { [weak self] theme in self?.setTheme(theme) }
+            onThemeChanged: { [weak self] theme in self?.setTheme(theme) },
+            onHintsChanged: { [weak self] shows in self?.setShowsHints(shows) }
         )
         self.settingsWindow = settingsWindow
 
@@ -188,10 +195,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Settings picked a new theme: apply, remember, and show a preview.
     private func setTheme(_ theme: OverlayTheme) {
-        themeStore.save(theme)
+        overlayStore.save(theme)
         overlayContent?.setTheme(theme)
         log("overlay theme: \(theme.rawValue)")
         showOverlay()
+    }
+
+    /// Settings switched the keyboard-mode footer on or off.
+    private func setShowsHints(_ shows: Bool) {
+        overlayStore.saveShowsHints(shows)
+        overlayContent?.setShowsHints(shows)
+        log("overlay keyboard hints: \(shows ? "on" : "off")")
     }
 
     /// Hovering a passive overlay pauses the auto-hide so the list stays

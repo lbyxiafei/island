@@ -2,24 +2,30 @@ import AppKit
 import IslandCore
 
 /// The overlay body: an island capsule hanging from the top of the screen.
-/// A `◉ island · N new` header, then one row per finished agent run with a
-/// number keycap, the agent's icon, title, `directory • agent`, and its age.
+/// A header, then one row per finished agent run with a number keycap, the
+/// agent's icon, title, `directory • agent`, and its age.
 ///
 /// Two modes (see `setKeyboardMode`): when summoned by the user the panel is
-/// key and a small search field in the header takes typing, arrows, Enter,
-/// ⌘1–9 and Esc; when it pops up by itself it never takes focus and rows are
-/// clicked with the mouse.
+/// key, the whole header is a search field (with an `N new` pill on the
+/// right), and it takes typing, arrows, Enter, ⌘1–9, ⌘, and Esc; when it pops
+/// up by itself the header reads `● N new` next to the hotkey, it never takes
+/// focus, and rows are clicked with the mouse.
 @MainActor
 final class OverlayContentView: NSView, NSTextFieldDelegate {
     static let width: CGFloat = 520
     static let rowHeight: CGFloat = 52
     private static let headerHeight: CGFloat = 40
-    private static let footerHeight: CGFloat = 22
+    private static let footerHeight: CGFloat = 28
     private static let padding: CGFloat = 10
+    /// Bottom inset under the footer; the footer's own height already gives
+    /// its text room, so it sits closer to the edge than the rows would.
+    private static let footerInset: CGFloat = 4
 
     var onSelect: ((AgentInbox.Entry) -> Void)?
     var onHoverChange: ((Bool) -> Void)?
     var onDismiss: (() -> Void)?
+    /// ⌘, in keyboard mode.
+    var onOpenSettings: (() -> Void)?
     /// The row count changed (typing filters the list), so the panel resizes.
     var onHeightChange: ((CGFloat) -> Void)?
 
@@ -29,17 +35,24 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
     private var unread = 0
     private var hotkey: HotkeySpec?
     private var isKeyboardMode = false
+    private(set) var showsHints = true
+
+    private var showsFooter: Bool { isKeyboardMode && showsHints }
 
     private let blurView = NSVisualEffectView()
     private let shape = CapsuleShapeView()
     private let dot = NSView()
-    private let heading = NSTextField(labelWithString: "")
+    private let status = NSTextField(labelWithString: "")
+    private let spacer = NSView()
     private let searchIcon = NSImageView()
     private let searchField = NSTextField()
+    private let newPill = KeycapView()
     private let hotkeyCap = KeycapView()
     private let list = NSStackView()
+    private let footerBox = NSView()
     private let footer = NSTextField(labelWithString: "")
     private var footerHeightConstraint: NSLayoutConstraint?
+    private var bottomInsetConstraint: NSLayoutConstraint?
     private var rowViews: [OverlayTaskRowView] = []
     private var trackingArea: NSTrackingArea?
 
@@ -56,8 +69,8 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
 
     var preferredHeight: CGFloat {
         let rows = max(selection.rows.count, 1)
-        return Self.headerHeight + CGFloat(rows) * Self.rowHeight
-            + (isKeyboardMode ? Self.footerHeight : 0) + Self.padding * 2
+        let bottom = showsFooter ? Self.footerHeight + Self.footerInset : Self.padding
+        return Self.padding + Self.headerHeight + CGFloat(rows) * Self.rowHeight + bottom
     }
 
     func update(entries: [AgentInbox.Entry], unread: Int, hotkey: HotkeySpec) {
@@ -70,6 +83,11 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
     func setTheme(_ theme: OverlayTheme) {
         self.theme = theme
         applyPalette()
+    }
+
+    func setShowsHints(_ shows: Bool) {
+        showsHints = shows
+        render()
     }
 
     /// Keyboard mode starts from an empty query with the first row highlighted.
@@ -143,39 +161,38 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
     }
 
     private func refreshHeader() {
-        let heading = NSMutableAttributedString(
-            string: "island",
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
-                .foregroundColor: NSColor(palette.title),
-            ])
-        if unread > 0 {
-            heading.append(
-                NSAttributedString(
-                    string: "  ·  \(unread) new",
-                    attributes: [
-                        .font: NSFont.systemFont(ofSize: 13),
-                        .foregroundColor: NSColor(palette.subtitle),
-                    ]))
-        }
-        self.heading.attributedStringValue = heading
+        let text = OverlayStatus.text(unread: unread)
+        status.stringValue = text
+        status.textColor = NSColor(unread > 0 ? palette.title : palette.subtitle)
         dot.layer?.backgroundColor = NSColor(unread > 0 ? palette.accent : palette.muted).cgColor
 
+        // Passive: `● N new` … hotkey. Keyboard: 🔍 search … `N new`.
+        dot.isHidden = isKeyboardMode
+        status.isHidden = isKeyboardMode
+        spacer.isHidden = isKeyboardMode
+        hotkeyCap.isHidden = isKeyboardMode || hotkey == nil
         searchIcon.isHidden = !isKeyboardMode
         searchField.isHidden = !isKeyboardMode
         searchField.isEditable = isKeyboardMode
-        hotkeyCap.isHidden = isKeyboardMode || hotkey == nil
+        newPill.isHidden = !isKeyboardMode || unread == 0
+
         hotkeyCap.set(text: hotkey?.displayString ?? "", palette: palette, fontSize: 11)
+        newPill.set(
+            text: text, textColor: NSColor(palette.accent),
+            background: NSColor(palette.selectionBackground), fontSize: 11)
+        let count = selection.rows.count
         searchField.placeholderAttributedString = NSAttributedString(
-            string: "filter",
+            string: count == 0
+                ? "Search tasks" : count == 1 ? "Search 1 task" : "Search \(count) tasks",
             attributes: [
                 .foregroundColor: NSColor(palette.muted),
-                .font: NSFont.systemFont(ofSize: 13),
+                .font: NSFont.systemFont(ofSize: 15),
             ])
 
-        footer.isHidden = !isKeyboardMode
-        footerHeightConstraint?.constant = isKeyboardMode ? Self.footerHeight : 0
-        footer.stringValue = "↑↓ move   ↩ open   ⌘1–9 jump   esc close"
+        footerBox.isHidden = !showsFooter
+        footerHeightConstraint?.constant = showsFooter ? Self.footerHeight : 0
+        bottomInsetConstraint?.constant = -(showsFooter ? Self.footerInset : Self.padding)
+        footer.stringValue = "↑↓ move   ↩ open   ⌘1–9 jump   ⌘, settings   esc close"
     }
 
     private func applyPalette() {
@@ -216,8 +233,9 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
 
         searchIcon.image = NSImage(
             systemSymbolName: "magnifyingglass", accessibilityDescription: "filter")
-        searchIcon.symbolConfiguration = .init(pointSize: 12, weight: .medium)
-        searchField.font = .systemFont(ofSize: 13)
+        searchIcon.symbolConfiguration = .init(pointSize: 14, weight: .medium)
+        searchField.font = .systemFont(ofSize: 15)
+        searchField.setContentHuggingPriority(.defaultLow - 1, for: .horizontal)
         searchField.isBordered = false
         searchField.drawsBackground = false
         searchField.focusRingType = .none
@@ -225,19 +243,19 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
         searchField.lineBreakMode = .byTruncatingTail
         searchField.delegate = self
 
-        let spacer = NSView()
+        status.font = .systemFont(ofSize: 13, weight: .semibold)
         spacer.setContentHuggingPriority(.defaultLow - 1, for: .horizontal)
         let header = NSStackView(views: [
-            dot, heading, spacer, searchIcon, searchField, hotkeyCap,
+            dot, status, searchIcon, searchField, spacer, newPill, hotkeyCap,
         ])
         header.orientation = .horizontal
         header.distribution = .fill
         header.alignment = .centerY
         header.spacing = 8
-        header.setCustomSpacing(4, after: searchIcon)
+        header.setCustomSpacing(6, after: searchIcon)
         header.translatesAutoresizingMaskIntoConstraints = false
-        heading.setContentHuggingPriority(.required, for: .horizontal)
-        heading.setContentCompressionResistancePriority(.required, for: .horizontal)
+        status.setContentHuggingPriority(.required, for: .horizontal)
+        status.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         list.orientation = .vertical
         list.alignment = .leading
@@ -247,11 +265,16 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
         footer.font = .systemFont(ofSize: 10.5)
         footer.alignment = .center
         footer.translatesAutoresizingMaskIntoConstraints = false
+        footerBox.translatesAutoresizingMaskIntoConstraints = false
+        footerBox.addSubview(footer)
 
-        for view in [header, list, footer] { blurView.addSubview(view) }
+        for view in [header, list, footerBox] { blurView.addSubview(view) }
 
-        let footerHeight = footer.heightAnchor.constraint(equalToConstant: 0)
+        let footerHeight = footerBox.heightAnchor.constraint(equalToConstant: 0)
         footerHeightConstraint = footerHeight
+        let bottomInset = footerBox.bottomAnchor.constraint(
+            equalTo: blurView.bottomAnchor, constant: -Self.padding)
+        bottomInsetConstraint = bottomInset
         let pad = Self.padding
         NSLayoutConstraint.activate([
             blurView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -265,7 +288,7 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
 
             dot.widthAnchor.constraint(equalToConstant: 8),
             dot.heightAnchor.constraint(equalToConstant: 8),
-            searchField.widthAnchor.constraint(equalToConstant: 180),
+            searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
             header.leadingAnchor.constraint(equalTo: blurView.leadingAnchor, constant: pad + 12),
             header.trailingAnchor.constraint(
                 equalTo: blurView.trailingAnchor, constant: -pad - 12),
@@ -276,10 +299,13 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
             list.trailingAnchor.constraint(equalTo: blurView.trailingAnchor, constant: -pad),
             list.topAnchor.constraint(equalTo: header.bottomAnchor),
 
-            footer.leadingAnchor.constraint(equalTo: list.leadingAnchor),
-            footer.trailingAnchor.constraint(equalTo: list.trailingAnchor),
-            footer.bottomAnchor.constraint(equalTo: blurView.bottomAnchor, constant: -pad),
+            footerBox.leadingAnchor.constraint(equalTo: list.leadingAnchor),
+            footerBox.trailingAnchor.constraint(equalTo: list.trailingAnchor),
             footerHeight,
+            bottomInset,
+            footer.leadingAnchor.constraint(equalTo: footerBox.leadingAnchor),
+            footer.trailingAnchor.constraint(equalTo: footerBox.trailingAnchor),
+            footer.centerYAnchor.constraint(equalTo: footerBox.centerYAnchor),
         ])
     }
 
@@ -310,9 +336,13 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
         return true
     }
 
-    /// ⌘1…⌘9 open the row with that keycap.
+    /// ⌘1…⌘9 open the row with that keycap; ⌘, opens settings.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if isKeyboardMode, modifiers == .command, event.charactersIgnoringModifiers == "," {
+            onOpenSettings?()
+            return true
+        }
         guard isKeyboardMode, modifiers == .command,
             let digit = event.charactersIgnoringModifiers.flatMap(Int.init),
             let entry = selection.entry(forShortcut: digit)
@@ -392,7 +422,8 @@ final class CapsuleShapeView: NSView {
     }
 }
 
-/// A small rounded keycap: the `1`…`9` on rows and the hotkey in the header.
+/// A small rounded keycap: the `1`…`9` on rows, the hotkey and the `N new`
+/// pill in the header.
 @MainActor
 final class KeycapView: NSView {
     private let label = NSTextField(labelWithString: "")
@@ -422,11 +453,17 @@ final class KeycapView: NSView {
     }
 
     func set(text: String, palette: OverlayPalette, fontSize: CGFloat) {
+        set(
+            text: text, textColor: NSColor(palette.keycapText),
+            background: NSColor(palette.keycapBackground), fontSize: fontSize)
+    }
+
+    func set(text: String, textColor: NSColor, background: NSColor, fontSize: CGFloat) {
         defer { invalidateIntrinsicContentSize() }
         label.stringValue = text
         label.font = .monospacedDigitSystemFont(ofSize: fontSize, weight: .medium)
-        label.textColor = NSColor(palette.keycapText)
-        layer?.backgroundColor = NSColor(palette.keycapBackground).cgColor
+        label.textColor = textColor
+        layer?.backgroundColor = background.cgColor
     }
 }
 

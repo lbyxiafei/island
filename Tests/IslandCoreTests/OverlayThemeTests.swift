@@ -69,7 +69,7 @@ final class OverlayThemeTests: XCTestCase {
     }
 }
 
-final class UserDefaultsThemeStoreTests: XCTestCase {
+final class UserDefaultsOverlayStoreTests: XCTestCase {
     private var suiteName = ""
     private var defaults: UserDefaults!
 
@@ -83,14 +83,36 @@ final class UserDefaultsThemeStoreTests: XCTestCase {
     }
 
     func testLoadsTheDefaultBeforeAnythingIsSaved() {
-        XCTAssertEqual(UserDefaultsThemeStore(defaults: defaults).load(), .system)
+        XCTAssertEqual(UserDefaultsOverlayStore(defaults: defaults).load(), .system)
     }
 
     func testSavedThemeSurvivesANewStoreInstance() {
-        UserDefaultsThemeStore(defaults: defaults).save(.coral)
+        UserDefaultsOverlayStore(defaults: defaults).save(.coral)
 
-        XCTAssertEqual(UserDefaultsThemeStore(defaults: defaults).load(), .coral)
-        XCTAssertEqual(defaults.string(forKey: UserDefaultsThemeStore.key), "coral")
+        XCTAssertEqual(UserDefaultsOverlayStore(defaults: defaults).load(), .coral)
+        XCTAssertEqual(defaults.string(forKey: UserDefaultsOverlayStore.key), "coral")
+    }
+
+    func testKeyboardHintsAreShownUntilSwitchedOff() {
+        let store = UserDefaultsOverlayStore(defaults: defaults)
+        XCTAssertTrue(store.loadShowsHints())
+
+        store.saveShowsHints(false)
+
+        XCTAssertFalse(UserDefaultsOverlayStore(defaults: defaults).loadShowsHints())
+        XCTAssertEqual(defaults.object(forKey: UserDefaultsOverlayStore.hintsKey) as? Bool, false)
+    }
+}
+
+final class OverlayStatusTests: XCTestCase {
+    func testCountsUnreadRuns() {
+        XCTAssertEqual(OverlayStatus.text(unread: 1), "1 new")
+        XCTAssertEqual(OverlayStatus.text(unread: 12), "12 new")
+    }
+
+    func testNothingUnreadIsAllCaughtUp() {
+        XCTAssertEqual(OverlayStatus.text(unread: 0), "All caught up")
+        XCTAssertEqual(OverlayStatus.text(unread: -1), "All caught up")
     }
 }
 

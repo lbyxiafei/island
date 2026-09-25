@@ -126,9 +126,10 @@ public enum OverlayTheme: String, CaseIterable, Sendable {
         title: ThemeColor(hex: 0xF5F5F7), subtitle: 0x8E8E93, muted: 0x6C6C70)
 }
 
-/// Remembers the picked theme across launches.
-public struct UserDefaultsThemeStore {
+/// Remembers the overlay preferences picked in settings across launches.
+public struct UserDefaultsOverlayStore {
     public static let key = "IslandOverlayTheme"
+    public static let hintsKey = "IslandOverlayShowsHints"
 
     private let defaults: UserDefaults
 
@@ -142,6 +143,22 @@ public struct UserDefaultsThemeStore {
 
     public func save(_ theme: OverlayTheme) {
         defaults.set(theme.rawValue, forKey: Self.key)
+    }
+
+    /// The keyboard-mode footer (`↑↓ move · ↩ open …`); on unless switched off.
+    public func loadShowsHints() -> Bool {
+        defaults.object(forKey: Self.hintsKey) as? Bool ?? true
+    }
+
+    public func saveShowsHints(_ shows: Bool) {
+        defaults.set(shows, forKey: Self.hintsKey)
+    }
+}
+
+/// The header's status text, which replaces the old `island` label.
+public enum OverlayStatus {
+    public static func text(unread: Int) -> String {
+        unread > 0 ? "\(unread) new" : "All caught up"
     }
 }
 

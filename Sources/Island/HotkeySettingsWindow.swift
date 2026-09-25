@@ -13,6 +13,9 @@ final class HotkeySettingsWindow: NSObject {
     private let onHotkeyChanged: (HotkeySpec, Bool) -> Void
     private let onThemeChanged: (OverlayTheme) -> Void
     private let themePicker = NSPopUpButton()
+    private let onHintsChanged: (Bool) -> Void
+    private let hintsToggle = NSButton(
+        checkboxWithTitle: "Show keyboard hints", target: nil, action: nil)
     private let window: NSWindow
     private let recorder: HotkeyRecorderView
     private let enabledToggle: NSButton
@@ -21,9 +24,12 @@ final class HotkeySettingsWindow: NSObject {
     init(
         coordinator: HotkeySettingsCoordinator,
         theme: OverlayTheme,
+        showsHints: Bool,
         onHotkeyChanged: @escaping (HotkeySpec, Bool) -> Void,
-        onThemeChanged: @escaping (OverlayTheme) -> Void
+        onThemeChanged: @escaping (OverlayTheme) -> Void,
+        onHintsChanged: @escaping (Bool) -> Void
     ) {
+        self.onHintsChanged = onHintsChanged
         self.coordinator = coordinator
         self.onHotkeyChanged = onHotkeyChanged
         self.onThemeChanged = onThemeChanged
@@ -31,7 +37,7 @@ final class HotkeySettingsWindow: NSObject {
         enabledToggle = NSButton(checkboxWithTitle: "Enabled", target: nil, action: nil)
         feedback = NSTextField(labelWithString: "")
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 320),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 330),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -54,6 +60,9 @@ final class HotkeySettingsWindow: NSObject {
         themePicker.selectItem(at: OverlayTheme.allCases.firstIndex(of: theme) ?? 0)
         themePicker.target = self
         themePicker.action = #selector(themePicked)
+        hintsToggle.state = showsHints ? .on : .off
+        hintsToggle.target = self
+        hintsToggle.action = #selector(hintsToggled)
         refreshFromCoordinator()
     }
 
@@ -97,7 +106,7 @@ final class HotkeySettingsWindow: NSObject {
 
         let stack = NSStackView(views: [
             title, recorder, help, enabledToggle, feedback, buttons, themeTitle, themePicker,
-            themeHelp,
+            themeHelp, hintsToggle,
         ])
         stack.setCustomSpacing(20, after: buttons)
         stack.orientation = .vertical
@@ -198,6 +207,11 @@ final class HotkeySettingsWindow: NSObject {
     @objc private func resetTapped() {
         recorder.setSpec(HotkeyConfiguration.fallbackSpec)
         applyTapped()
+    }
+
+    /// The `↑↓ move · ↩ open …` footer shown while typing in the overlay.
+    @objc private func hintsToggled() {
+        onHintsChanged(hintsToggle.state == .on)
     }
 
     @objc private func themePicked() {
