@@ -40,12 +40,15 @@ public struct AgentActivityScanner: Sendable {
 // MARK: - Claude Code
 
 /// Claude Code keeps one live `~/.claude/sessions/<pid>.json` per running
-/// process. `status` flips `busy` -> `idle` when a turn finishes.
+/// process. `status` flips `busy` -> `idle` whenever the process goes quiet,
+/// which also happens when a session is just opened or the user presses esc,
+/// so the transcript decides whether a turn actually finished.
 public struct ClaudeCodeActivitySource: AgentActivitySource {
     public let agent = AgentKind.claudeCode
 
     private let sessionsDirectory: URL
     private let projectsDirectory: URL
+    private let transcripts = ClaudeTranscriptCache()
 
     public init(sessionsDirectory: URL, projectsDirectory: URL) {
         self.sessionsDirectory = sessionsDirectory
@@ -66,24 +69,13 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
             .filter { $0.pathExtension == "json" }
             .compactMap { url in
                 guard let data = try? Data(contentsOf: url),
-                    let state = try? JSONDecoder().decode(ClaudeSessionState.self, from: data)
+                    let state = try? JSONDecoder().decode(ClaudeSessionState.self, from: data),
+                    state.status == "idle",
+                    let sessionID = state.sessionId, !sessionID.isEmpty,
+                    let file = Self.sessionFile(sessionID: sessionID, in: projectsDirectory)
                 else { return nil }
-                // Only pay for the transcript read when the session has no name.
-                let lastMessage = Self.hasTitle(state) ? nil : lastMessage(for: state)
-                return Self.task(from: state, lastMessage: lastMessage)
+                return Self.task(from: state, transcript: transcripts.transcript(at: file))
             }
-    }
-
-    private func lastMessage(for state: ClaudeSessionState) -> String? {
-        guard let sessionID = state.sessionId, !sessionID.isEmpty else { return nil }
-        guard let file = Self.sessionFile(sessionID: sessionID, in: projectsDirectory) else {
-            return nil
-        }
-        return Self.lastAssistantText(inFile: file)
-    }
-
-    static func hasTitle(_ state: ClaudeSessionState) -> Bool {
-        !(state.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// The transcript lives in `<projects>/<cwd-slug>/<sessionId>.jsonl`; the
@@ -94,34 +86,23 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
             .first { FileManager.default.fileExists(atPath: $0.path) }
     }
 
-    /// The final assistant text of a transcript. Only read when the session has
-    /// no name, which is rare — so reading the whole file is fine.
-    static func lastAssistantText(inFile url: URL) -> String? {
-        guard let contents = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-        return lastAssistantText(in: contents)
-    }
-
-    static func lastAssistantText(in contents: String) -> String? {
-        for line in contents.split(separator: "\n").reversed() {
-            guard let object = JSON.object(fromLine: String(line)),
-                object["type"] as? String == "assistant",
-                let message = object["message"] as? [String: Any],
-                let content = JSON.firstText(in: message["content"])
-            else { continue }
-            return content
-        }
-        return nil
-    }
-
-    static func task(from state: ClaudeSessionState, lastMessage: String? = nil) -> AgentTask? {
-        guard state.status == "idle", let sessionID = state.sessionId, !sessionID.isEmpty else {
-            return nil
-        }
-        let completedAt = state.updatedAt.map { Date(timeIntervalSince1970: $0 / 1000) } ?? Date()
+    static func task(from state: ClaudeSessionState, transcript: Transcript?) -> AgentTask? {
+        guard state.status == "idle", let sessionID = state.sessionId, !sessionID.isEmpty,
+            let transcript, transcript.isComplete
+        else { return nil }
+        let completedAt =
+            transcript.completedAt
+            ?? state.updatedAt.map { Date(timeIntervalSince1970: $0 / 1000) } ?? Date()
+        // `derived` names are Claude's own `<dir>-<hex>` placeholders, not titles.
+        let ownName = state.nameSource == "derived" ? nil : state.name
+        let title = [transcript.customTitle, ownName, transcript.aiTitle]
+            .compactMap { $0 }
+            .first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         return AgentTask(
             agent: .claudeCode,
             sessionID: sessionID,
-            title: TaskTitle.resolve(title: state.name, lastMessage: lastMessage, cwd: state.cwd),
+            title: TaskTitle.resolve(
+                title: title, lastMessage: transcript.lastPrompt, cwd: state.cwd),
             cwd: state.cwd,
             completedAt: completedAt,
             host: state.pid.map(AgentHost.terminal) ?? .unknown,
@@ -136,6 +117,85 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
         let name: String?
         let status: String?
         let updatedAt: Double?
+        var nameSource: String? = nil
+    }
+
+    /// What island needs from a transcript: the titles, what the user last
+    /// asked, and whether the latest turn ran to its end.
+    struct Transcript: Equatable {
+        var customTitle: String?
+        var aiTitle: String?
+        var lastPrompt: String?
+        var isComplete: Bool
+        var completedAt: Date?
+    }
+
+    /// A turn is finished when a `system/turn_duration` entry follows the last
+    /// prompt and nothing in between says the user interrupted it.
+    static func scanTranscript(_ contents: String) -> Transcript {
+        var transcript = Transcript(isComplete: false)
+        var interrupted = false
+        for line in contents.split(separator: "\n") {
+            guard let object = JSON.object(fromLine: String(line)) else { continue }
+            switch object["type"] as? String {
+            case "custom-title":
+                transcript.customTitle = object["customTitle"] as? String ?? transcript.customTitle
+            case "ai-title":
+                transcript.aiTitle = object["aiTitle"] as? String ?? transcript.aiTitle
+            case "system" where object["subtype"] as? String == "turn_duration":
+                transcript.isComplete = !interrupted
+                transcript.completedAt =
+                    (object["timestamp"] as? String).flatMap(AgentTimestamp.date(from:))
+            case "user":
+                guard object["isMeta"] as? Bool != true, object["isSidechain"] as? Bool != true,
+                    let message = object["message"] as? [String: Any],
+                    let text = JSON.firstText(in: message["content"])
+                else { continue }
+                if text.hasPrefix("[Request interrupted by user") {
+                    interrupted = true
+                    transcript.isComplete = false
+                    continue
+                }
+                // A new turn starts, including one kicked off by a slash command.
+                interrupted = false
+                transcript.isComplete = false
+                transcript.completedAt = nil
+                if !text.hasPrefix("<") { transcript.lastPrompt = text }
+            default:
+                break
+            }
+        }
+        return transcript
+    }
+}
+
+/// Transcripts grow to megabytes and are polled every few seconds, so each
+/// file is parsed again only when its size or modification date changes.
+final class ClaudeTranscriptCache: @unchecked Sendable {
+    private struct Stamp: Equatable {
+        let size: Int
+        let modified: Date
+    }
+
+    private let lock = NSLock()
+    private var entries: [String: (stamp: Stamp, transcript: ClaudeCodeActivitySource.Transcript)] =
+        [:]
+
+    func transcript(at url: URL) -> ClaudeCodeActivitySource.Transcript? {
+        guard
+            let values = try? url.resourceValues(forKeys: [
+                .fileSizeKey, .contentModificationDateKey,
+            ]),
+            let size = values.fileSize, let modified = values.contentModificationDate
+        else { return nil }
+        let stamp = Stamp(size: size, modified: modified)
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached = entries[url.path], cached.stamp == stamp { return cached.transcript }
+        guard let contents = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        let transcript = ClaudeCodeActivitySource.scanTranscript(contents)
+        entries[url.path] = (stamp, transcript)
+        return transcript
     }
 }
 
@@ -192,8 +252,9 @@ public struct PiActivitySource: AgentActivitySource {
     struct SessionScan: Equatable {
         let sessionID: String
         let cwd: String?
+        /// The `/name` the user gave the session, if any.
         let title: String?
-        /// The last thing the agent said — the fallback when there is no title.
+        /// The last thing the user asked — the fallback when there is no title.
         let lastMessage: String?
         let completedAt: Date
         let isComplete: Bool
@@ -203,9 +264,9 @@ public struct PiActivitySource: AgentActivitySource {
     static func scan(contents: String, fileModified: Date) -> SessionScan? {
         var sessionID: String?
         var cwd: String?
-        var firstUserText: String?
+        var sessionName: String?
+        var lastUserText: String?
         var lastAssistantStop: String?
-        var lastAssistantText: String?
         var lastAssistantDate: Date?
         var lastTimestamp: Date?
 
@@ -220,16 +281,15 @@ public struct PiActivitySource: AgentActivitySource {
             case "session":
                 sessionID = object["id"] as? String
                 cwd = object["cwd"] as? String
+            case "session_info":
+                sessionName = object["name"] as? String ?? sessionName
             case "message":
                 guard let message = object["message"] as? [String: Any] else { continue }
                 switch message["role"] as? String {
                 case "user":
-                    if firstUserText == nil {
-                        firstUserText = JSON.firstText(in: message["content"])
-                    }
+                    lastUserText = JSON.firstText(in: message["content"]) ?? lastUserText
                 case "assistant":
                     lastAssistantStop = message["stopReason"] as? String
-                    lastAssistantText = JSON.firstText(in: message["content"])
                     lastAssistantDate =
                         (object["timestamp"] as? String).flatMap(AgentTimestamp.date(from:))
                 default:
@@ -244,8 +304,8 @@ public struct PiActivitySource: AgentActivitySource {
         return SessionScan(
             sessionID: sessionID,
             cwd: cwd,
-            title: firstUserText,
-            lastMessage: lastAssistantText,
+            title: sessionName,
+            lastMessage: lastUserText,
             completedAt: lastAssistantDate ?? lastTimestamp ?? fileModified,
             isComplete: lastAssistantStop == "stop"
         )

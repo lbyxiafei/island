@@ -99,6 +99,60 @@ final class AgentInboxTests: XCTestCase {
         XCTAssertFalse(inbox.ingest([oldest]))
     }
 
+    /// Issue dropdown-title-ux #2: one row per session. A newer run of the same
+    /// session replaces the old row and makes it unread again.
+    func testANewerRunOfTheSameSessionReplacesItsRow() {
+        let inbox = AgentInbox()
+        inbox.ingest([task("a", at: 1), task("b", at: 2)])
+        inbox.markRead(id: task("a", at: 1).id)
+
+        XCTAssertTrue(inbox.ingest([task("a", at: 5)]))
+
+        XCTAssertEqual(inbox.allEntries.count, 2)
+        XCTAssertEqual(inbox.unreadCount, 2)
+        XCTAssertEqual(inbox.allEntries.map(\.id), [task("a", at: 5).id, task("b", at: 2).id])
+    }
+
+    func testAnOlderOrRepeatedRunOfAKnownSessionChangesNothing() {
+        let inbox = AgentInbox()
+        inbox.ingest([task("a", at: 5)])
+        inbox.markRead(id: task("a", at: 5).id)
+
+        XCTAssertFalse(inbox.ingest([task("a", at: 3), task("a", at: 5)]))
+        XCTAssertEqual(inbox.allEntries.map(\.id), [task("a", at: 5).id])
+        XCTAssertEqual(inbox.unreadCount, 0)
+    }
+
+    func testRunsOfOneSessionInTheSameBatchCollapseToTheNewest() {
+        let inbox = AgentInbox()
+
+        inbox.ingest([task("a", at: 1), task("a", at: 3), task("a", at: 2)])
+
+        XCTAssertEqual(inbox.allEntries.map(\.id), [task("a", at: 3).id])
+    }
+
+    func testSameSessionIDFromDifferentAgentsStaysSeparate() {
+        let inbox = AgentInbox()
+        let codex = AgentTask(
+            agent: .codex, sessionID: "a", title: "a", cwd: nil,
+            completedAt: Date(timeIntervalSince1970: 2), host: .unknown, resumeCommand: nil)
+
+        inbox.ingest([task("a", at: 1), codex])
+
+        XCTAssertEqual(inbox.allEntries.count, 2)
+    }
+
+    func testADroppedSessionComesBackWithANewerRun() {
+        let inbox = AgentInbox(limit: 1, capacity: 1)
+        inbox.ingest([task("a", at: 1)])
+        inbox.markRead(id: task("a", at: 1).id)
+        inbox.ingest([task("b", at: 2)])
+        XCTAssertEqual(inbox.allEntries.map(\.id), [task("b", at: 2).id])
+
+        XCTAssertTrue(inbox.ingest([task("a", at: 3)]))
+        XCTAssertTrue(inbox.allEntries.contains { $0.id == task("a", at: 3).id })
+    }
+
     private func task(_ sessionID: String, at seconds: TimeInterval) -> AgentTask {
         AgentTask(
             agent: .pi,

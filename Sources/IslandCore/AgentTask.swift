@@ -70,6 +70,10 @@ public struct AgentTask: Equatable, Sendable {
         "\(agent.rawValue):\(sessionID):\(Int(completedAt.timeIntervalSince1970 * 1000))"
     }
 
+    /// Identity of the session across runs: the overlay shows one row per
+    /// session, however many turns it finishes.
+    public var sessionKey: String { "\(agent.rawValue):\(sessionID)" }
+
     /// A copy with a host resolved at click time (some agents do not record one).
     public func withHost(_ host: AgentHost) -> AgentTask {
         AgentTask(

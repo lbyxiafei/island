@@ -12,9 +12,10 @@ public enum TaskLimit {
     }
 }
 
-/// The in-memory list island builds from scanner output. It owns the three rules
-/// PLAN § Design asks for: keep only runs seen live, order unread first then by
-/// completion time, and remember which ones the user already opened.
+/// The in-memory list island builds from scanner output. It owns the rules
+/// PLAN § Design asks for: keep only runs seen live, one row per session (its
+/// latest run), order unread first then by completion time, and remember which
+/// ones the user already opened.
 public final class AgentInbox {
     public struct Entry: Equatable, Sendable {
         public let task: AgentTask
@@ -28,20 +29,26 @@ public final class AgentInbox {
 
     private let capacity: Int
     private var entries: [Entry] = []
-    private var known: Set<String> = []
+    /// Latest completion seen per session, so a dropped or already-shown run is
+    /// never re-added, while a newer run of the same session is.
+    private var known: [String: Date] = [:]
 
     public init(limit: Int = 10, capacity: Int = 200) {
         self.limit = max(1, limit)
         self.capacity = max(self.limit, capacity)
     }
 
-    /// Adds newly finished runs. Returns true when something was added, so the
+    /// Adds newly finished runs; a newer run of a listed session replaces its row
+    /// and makes it unread again. Returns true when something changed, so the
     /// caller can refresh the UI only when it matters.
     @discardableResult
     public func ingest(_ tasks: [AgentTask]) -> Bool {
         var added = false
-        for task in tasks where !known.contains(task.id) {
-            known.insert(task.id)
+        for task in tasks {
+            let key = task.sessionKey
+            if let seen = known[key], seen >= task.completedAt { continue }
+            known[key] = task.completedAt
+            entries.removeAll { $0.task.sessionKey == key }
             entries.append(Entry(task: task, isRead: false))
             added = true
         }

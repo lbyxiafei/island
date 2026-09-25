@@ -52,7 +52,8 @@ public struct CodexTurnActivitySource: AgentActivitySource {
 
     /// The thread metadata (title, cwd) and the turn history live in two files,
     /// so the query attaches one to the other. `name` is the short title Codex
-    /// shows; `title` is the raw first user message.
+    /// shows; `title` is the raw first user message; `last_prompt` is the last
+    /// thing the user typed (slash-command wrappers start with `<`).
     static func sql(history: URL) -> String {
         """
         attach database '\(history.path)' as history;
@@ -61,12 +62,13 @@ public struct CodexTurnActivitySource: AgentActivitySource {
                threads.title as title,
                threads.cwd as cwd,
                max(history.thread_turns.completed_at) as completed_at,
-               (select json_extract(items.item_json, '$.text')
+               (select json_extract(items.item_json, '$.content[0].text')
                 from history.thread_items as items
                 where items.thread_id = threads.id
-                  and items.item_type = 'agentMessage'
+                  and items.item_type = 'userMessage'
+                  and json_extract(items.item_json, '$.content[0].text') not like '<%'
                 order by items.rollout_ordinal desc
-                limit 1) as last_message
+                limit 1) as last_prompt
         from history.thread_turns
         join threads on threads.id = history.thread_turns.thread_id
         where history.thread_turns.status = 'completed'
@@ -87,14 +89,14 @@ public struct CodexTurnActivitySource: AgentActivitySource {
                 let seconds = (row["completed_at"] as? NSNumber)?.doubleValue
             else { return nil }
             let cwd = row["cwd"] as? String
-            let name = row["name"] as? String
-            let title = row["title"] as? String
-            let chosen = [name, title].compactMap { $0 }.first { !$0.isEmpty }
+            let prompt = [row["last_prompt"], row["title"]]
+                .compactMap { $0 as? String }
+                .first { !$0.isEmpty }
             return AgentTask(
                 agent: .codex,
                 sessionID: id,
                 title: TaskTitle.resolve(
-                    title: chosen, lastMessage: row["last_message"] as? String, cwd: cwd),
+                    title: row["name"] as? String, lastMessage: prompt, cwd: cwd),
                 cwd: cwd,
                 completedAt: Date(timeIntervalSince1970: seconds),
                 host: .desktop(bundleID: "com.openai.codex"),

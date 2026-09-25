@@ -16,6 +16,16 @@ final class AgentTaskTests: XCTestCase {
         XCTAssertEqual(task.id, "pi:abc:100000")
     }
 
+    func testSessionKeyIgnoresCompletionTime() {
+        let first = makeTask(
+            agent: .pi, sessionID: "abc", completedAt: Date(timeIntervalSince1970: 1))
+        let second = makeTask(
+            agent: .pi, sessionID: "abc", completedAt: Date(timeIntervalSince1970: 2))
+
+        XCTAssertEqual(first.sessionKey, "pi:abc")
+        XCTAssertEqual(first.sessionKey, second.sessionKey)
+    }
+
     func testAnotherTurnOfTheSameSessionIsADifferentRun() {
         let first = makeTask(
             agent: .codex, sessionID: "abc", completedAt: Date(timeIntervalSince1970: 1))
@@ -119,138 +129,185 @@ final class ClaudeCodeActivitySourceTests: XCTestCase {
         temporary = []
     }
 
-    func testIdleSessionBecomesATask() throws {
-        let state = ClaudeCodeActivitySource.ClaudeSessionState(
-            pid: 42,
-            sessionId: "sess-1",
-            cwd: "/Users/x/Repos/island",
-            name: "island-6d",
-            status: "idle",
-            updatedAt: 1_790_268_825_080
-        )
+    private typealias State = ClaudeCodeActivitySource.ClaudeSessionState
+    private typealias Transcript = ClaudeCodeActivitySource.Transcript
 
-        let task = try XCTUnwrap(ClaudeCodeActivitySource.task(from: state))
+    private let finished = Transcript(
+        customTitle: nil, aiTitle: nil, lastPrompt: nil, isComplete: true,
+        completedAt: Date(timeIntervalSince1970: 1_790_268_825))
+
+    func testIdleSessionWithAFinishedTurnBecomesATask() throws {
+        let state = State(
+            pid: 42, sessionId: "sess-1", cwd: "/Users/x/Repos/island", name: "island-6d",
+            status: "idle", updatedAt: 1_790_268_999_000, nameSource: "user")
+
+        let task = try XCTUnwrap(ClaudeCodeActivitySource.task(from: state, transcript: finished))
 
         XCTAssertEqual(task.agent, .claudeCode)
         XCTAssertEqual(task.sessionID, "sess-1")
         XCTAssertEqual(task.title, "island-6d")
         XCTAssertEqual(task.host, .terminal(processID: 42))
         XCTAssertEqual(task.resumeCommand, "claude --resume sess-1")
-        XCTAssertEqual(task.completedAt, Date(timeIntervalSince1970: 1_790_268_825.08))
+        // The turn's own end, not the session file's last write.
+        XCTAssertEqual(task.completedAt, Date(timeIntervalSince1970: 1_790_268_825))
     }
 
     func testBusySessionIsNotATask() {
-        let state = ClaudeCodeActivitySource.ClaudeSessionState(
+        let state = State(
             pid: 1, sessionId: "s", cwd: nil, name: nil, status: "busy", updatedAt: nil)
 
-        XCTAssertNil(ClaudeCodeActivitySource.task(from: state))
+        XCTAssertNil(ClaudeCodeActivitySource.task(from: state, transcript: finished))
     }
 
     func testSessionWithoutAnIDIsIgnored() {
-        let state = ClaudeCodeActivitySource.ClaudeSessionState(
+        let state = State(
             pid: 1, sessionId: "", cwd: nil, name: nil, status: "idle", updatedAt: nil)
 
-        XCTAssertNil(ClaudeCodeActivitySource.task(from: state))
+        XCTAssertNil(ClaudeCodeActivitySource.task(from: state, transcript: finished))
     }
 
-    func testMissingPIDBecomesAnUnknownHostAndNowAsTheTime() throws {
-        let before = Date()
-        let state = ClaudeCodeActivitySource.ClaudeSessionState(
-            pid: nil, sessionId: "s", cwd: nil, name: nil, status: "idle", updatedAt: nil)
+    /// Issue dropdown-title-ux #3: a freshly opened session is idle but has not
+    /// finished anything, and an interrupted turn is not a finished one either.
+    func testIdleWithoutAFinishedTurnIsNotATask() {
+        let state = State(
+            pid: 1, sessionId: "s", cwd: nil, name: nil, status: "idle", updatedAt: 1)
+        let unfinished = Transcript(
+            customTitle: nil, aiTitle: nil, lastPrompt: "hi", isComplete: false, completedAt: nil)
 
-        let task = try XCTUnwrap(ClaudeCodeActivitySource.task(from: state))
+        XCTAssertNil(ClaudeCodeActivitySource.task(from: state, transcript: nil))
+        XCTAssertNil(ClaudeCodeActivitySource.task(from: state, transcript: unfinished))
+    }
+
+    func testMissingPIDAndTurnTimeFallBackToUnknownHostAndTheSessionTime() throws {
+        let state = State(
+            pid: nil, sessionId: "s", cwd: nil, name: nil, status: "idle", updatedAt: 5_000)
+        let untimed = Transcript(
+            customTitle: nil, aiTitle: nil, lastPrompt: nil, isComplete: true, completedAt: nil)
+
+        let task = try XCTUnwrap(ClaudeCodeActivitySource.task(from: state, transcript: untimed))
 
         XCTAssertEqual(task.host, .unknown)
-        XCTAssertGreaterThanOrEqual(task.completedAt, before)
+        XCTAssertEqual(task.completedAt, Date(timeIntervalSince1970: 5))
         XCTAssertEqual(task.title, "(untitled)")
     }
 
-    func testTitleFallsBackToTheLastMessageThenTheDirectory() {
-        XCTAssertEqual(
-            ClaudeCodeActivitySource.task(
-                from: .init(
-                    pid: 1, sessionId: "s", cwd: "/Users/x/Repos/island", name: nil,
-                    status: "idle", updatedAt: nil),
-                lastMessage: "done with the thing"
-            )?.title,
-            "done with the thing"
-        )
-        XCTAssertEqual(
-            ClaudeCodeActivitySource.task(
-                from: .init(
-                    pid: 1, sessionId: "s", cwd: "/Users/x/Repos/island", name: "   ",
-                    status: "idle", updatedAt: nil)
-            )?.title,
-            "island"
-        )
-        XCTAssertEqual(
-            ClaudeCodeActivitySource.task(
-                from: .init(
-                    pid: 1, sessionId: "s", cwd: nil, name: nil, status: "idle", updatedAt: nil))?
-                .title,
-            "(untitled)"
-        )
+    func testMissingAnyTimeFallsBackToNow() throws {
+        let before = Date()
+        let state = State(
+            pid: nil, sessionId: "s", cwd: nil, name: nil, status: "idle", updatedAt: nil)
+        let untimed = Transcript(
+            customTitle: nil, aiTitle: nil, lastPrompt: nil, isComplete: true, completedAt: nil)
+
+        let task = try XCTUnwrap(ClaudeCodeActivitySource.task(from: state, transcript: untimed))
+
+        XCTAssertGreaterThanOrEqual(task.completedAt, before)
     }
 
-    func testCompletedTasksReadsTheSessionsDirectory() throws {
+    /// Issue dropdown-title-ux #1: `/rename` > AI title > last user prompt >
+    /// directory. Claude's auto-derived `<dir>-<hex>` name is not a title.
+    func testTitlePrefersRenameThenAITitleThenTheLastPrompt() {
+        func title(_ name: String?, _ source: String?, _ transcript: Transcript) -> String? {
+            ClaudeCodeActivitySource.task(
+                from: State(
+                    pid: 1, sessionId: "s", cwd: "/Users/x/Repos/dotfiles", name: name,
+                    status: "idle", updatedAt: nil, nameSource: source),
+                transcript: transcript
+            )?.title
+        }
+        func scan(custom: String? = nil, ai: String? = nil, prompt: String? = nil) -> Transcript {
+            Transcript(
+                customTitle: custom, aiTitle: ai, lastPrompt: prompt, isComplete: true,
+                completedAt: nil)
+        }
+
+        XCTAssertEqual(
+            title("dotfiles-9e", "derived", scan(custom: "renamed", ai: "ai", prompt: "p")),
+            "renamed")
+        XCTAssertEqual(title("my name", "user", scan(ai: "ai", prompt: "p")), "my name")
+        XCTAssertEqual(title("dotfiles-9e", "derived", scan(ai: "ai", prompt: "p")), "ai")
+        XCTAssertEqual(
+            title("dotfiles-9e", "derived", scan(prompt: "fix the list")), "fix the list")
+        XCTAssertEqual(title("dotfiles-9e", "derived", scan()), "dotfiles")
+        XCTAssertEqual(title("  ", nil, scan()), "dotfiles")
+        XCTAssertEqual(title("legacy", nil, scan(ai: "ai")), "legacy")
+    }
+
+    func testCompletedTasksReadsSessionsAndTheirTranscripts() throws {
         let home = try makeTempHome()
-        let directory = home.appendingPathComponent(".claude/sessions")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let sessions = home.appendingPathComponent(".claude/sessions")
+        let project = home.appendingPathComponent(".claude/projects/-tmp-x")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
         try write(
-            #"{"pid":7,"sessionId":"live","cwd":"/tmp/x","name":"live one","status":"idle","updatedAt":1790268825080}"#,
-            to: directory.appendingPathComponent("7.json"))
+            #"{"pid":7,"sessionId":"done","cwd":"/tmp/x","name":"x-1a","nameSource":"derived","status":"idle","updatedAt":1790268825080}"#,
+            to: sessions.appendingPathComponent("7.json"))
         try write(
-            #"{"pid":8,"sessionId":"busy","cwd":"/tmp/x","name":"n","status":"busy","updatedAt":1790268825080}"#,
-            to: directory.appendingPathComponent("8.json"))
-        try write("garbage", to: directory.appendingPathComponent("9.json"))
-        try write("secret", to: directory.appendingPathComponent("7.abc.key"))
-        try write("not json", to: directory.appendingPathComponent("notes.txt"))
+            #"{"pid":8,"sessionId":"busy","cwd":"/tmp/x","status":"busy","updatedAt":1790268825080}"#,
+            to: sessions.appendingPathComponent("8.json"))
+        try write(
+            #"{"pid":9,"sessionId":"fresh","cwd":"/tmp/x","status":"idle","updatedAt":1790268825080}"#,
+            to: sessions.appendingPathComponent("9.json"))
+        try write(
+            #"{"pid":10,"sessionId":"stopped","cwd":"/tmp/x","status":"idle","updatedAt":1790268825080}"#,
+            to: sessions.appendingPathComponent("10.json"))
+        try write("garbage", to: sessions.appendingPathComponent("11.json"))
+        try write("secret", to: sessions.appendingPathComponent("7.abc.key"))
+        try write("not json", to: sessions.appendingPathComponent("notes.txt"))
+        try write(
+            """
+            {"type":"user","message":{"role":"user","content":"tidy the dotfiles"}}
+            {"type":"ai-title","aiTitle":"Tidy dotfiles"}
+            {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"done"}]}}
+            {"type":"system","subtype":"turn_duration","timestamp":"2026-09-25T19:00:00.000Z"}
+            """, to: project.appendingPathComponent("done.jsonl"))
+        try write(
+            """
+            {"type":"user","message":{"role":"user","content":"go"}}
+            {"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]}}
+            """, to: project.appendingPathComponent("stopped.jsonl"))
 
         let tasks = ClaudeCodeActivitySource.standard(home: home).completedTasks()
 
-        XCTAssertEqual(tasks.map(\.sessionID), ["live"])
+        XCTAssertEqual(tasks.map(\.sessionID), ["done"])
+        XCTAssertEqual(tasks.first?.title, "Tidy dotfiles")
+        XCTAssertEqual(
+            tasks.first?.completedAt, AgentTimestamp.date(from: "2026-09-25T19:00:00.000Z"))
+    }
+
+    func testTranscriptsAreRereadOnlyWhenTheyChange() throws {
+        let home = try makeTempHome()
+        let sessions = home.appendingPathComponent(".claude/sessions")
+        let project = home.appendingPathComponent(".claude/projects/-tmp-x")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        try write(
+            #"{"pid":7,"sessionId":"s","cwd":"/tmp/x","status":"idle","updatedAt":1}"#,
+            to: sessions.appendingPathComponent("7.json"))
+        let transcript = project.appendingPathComponent("s.jsonl")
+        let firstTurn = """
+            {"type":"user","message":{"role":"user","content":"one"}}
+            {"type":"system","subtype":"turn_duration","timestamp":"2026-09-25T19:00:00.000Z"}
+            """
+        try write(firstTurn, to: transcript)
+        let source = ClaudeCodeActivitySource.standard(home: home)
+
+        XCTAssertEqual(source.completedTasks().map(\.title), ["one"])
+        XCTAssertEqual(source.completedTasks().map(\.title), ["one"])
+
+        try write(
+            firstTurn + """
+
+                {"type":"user","message":{"role":"user","content":"two"}}
+                {"type":"system","subtype":"turn_duration","timestamp":"2026-09-25T19:05:00.000Z"}
+                """, to: transcript)
+
+        XCTAssertEqual(source.completedTasks().map(\.title), ["two"])
     }
 
     func testCompletedTasksOnAMissingDirectory() throws {
         let home = try makeTempHome()
 
         XCTAssertTrue(ClaudeCodeActivitySource.standard(home: home).completedTasks().isEmpty)
-    }
-
-    func testNamelessSessionFallsBackToItsTranscript() throws {
-        let home = try makeTempHome()
-        let sessions = home.appendingPathComponent(".claude/sessions")
-        let project = home.appendingPathComponent(".claude/projects/-tmp-island")
-        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
-        try write(
-            #"{"pid":7,"sessionId":"sess","cwd":"/tmp/island","name":"","status":"idle","updatedAt":1790268825080}"#,
-            to: sessions.appendingPathComponent("7.json"))
-        try write(
-            #"{"type":"assistant","message":{"content":[{"type":"text","text":"final from transcript"}]}}"#,
-            to: project.appendingPathComponent("sess.jsonl"))
-
-        let tasks = ClaudeCodeActivitySource.standard(home: home).completedTasks()
-
-        XCTAssertEqual(tasks.map(\.title), ["final from transcript"])
-    }
-
-    func testNamelessSessionWithoutATranscriptFallsBackToTheDirectory() throws {
-        let home = try makeTempHome()
-        let sessions = home.appendingPathComponent(".claude/sessions")
-        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
-        try write(
-            #"{"pid":8,"sessionId":"nofile","cwd":"/tmp/island","name":"   ","status":"idle","updatedAt":1790268825080}"#,
-            to: sessions.appendingPathComponent("8.json"))
-        // Name is blank and there is no transcript, so this session is skipped
-        // by the transcript lookup and titled from its working directory.
-        try write(
-            #"{"pid":9,"cwd":"/tmp/other","name":"","status":"idle","updatedAt":1790268825080}"#,
-            to: sessions.appendingPathComponent("9.json"))
-
-        let tasks = ClaudeCodeActivitySource.standard(home: home).completedTasks()
-
-        XCTAssertEqual(tasks.map(\.title), ["island"])
     }
 
     private func makeTempHome() throws -> URL {
@@ -288,7 +345,8 @@ final class PiActivitySourceTests: XCTestCase {
         XCTAssertTrue(scan.isComplete)
         XCTAssertEqual(scan.sessionID, "01a0")
         XCTAssertEqual(scan.cwd, "/Users/x/Repos/island")
-        XCTAssertEqual(scan.title, "build the thing")
+        XCTAssertNil(scan.title)
+        XCTAssertEqual(scan.lastMessage, "build the thing")
         XCTAssertEqual(scan.completedAt, AgentTimestamp.date(from: "2026-09-24T20:35:00.000Z"))
     }
 
@@ -388,19 +446,53 @@ final class PiActivitySourceTests: XCTestCase {
         XCTAssertTrue(PiActivitySource.standard(home: home).completedTasks().isEmpty)
     }
 
-    func testTitleFallsBackToTheLastAssistantMessage() throws {
+    func testTitleFallsBackToTheLastUserMessage() throws {
         let home = try makeTempHome()
         let project = home.appendingPathComponent(".pi/agent/sessions/--tmp-island--")
         try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
         try write(
             """
             {"type":"session","id":"quiet","cwd":"/tmp/island"}
+            {"type":"message","message":{"role":"user","content":"first ask"}}
+            {"type":"message","message":{"role":"assistant","stopReason":"stop","content":[{"type":"text","text":"answer"}]}}
+            {"type":"message","message":{"role":"user","content":"follow-up ask"}}
             {"type":"message","message":{"role":"assistant","stopReason":"stop","content":[{"type":"text","text":"all done here"}]}}
             """, to: project.appendingPathComponent("run.jsonl"))
 
         let tasks = PiActivitySource.standard(home: home).completedTasks()
 
-        XCTAssertEqual(tasks.map(\.title), ["all done here"])
+        XCTAssertEqual(tasks.map(\.title), ["follow-up ask"])
+    }
+
+    /// pi's `/name` writes a `session_info` entry; the latest one is the title.
+    func testSessionNameIsTheTitle() throws {
+        let contents = """
+            {"type":"session","id":"s","cwd":"/tmp/island"}
+            {"type":"session_info","name":"old name"}
+            {"type":"message","message":{"role":"user","content":"do it"}}
+            {"type":"session_info","name":"vs-space"}
+            {"type":"session_info"}
+            {"type":"message","message":{"role":"assistant","stopReason":"stop"}}
+            """
+
+        let scan = try XCTUnwrap(
+            PiActivitySource.scan(contents: contents, fileModified: .distantPast))
+
+        XCTAssertEqual(scan.title, "vs-space")
+        XCTAssertEqual(scan.lastMessage, "do it")
+    }
+
+    func testAnAbortedTurnIsNotComplete() throws {
+        let contents = """
+            {"type":"session","id":"s","cwd":"/tmp/island"}
+            {"type":"message","message":{"role":"user","content":"go"}}
+            {"type":"message","message":{"role":"assistant","stopReason":"aborted"}}
+            """
+
+        let scan = try XCTUnwrap(
+            PiActivitySource.scan(contents: contents, fileModified: .distantPast))
+
+        XCTAssertFalse(scan.isComplete)
     }
 
     func testTitleFallsBackToTheWorkingDirectoryWhenThereIsNoMessageAtAll() throws {
@@ -418,10 +510,11 @@ final class PiActivitySourceTests: XCTestCase {
         XCTAssertEqual(tasks.map(\.title), ["island"])
     }
 
-    func testScanCapturesTheLastAssistantText() throws {
+    func testScanCapturesTheLastUserText() throws {
         let contents = """
             {"type":"session","id":"s","cwd":"/tmp/island"}
-            {"type":"message","message":{"role":"assistant","stopReason":"toolUse","content":[{"type":"text","text":"working"}]}}
+            {"type":"message","message":{"role":"user","content":"one"}}
+            {"type":"message","message":{"role":"user","content":[{"type":"text","text":"two"}]}}
             {"type":"message","message":{"role":"assistant","stopReason":"stop","content":[{"type":"text","text":"all done"}]}}
             """
 
@@ -429,7 +522,7 @@ final class PiActivitySourceTests: XCTestCase {
             PiActivitySource.scan(contents: contents, fileModified: .distantPast))
 
         XCTAssertNil(scan.title)
-        XCTAssertEqual(scan.lastMessage, "all done")
+        XCTAssertEqual(scan.lastMessage, "two")
         XCTAssertTrue(scan.isComplete)
     }
 
@@ -506,7 +599,7 @@ final class CodexActivitySourceTests: XCTestCase {
             [
               {"id":"01a","name":"评估 AI 玩游戏","title":"你有办法玩游戏吗","cwd":"/Users/x/Repos/compounding","completed_at":1789162387},
               {"id":"01b","name":null,"title":"raw first message","cwd":"/tmp","completed_at":1789162388},
-              {"id":"01c","name":"","title":"","cwd":null,"completed_at":1789162389,"last_message":"codex said this last"},
+              {"id":"01c","name":"","title":"","cwd":null,"completed_at":1789162389,"last_prompt":"user asked this last"},
               {"id":"01d","name":"","title":"","cwd":null,"completed_at":1789162390},
               {"id":"01e","name":"no time","cwd":"/tmp"},
               {"name":"no id","completed_at":1},
@@ -519,11 +612,24 @@ final class CodexActivitySourceTests: XCTestCase {
         XCTAssertEqual(tasks.map(\.sessionID), ["01a", "01b", "01c", "01d"])
         XCTAssertEqual(
             tasks.map(\.title),
-            ["评估 AI 玩游戏", "raw first message", "codex said this last", "(untitled)"])
+            ["评估 AI 玩游戏", "raw first message", "user asked this last", "(untitled)"])
         XCTAssertEqual(tasks.first?.cwd, "/Users/x/Repos/compounding")
         XCTAssertEqual(tasks.first?.resumeCommand, "codex resume 01a")
         XCTAssertEqual(
             tasks.first?.completedAt, Date(timeIntervalSince1970: 1_789_162_387))
+    }
+
+    /// Issue dropdown-title-ux #1: without a name, the last thing the user
+    /// asked beats the thread's first message.
+    func testTheLastPromptBeatsTheFirstMessage() {
+        let tasks = CodexTurnActivitySource.parse(
+            #"[{"id":"t","name":null,"title":"first ask","last_prompt":"latest ask","completed_at":1}]"#
+        )
+
+        XCTAssertEqual(tasks.map(\.title), ["latest ask"])
+        XCTAssertTrue(
+            CodexTurnActivitySource.sql(history: URL(fileURLWithPath: "/h")).contains(
+                "'userMessage'"))
     }
 
     func testTurnHistoryRejectsGarbage() {
@@ -701,20 +807,127 @@ final class ClaudeTranscriptTests: XCTestCase {
         temporary = []
     }
 
-    func testHasTitle() {
-        XCTAssertTrue(
-            ClaudeCodeActivitySource.hasTitle(
-                .init(
-                    pid: 1, sessionId: "s", cwd: nil, name: "island", status: "idle", updatedAt: nil
-                )
-            ))
+    private func scan(_ contents: String) -> ClaudeCodeActivitySource.Transcript {
+        ClaudeCodeActivitySource.scanTranscript(contents)
+    }
+
+    func testATurnEndingInTurnDurationIsComplete() {
+        let transcript = scan(
+            """
+            {"type":"user","message":{"role":"user","content":"build it"}}
+            {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]}}
+            {"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"x"}]}}
+            {"type":"system","subtype":"turn_duration","timestamp":"2026-09-25T19:00:00.000Z"}
+            """)
+
+        XCTAssertTrue(transcript.isComplete)
+        XCTAssertEqual(
+            transcript.completedAt, AgentTimestamp.date(from: "2026-09-25T19:00:00.000Z"))
+        XCTAssertEqual(transcript.lastPrompt, "build it")
+    }
+
+    func testAFreshSessionHasNothingComplete() {
+        let transcript = scan(
+            """
+            {"type":"attachment","attachment":{"type":"hook_success"}}
+            {"type":"system","subtype":"informational","content":"hello"}
+            """)
+
+        XCTAssertFalse(transcript.isComplete)
+        XCTAssertNil(transcript.completedAt)
+        XCTAssertNil(transcript.lastPrompt)
+        XCTAssertFalse(scan("").isComplete)
+    }
+
+    func testAnEscapedTurnIsNotComplete() {
         XCTAssertFalse(
-            ClaudeCodeActivitySource.hasTitle(
-                .init(pid: 1, sessionId: "s", cwd: nil, name: "  ", status: "idle", updatedAt: nil))
-        )
+            scan(
+                """
+                {"type":"system","subtype":"turn_duration","timestamp":"2026-09-25T18:00:00.000Z"}
+                {"type":"user","message":{"role":"user","content":"go"}}
+                {"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]}}
+                """
+            ).isComplete)
+        // Interrupting a tool call still writes a turn_duration.
         XCTAssertFalse(
-            ClaudeCodeActivitySource.hasTitle(
-                .init(pid: 1, sessionId: "s", cwd: nil, name: nil, status: "idle", updatedAt: nil)))
+            scan(
+                """
+                {"type":"user","message":{"role":"user","content":"go"}}
+                {"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user for tool use]"}]}}
+                {"type":"system","subtype":"turn_duration","timestamp":"2026-09-25T19:00:00.000Z"}
+                """
+            ).isComplete)
+    }
+
+    func testATurnStillRunningIsNotComplete() {
+        let transcript = scan(
+            """
+            {"type":"user","message":{"role":"user","content":"one"}}
+            {"type":"system","subtype":"turn_duration","timestamp":"2026-09-25T19:00:00.000Z"}
+            {"type":"user","message":{"role":"user","content":"two"}}
+            {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"working"}]}}
+            """)
+
+        XCTAssertFalse(transcript.isComplete)
+        XCTAssertEqual(transcript.lastPrompt, "two")
+    }
+
+    func testATurnAfterAnInterruptedOneCanComplete() {
+        let transcript = scan(
+            """
+            {"type":"user","message":{"role":"user","content":"one"}}
+            {"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]}}
+            {"type":"user","message":{"role":"user","content":"two"}}
+            {"type":"system","subtype":"turn_duration","timestamp":"2026-09-25T19:00:00.000Z"}
+            """)
+
+        XCTAssertTrue(transcript.isComplete)
+        XCTAssertEqual(transcript.lastPrompt, "two")
+    }
+
+    func testAnUntimedTurnDurationStillCompletesTheTurn() {
+        let transcript = scan(
+            """
+            {"type":"user","message":{"role":"user","content":"one"}}
+            {"type":"system","subtype":"turn_duration"}
+            """)
+
+        XCTAssertTrue(transcript.isComplete)
+        XCTAssertNil(transcript.completedAt)
+    }
+
+    func testTitlesTakeTheLatestValue() {
+        let transcript = scan(
+            """
+            {"type":"ai-title","aiTitle":"first ai"}
+            {"type":"custom-title","customTitle":"first rename"}
+            {"type":"ai-title","aiTitle":"second ai"}
+            {"type":"custom-title","customTitle":"second rename"}
+            {"type":"ai-title"}
+            {"type":"custom-title"}
+            """)
+
+        XCTAssertEqual(transcript.aiTitle, "second ai")
+        XCTAssertEqual(transcript.customTitle, "second rename")
+    }
+
+    /// The last prompt is what the user typed: slash-command wrappers, injected
+    /// meta messages, tool results, interrupts and side chains do not count.
+    func testLastPromptSkipsWhatTheUserDidNotType() {
+        let transcript = scan(
+            """
+            {"type":"user","message":{"role":"user","content":[{"type":"image"},{"type":"text","text":"typed this"}]}}
+            {"type":"user","message":{"role":"user","content":"<command-name>/rename</command-name>"}}
+            {"type":"user","message":{"role":"user","content":"<local-command-stdout>ok</local-command-stdout>"}}
+            {"type":"user","isMeta":true,"message":{"role":"user","content":[{"type":"text","text":"skill body"}]}}
+            {"type":"user","isSidechain":true,"message":{"role":"user","content":"subagent prompt"}}
+            {"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"x"}]}}
+            {"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]}}
+            {"type":"user"}
+            not json
+            """)
+
+        XCTAssertEqual(transcript.lastPrompt, "typed this")
     }
 
     func testSessionFileIsFoundBySessionID() throws {
@@ -735,36 +948,18 @@ final class ClaudeTranscriptTests: XCTestCase {
         XCTAssertNil(ClaudeCodeActivitySource.sessionFile(sessionID: "sess", in: project))
     }
 
-    func testLastAssistantTextPicksTheFinalOne() {
-        let contents = """
-            {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"first"}]}}
-            {"type":"user","message":{"role":"user","content":"hi"}}
-            {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"final answer"}]}}
-            """
-
-        XCTAssertEqual(ClaudeCodeActivitySource.lastAssistantText(in: contents), "final answer")
-    }
-
-    func testLastAssistantTextWhenThereIsNone() {
-        XCTAssertNil(ClaudeCodeActivitySource.lastAssistantText(in: ""))
-        XCTAssertNil(ClaudeCodeActivitySource.lastAssistantText(in: #"{"type":"user"}"#))
-        XCTAssertNil(
-            ClaudeCodeActivitySource.lastAssistantText(
-                in:
-                    #"{"type":"assistant","message":{"role":"assistant","content":[{"type":"thinking","thinking":"x"}]}}"#
-            ))
-    }
-
-    func testLastAssistantTextFromAFile() throws {
+    func testTranscriptCacheReadsAFileAndToleratesAMissingOne() throws {
         let directory = try makeTempDirectory()
         let file = directory.appendingPathComponent("sess.jsonl")
-        try #"{"type":"assistant","message":{"content":[{"type":"text","text":"from disk"}]}}"#
+        try #"{"type":"ai-title","aiTitle":"from disk"}"#
             .write(to: file, atomically: true, encoding: .utf8)
+        let cache = ClaudeTranscriptCache()
 
-        XCTAssertEqual(ClaudeCodeActivitySource.lastAssistantText(inFile: file), "from disk")
-        XCTAssertNil(
-            ClaudeCodeActivitySource.lastAssistantText(
-                inFile: directory.appendingPathComponent("missing.jsonl")))
+        XCTAssertEqual(cache.transcript(at: file)?.aiTitle, "from disk")
+        XCTAssertNil(cache.transcript(at: directory.appendingPathComponent("missing.jsonl")))
+        let binary = directory.appendingPathComponent("binary.jsonl")
+        try Data([0xFF, 0xFE, 0xFD]).write(to: binary)
+        XCTAssertNil(cache.transcript(at: binary))
     }
 
     private func makeTempDirectory() throws -> URL {
