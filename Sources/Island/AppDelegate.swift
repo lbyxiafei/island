@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         reportConfiguration()
+        VSCodeExtensionInstaller.installIfNeeded()
 
         let content = OverlayContentView(
             frame: NSRect(

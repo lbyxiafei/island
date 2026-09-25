@@ -27,6 +27,10 @@ rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$executable" "$app/Contents/MacOS/Island"
 
+# The VS Code extension island installs on launch (VSCodeExtensionInstaller).
+vscode_extension_version="$(/usr/bin/plutil -extract version raw -o - "$root/vscode-extension/package.json")"
+"$root/scripts/build-vscode-extension.sh" "$app/Contents/Resources/island-vscode.vsix" >/dev/null
+
 cat >"$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -53,6 +57,11 @@ cat >"$app/Contents/Info.plist" <<PLIST
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <!-- Shown once per terminal app the first time island focuses one of its tabs. -->
+    <key>NSAppleEventsUsageDescription</key>
+    <string>island brings the terminal tab running a finished agent task to the front.</string>
+    <key>IslandVSCodeExtensionVersion</key>
+    <string>$vscode_extension_version</string>
 </dict>
 </plist>
 PLIST

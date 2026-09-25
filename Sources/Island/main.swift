@@ -18,7 +18,7 @@ if arguments.contains("--help") || arguments.contains("-h") {
         flags (login-item flags must run from inside the app bundle):
           --print-config                  resolve the environment and exit
           --scan-agents                   list completed agent tasks and exit
-          --reopen-plan <pid>             print how island would reopen a task on that pid
+          --reopen-plan <pid> [--perform] print how island would reopen a task on that pid (and do it)
           --login-item-status             report the launch-at-login state
           --login-item-enable             start at login from now on
           --login-item-disable            stop starting at login
@@ -98,10 +98,14 @@ if let flag = CommandLine.arguments.firstIndex(of: "--reopen-plan"),
             resumeCommand: "\(agent.rawValue) --resume debug"
         )
     } else {
-        print("usage: --reopen-plan <pid> | <agent: claude-code|pi|codex> <cwd>")
+        print("usage: --reopen-plan <pid> | <agent: claude-code|pi|codex> <cwd> [--perform]")
         exit(EXIT_FAILURE)
     }
-    print(executor.plan(for: task))
+    let plan = executor.plan(for: task)
+    print(plan)
+    if CommandLine.arguments.contains("--perform") {
+        executor.perform(plan, for: task)
+    }
     exit(EXIT_SUCCESS)
 }
 

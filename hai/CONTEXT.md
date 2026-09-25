@@ -89,7 +89,7 @@ defaults delete com.binyanli.island.poc IslandHotkeyEnabled   # 回到默认开�
 - 覆盖率：`./scripts/coverage.sh` 把**单行百分数**写进 `coverage.txt`；`make verify` 的 coverage gate 先刷新它，再与 `coverage-baseline.txt` 比对（当前基线 `100`，即 `IslandCore` 的 65 行全部被覆盖）
 - 覆盖率排除项声明在 **`coverage.config`**（`llvm-cov -ignore-filename-regex`，一行一条正则），理由如下：
   1. `Tests/`、`\.derived/runner\.swift` —— 测试自身与 SwiftPM 自动生成的测试入口（AGENTS 排除类 1：自动生成的代码）
-  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift` / `AgentReopenExecutor.swift` / `ProcessSQLite.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
+  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift` / `AgentReopenExecutor.swift` / `TerminalTabFocuser.swift` / `Subprocess.swift` / `VSCodeExtensionInstaller.swift` / `ProcessSQLite.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
   - 没有类 3（纯数据结构）、类 4（平台分支）的排除项
 - 增量覆盖率：本 repo 没有可用的 Swift delta-coverage 工具（`xcrun llvm-cov` 没有 diff 模式）。改动达到增量门槛时，用 `xcrun llvm-cov show` 人工核对改动行，并在 commit body 说明；`IslandCore` 的基线是 100%，任何新增未覆盖行都会在下次 `make verify` 里暴露
 
@@ -111,7 +111,8 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   Snappy.swift                 #   snappy 原始流解压 + ByteReader
   V8Value.swift                #   V8 structured clone 反序列化（只覆盖 island 用到的类型）
   CodexTurns.swift             #   Codex：turn 历史（sqlite，注入 runner）+ session_index 兑底
-  AgentReopen.swift            #   点击任务后“回到它”的决策（ps 父链 + tmux pane → action）
+  AgentReopen.swift            #   点击任务后“回到它”的决策（ps 父链 + tmux pane → action）+ HostApp.nearest
+  TerminalFocus.swift          #   精确到 tab：tmux client 挑选、按宿主选定位手段（TerminalTabFocus）、AppleScript 文本、VS Code 请求/响应、扩展版本判断
   AgentInbox.swift             #   增量入库 + 已读/未读 + 排序 + 条数上限（N）
   OverlaySelection.swift       #   悬浮窗查询过滤（TaskFilter）+ 键盘选中行 / ⌘N / ↩ 标注
   OverlayTheme.swift           #   主题预设 → 配色（OverlayPalette）+ UserDefaults 存储 + agent 图标选择
@@ -120,7 +121,10 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
   AppDelegate.swift            #   启动、注册 hotkey、显示与自动隐藏
   OverlayPanel.swift           #   不抢焦点的悬浮 NSPanel
   OverlayContent.swift         #   岛式悬浮窗：CapsuleShapeView（平顶圆底）+ 标题行（被动 `● N new` / 键盘模式整行搜索 + `N new` 胶囊）+ 行（键帽/agent 图标/未读点/短时间）+ 键盘处理 + 主题上色
-  AgentReopenExecutor.swift    #   执行 reopen 计划：tmux select / 激活 app / 写剪贴板
+  AgentReopenExecutor.swift    #   执行 reopen 计划：tmux select + switch-client / 找宿主 app / 写剪贴板
+  TerminalTabFocuser.swift     #   执行 TerminalTabFocus：AppleScript（cmux/Ghostty/Terminal/iTerm2）、tty 标题探针、VS Code 文件握手
+  VSCodeExtensionInstaller.swift # 启动时把包内 island-vscode.vsix 装/升级进 VS Code（版本不同才装）
+  Subprocess.swift             #   子进程 + osascript 的公共封装
   ProcessSQLite.swift          #   /usr/bin/sqlite3 -json 包装（Codex turn 历史用）
   HotkeyRegistrar.swift        #   Carbon RegisterEventHotKey 包装
   StatusItemController.swift   #   菜单栏图标与菜单
@@ -136,6 +140,8 @@ scripts/coverage.sh            # 刷新 coverage.txt
 scripts/check-layering.sh      # 依赖方向检查
 hai/reference/icon/            # 菜单栏图标的设计资产（SVG + 预览 + 说明），非运行时依赖
 hai/reference/agents/          # MVP 调研：各 agent 的完成信号 / 任务身份 / 宿主 / 回到任务的手段
+vscode-extension/              # island 自带的 VS Code 扩展（纯 JS，零依赖）：按 pid 聚焦终端 tab；scripts/build-vscode-extension.sh 用系统 zip 打成 vsix，build-app.sh 放进 Resources
+scripts/build-vscode-extension.sh # 打 vsix（不需要 vsce / npm）
 coverage.config                # 覆盖率排除项
 .swift-format                  # 格式化配置（4 空格缩进）
 ```
@@ -181,7 +187,10 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - **悬浮窗一个 session 一行**：`AgentInbox.ingest` 按 `AgentTask.sessionKey`（`agent:sessionID`）去重，同一 session 的更新一轮替换旧行并重新标未读；`AgentTask.id`（含 completedAt）仍是行 id
 - **Claude transcript 会长到 MB 级**，`ClaudeTranscriptCache` 按 (size, mtime) 缓存解析结果，只在文件变化时重读；`busy` 的 session 直接跳过不读。scanner 必须长期持有（`AgentMonitor` 里就是），每次 new 一个会让缓存失效
 - **Codex 的 sqlite 访问走注入的 `SQLiteQuerying`**：IslandCore 只定义协议 + 解析，`Sources/Island/ProcessSQLite.swift` 才是 `/usr/bin/sqlite3` 包装。测试用 `NoSQLiteQuerying` / stub，所以核心层不会 spawn 进程
-- **点击任务后的行为**（`AgentReopen.plan`，纯逻辑有测试）：命中 tmux pane 就 `focusTmux`；host 是 terminal 但不在 tmux 就 `focusHostApp`（沿祖先链找离它最近的常规 GUI app，`HostApp.nearest`，不靠终端白名单——cmux 等任意终端都能命中；tmux 场景同样用它从 tmux client 找到宿主终端，`hostingBundleIDs` 只在 tmux 没有 client 时兜底；VS Code 用 `open -b com.microsoft.VSCode <cwd>` 聚焦到目录）；桌面 app 就 `activateApp`；host 仍无法确定时才 `copyToClipboard(resume)`。执行层 `AgentReopenExecutor` 在 Sources/Island。调试：`--reopen-plan <pid>` 或 `--reopen-plan <agent> <cwd>`（后者走无 pid 的宿主反查）
+- **点击任务后的行为**（`AgentReopen.plan`，纯逻辑有测试）：命中 tmux pane 就 `focusTmux`；host 是 terminal 但不在 tmux 就 `focusHostApp`（沿祖先链找离它最近的常规 GUI app，`HostApp.nearest`，不靠终端白名单——cmux 等任意终端都能命中；tmux 场景同样用它从 tmux client 找到宿主终端，`hostingBundleIDs` 只在 tmux 没有 client 时兜底）；桌面 app 就 `activateApp`；host 仍无法确定时才 `copyToClipboard(resume)`。执行层 `AgentReopenExecutor` 在 Sources/Island。调试：`--reopen-plan <pid>` 或 `--reopen-plan <agent> <cwd>`（后者走无 pid 的宿主反查），**加 `--perform` 真的执行**（会抢焦点）
+- **精确到 tab**（issue `reopen-precise-terminal-tab`，机制与实测细节见 `hai/reference/agents/README.md` § 5）：tmux 必须 `switch-client`，只 `select-window` 不会让 client 离开当前 session；叶子进程（agent 或 tmux client）的宿主 app 决定手段——cmux 读 `CMUX_SURFACE_ID` 走 AppleScript（**不走 cmux socket**，默认只许 cmux 内进程连）；Ghostty 往 tty 写 OSC 2 标题探针再按 name 找 terminal，找到后写回原标题；Terminal / iTerm2 按 tty（Terminal 要先 activate 再调窗口顺序）；VS Code 用自带扩展做**文件握手**（`~/Library/Application Support/island/vscode/focus-request.json` → `focus-response-<id>.json`），**不用 `vscode://` URI**，因为 VS Code 每次都弹确认框
+- AppleScript 用 `/usr/bin/osascript` 子进程跑，首次控制某个终端 app 时 macOS 弹一次自动化授权（`Info.plist` 的 `NSAppleEventsUsageDescription`）。**ad-hoc 签名每次重新构建 cdhash 都会变，开发时可能反复弹授权**
+- VS Code 扩展：`vscode-extension/package.json` 的 `version` 是唯一版本号，`build-app.sh` 写进 `Info.plist` 的 `IslandVSCodeExtensionVersion`；**改了 extension.js 必须 bump version**，否则已安装用户不会升级（安装器只比版本）。全新安装会在已打开的 VS Code 窗口里直接激活；同版本覆盖安装不会重新加载。扩展是 JS wiring，不在 Swift 覆盖率统计内
 - **任务标题的取值是 `title → 最后一条用户消息 → 目录名`**（`TaskTitle.resolve`，PLAN § Design / 下拉框 UX #1）。Claude：transcript 里的 `custom-title`（/rename）→ session json 里 `nameSource != "derived"` 的 `name` → `ai-title` → 最后一条用户 prompt（跳过 `isMeta`、sidechain、tool_result、`<command-…>` 包装、中断标记）。**`nameSource: "derived"` 的 `name`（如 `dotfiles-9e`）是 Claude 自动生成的占位名，不算标题**。pi：`session_info.name`（/name）→ 最后一条 user 文本。Codex：`threads.name` → 最后一条不以 `<` 开头的 `userMessage` → `threads.title`（首条用户消息）
 - **点任务后悬浮窗会立刻收起**（PLAN § Design / 下拉框 UX #2）：`selectTask` 先 `markRead` + `refreshAgentUI`，再 `hideOverlay(reason:)`，最后才 focus/跳转（顺序重要，否则聚焦那一刻悬浮窗还会闪）
 - **pi 没有 host pid 落盘**，`AgentReopenExecutor.resolveHost` 在点击时才反查：`ps -axo pid=,comm=` 筛命令名 `pi`，再 `lsof -a -p <pids> -d cwd -Fpn` 取 cwd，按 session 的 cwd 匹配。**`lsof -c pi` 不好使**——pi 是 node 脚本，lsof 看到的命令名是 node，必须先用 ps 拿到 pid 再 `lsof -p`

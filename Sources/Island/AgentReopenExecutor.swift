@@ -1,9 +1,10 @@
 import AppKit
 import IslandCore
 
-/// Executes the plan `AgentReopen` produces: focus the tmux pane hosting the
-/// task, bring the app hosting its terminal forward, activate a desktop app, or
-/// put the resume command on the clipboard.
+/// Executes the plan `AgentReopen` produces: switch tmux to the task's pane,
+/// bring the exact terminal tab showing it forward (cmux / Ghostty / Terminal /
+/// iTerm2 / VS Code), activate a desktop app, or put the resume command on the
+/// clipboard.
 ///
 /// Everything here is best effort — PLAN § Design accepts "second best" — so a
 /// missing `tmux` or a dead app degrades to the next step instead of failing.
@@ -26,8 +27,7 @@ final class AgentReopenExecutor {
         "dev.warp.Warp-Stable",
     ]
 
-    /// VS Code can be pointed at a folder, which focuses the window showing it.
-    private static let vscodeBundleID = "com.microsoft.VSCode"
+    private let tabFocuser = TerminalTabFocuser()
 
     /// Builds the plan from this machine's live process and tmux state. Task
     /// hosts are resolved here (not in the sources) because only some agents
@@ -85,23 +85,28 @@ final class AgentReopenExecutor {
 
     // MARK: - Actions
 
+    /// Selects the pane, then switches a tmux client to it — `select-window`
+    /// alone changes the session's current window but leaves every client on
+    /// whatever session it was showing.
     private func focusTmux(windowTarget: String, paneTarget: String, task: AgentTask) {
         _ = run(tmuxArguments(["select-window", "-t", windowTarget]))
         _ = run(tmuxArguments(["select-pane", "-t", paneTarget]))
-        log("tmux -> \(paneTarget)")
-        activateTmuxHost()
+        let clients = TmuxClient.parse(
+            run(tmuxArguments(["list-clients", "-F", Self.clientFormat])) ?? "")
+        if let client = TmuxClient.pick(clients, forPane: paneTarget) {
+            _ = run(tmuxArguments(["switch-client", "-c", client.tty, "-t", paneTarget]))
+            log("tmux client \(client.tty) -> \(paneTarget)")
+            if focusTerminal(TerminalLeaf(pid: client.pid, tty: client.tty), cwd: task.cwd) {
+                return
+            }
+        } else {
+            log("tmux -> \(paneTarget) (no attached client)")
+        }
+        activateAnyTerminal()
     }
 
-    /// The tmux client's ancestor chain ends at the GUI terminal showing it, so
-    /// focusing the first client we can place brings that window up.
-    private func activateTmuxHost() {
-        let clients =
-            (run(tmuxArguments(["list-clients", "-F", "#{client_pid}"])) ?? "")
-            .split(separator: "\n")
-            .compactMap { Int32($0.trimmingCharacters(in: .whitespaces)) }
-        for client in clients where focusHostApp(processID: client, cwd: nil) {
-            return
-        }
+    /// Last resort when tmux has no client island can trace to an app.
+    private func activateAnyTerminal() {
         for bundleID in Self.hostingBundleIDs {
             guard
                 let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
@@ -114,11 +119,18 @@ final class AgentReopenExecutor {
         log("could not find the terminal hosting tmux")
     }
 
-    /// Walks the ancestor chain up to the GUI app showing the process. Returns
-    /// false when the process is not running under any app.
     private func focusHostApp(processID: Int32, cwd: String?) -> Bool {
+        let tty = ProcessEnvironment.ttyPath(
+            fromPS: run(["/bin/ps", "-o", "tty=", "-p", String(processID)]) ?? "")
+        return focusTerminal(TerminalLeaf(pid: processID, tty: tty), cwd: cwd)
+    }
+
+    /// Walks the ancestor chain up to the GUI app showing `leaf`, focuses the
+    /// tab holding it when that app is scriptable, and otherwise just brings
+    /// the app forward. Returns false when `leaf` runs under no app at all.
+    private func focusTerminal(_ leaf: TerminalLeaf, cwd: String?) -> Bool {
         let nodes = ProcessTree.parse(run(["/bin/ps", "-axo", "pid=,ppid="]) ?? "")
-        let chain = ProcessTree.ancestors(of: processID, in: nodes)
+        let chain = ProcessTree.ancestors(of: leaf.pid, in: nodes)
         let running = NSWorkspace.shared.runningApplications.filter {
             $0.activationPolicy == .regular
         }
@@ -129,14 +141,27 @@ final class AgentReopenExecutor {
             let app = running.first(where: { $0.processIdentifier == host.pid })
         else { return false }
 
-        let bundleID = host.bundleID ?? "pid \(host.pid)"
-        if host.bundleID == Self.vscodeBundleID, let cwd, !cwd.isEmpty {
-            // Focuses the VS Code window showing that folder.
-            _ = run(["/usr/bin/open", "-b", Self.vscodeBundleID, cwd])
+        let environment =
+            host.bundleID == TerminalTabFocus.cmuxBundleID
+            ? ProcessEnvironment.parse(
+                run(["/bin/ps", "eww", "-o", "command=", "-p", String(leaf.pid)]) ?? "",
+                keys: [TerminalTabFocus.surfaceKey])
+            : [:]
+        let focus = TerminalTabFocus.plan(
+            hostBundleID: host.bundleID, leaf: leaf, chain: chain, environment: environment)
+        let name = host.bundleID ?? "pid \(host.pid)"
+        if tabFocuser.focus(focus) {
+            log("focused \(focus) in \(name) for pid \(leaf.pid)")
+            return true
+        }
+
+        if host.bundleID == TerminalTabFocus.vscodeBundleID, let cwd, !cwd.isEmpty {
+            // Without the extension, the folder still picks the right window.
+            _ = run(["/usr/bin/open", "-b", TerminalTabFocus.vscodeBundleID, cwd])
         } else {
             app.activate()
         }
-        log("focused \(bundleID) for pid \(processID)")
+        log("activated \(name) for pid \(leaf.pid) (tab not found: \(focus))")
         return true
     }
 
@@ -173,6 +198,8 @@ final class AgentReopenExecutor {
     // MARK: - Process plumbing
 
     private static let paneFormat = "#{pane_pid}\t#{session_name}:#{window_index}.#{pane_index}"
+    private static let clientFormat =
+        "#{client_pid}\t#{client_tty}\t#{client_session}\t#{client_activity}"
 
     private func tmuxArguments(_ arguments: [String]) -> [String] {
         [tmuxPath()] + arguments
@@ -183,21 +210,7 @@ final class AgentReopenExecutor {
     }
 
     private func run(_ arguments: [String]) -> String? {
-        guard let executable = arguments.first else { return nil }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = Array(arguments.dropFirst())
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-        } catch {
-            return nil
-        }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return String(data: data, encoding: .utf8)
+        Subprocess.run(arguments)
     }
 
     private func log(_ message: String) {

@@ -4,8 +4,8 @@
 所有路径都是在本机 macOS 26.6.2 上实测的，样本来自 2026-09-24 的运行。
 
 > 结论先行：三类 CLI agent（Claude Code / pi / Codex）都有**结构化落盘**，能稳定拿到「谁、什么时候、哪件事、在哪个目录」；
-> “把用户送回对应窗口”也能做到大多数情况：tmux 精确命中，VS Code 可聚焦到对应文件夹，桌面 app 直接激活；
-> 只有非 tmux、非 VS Code 的终端（Ghostty / Terminal / iTerm2）只能到 app 级别，其余兑底 resume 命令进 clipboard。
+> “把用户送回对应窗口”已经能精确到 tab：tmux 切 client 到对应 session/window/pane，cmux / Ghostty / Terminal / iTerm2 用 AppleScript 定位 tab，
+> VS Code 靠 island 自带的扩展定位终端 tab，桌面 app 走 deep link；其余兑底 resume 命令进 clipboard。详见 § 5。
 
 ## 0. 通用中间层（提议）
 
@@ -108,8 +108,14 @@ order by completed_at desc limit 100;
 
 ## 5. 回到任务的可行手段（按可靠性排序）
 
-1. **tmux**（本机最常见）：`claude → zsh → tmux`。可由 pid 沿父进程链上溯到 tmux server pid，再 `tmux list-panes -a -F '#{pane_pid} ...'` 反查 `session:window.pane`，然后 `tmux select-window -t <target>` + `tmux select-pane -t <target>`，最后激活终端 app。实测 pane 标题已经带上 claude 的会话标题（`✳ 多Agent工作流框架`），可直接用于展示。
-2. **终端 app（非 tmux）**：在 agent 的祖先链里找已知终端的 bundle id。实测 pi 的链是 `pi → zsh → Code Helper → Code`，即 `com.microsoft.VSCode`；VS Code 可以用 `open -b com.microsoft.VSCode <cwd>` 直接聚焦到对应文件夹的窗口（最接近“回到那个会话”）。Ghostty / Terminal / iTerm2 只能 `activate()` 到 app 级别，定位不到具体 tab。
+1. **tmux**（本机最常见）：`claude → zsh → tmux`。由 pid 沿父进程链命中 `tmux list-panes -a` 的 `pane_pid` 得到 `session:window.pane`，`select-window` + `select-pane` 之后**必须 `switch-client -c <client_tty> -t <pane>`**——只 select 不会让 client 离开它当前显示的 session（2026-09-25 实测 client 挂在 `job`，目标在 `island`，点完屏幕不变）。client 优先选已经在目标 session 上的，否则选 `client_activity` 最新的。之后把 **tmux client** 当作下面第 2 条的"叶子进程"，继续定位显示它的终端 tab。
+2. **终端 tab（叶子进程 = agent 或 tmux client）**：沿叶子的祖先链找最近的常规 GUI app（`HostApp.nearest`），再按 app 选手段（`TerminalTabFocus`）：
+   - **cmux**（`com.cmuxterm.app`）：每个终端都有 `CMUX_SURFACE_ID`（`ps eww -o command= -p <pid>` 可读），它就是 AppleScript 里 `terminal` 的 `id`；`activate window w` + `focus t`。**不要走 cmux socket**：默认 `cmuxOnly` 模式拒绝 cmux 外的进程
+   - **Ghostty**（独立版，1.3.1 起有 AppleScript）：没有任何可读的终端 id，终端也没有 `tty` 属性。往叶子的 tty 写 OSC 2 标题探针，按 `name` 找到 terminal 后 `focus`，再把原标题写回。注意 `tell application "Ghostty"` 块里 `tab` 是 Ghostty 的类名，不是制表符
+   - **Terminal.app / iTerm2**：AppleScript 按 `tty` 匹配 tab / session。Terminal 必须**先 `activate` 再 `set index of w to 1`**，反过来窗口顺序会被还原
+   - **VS Code**：没有 CLI 能按 pid 聚焦终端，`vscode://` URI 每次都会弹确认框。island 自带一个零依赖扩展（`vscode-extension/`），启动时自动 `code --install-extension`；island 往 `~/Library/Application Support/island/vscode/focus-request.json` 写祖先链 pid，各窗口里的扩展 `fs.watch` 到后比对 `terminal.processId`，命中的 `terminal.show()` 并回写工作区路径，island 再 `open -b com.microsoft.VSCode <路径>` 把那个窗口提到前面
+   - 其他终端（Warp 等）：只激活 app
+   - `ps eww` 读不到系统签名二进制（`/bin/sleep`、`login` 起的 shell）的环境变量，claude / node / tmux 可以
 3. **桌面 app**：`NSRunningApplication` / `open -a`，按 bundle id 激活（`com.openai.codex` / `com.anthropic.claudefordesktop`）。
 4. **都定位不到**：把 `resumeCommand` 贴到 clipboard（PLAN § Design 已认可这是 second best）。
 
@@ -118,5 +124,5 @@ order by completed_at desc limit 100;
 - ~~Codex 桌面版的活动到底落在哪张 sqlite~~ → 已解决，见 § 3
 - ~~Claude 桌面版有没有可读的本地任务状态~~ → 已解决，见 § 4
 - Claude 桌面版的 Code 标签页：自带一份 Claude Code（`Claude/claude-code/<ver>/claude.app`），推测也写 `~/.claude/sessions`，待真实数据验证
-- 非 tmux 终端窗口的定位手段（iTerm2 AppleScript 的 session 匹配、Ghostty 未来是否有 CLI）
-- 一个 agent 在 VS Code 内运行时，如何把焦点给到正确 terminal 面板
+- ~~非 tmux 终端窗口的定位手段~~ → 已解决，见 § 5（iTerm2 本机未安装，脚本未实测）
+- ~~一个 agent 在 VS Code 内运行时，如何把焦点给到正确 terminal 面板~~ → 已解决，见 § 5
