@@ -3,10 +3,12 @@ import IslandCore
 
 /// A click-to-record control for the global hotkey.
 ///
-/// The user clicks it, then presses the combination they want; the raw
-/// `NSEvent` is turned into a `HotkeySpec` by `HotkeySpec.captured`. While the
-/// view is first responder it also swallows `performKeyEquivalent`, so combos
-/// like ⌘Q that the window would otherwise route to the menu get recorded too.
+/// Recording is explicit: it starts only when the user clicks the field, ends
+/// after one combination, and Esc or clicking elsewhere cancels it and puts
+/// the previous value back. So opening settings and pressing ⌘W closes the
+/// window instead of rebinding the hotkey. While recording, the view also
+/// swallows `performKeyEquivalent`, so ⌘-combos get recorded too. What each
+/// key does is decided by `SettingsKey.action` (IslandCore, tested).
 @MainActor
 final class HotkeyRecorderView: NSView {
     /// The recorded combination, or nil when nothing is bound.
@@ -22,9 +24,14 @@ final class HotkeyRecorderView: NSView {
     /// window can explain why instead of staying silent.
     var onReject: (() -> Void)?
 
-    override var acceptsFirstResponder: Bool { true }
+    /// Fired when recording ends without a new combination (Esc, click away).
+    var onCancel: (() -> Void)?
 
-    private var isRecording: Bool { window?.firstResponder === self }
+    private(set) var isRecording = false
+    private var specBeforeRecording: HotkeySpec?
+
+    /// Only while recording, so the window never picks the field on its own.
+    override var acceptsFirstResponder: Bool { isRecording }
 
     /// Sets the displayed combination without treating it as a fresh recording.
     func setSpec(_ spec: HotkeySpec?) {
@@ -43,7 +50,10 @@ final class HotkeyRecorderView: NSView {
 
         let text: String
         let color: NSColor
-        if let spec {
+        if isRecording {
+            text = "Press a combination…"
+            color = .secondaryLabelColor
+        } else if let spec {
             text = spec.displayString
             color = .labelColor
         } else {
@@ -63,39 +73,57 @@ final class HotkeyRecorderView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        guard !isRecording else { return }
+        specBeforeRecording = spec
+        isRecording = true
         window?.makeFirstResponder(self)
-    }
-
-    override func becomeFirstResponder() -> Bool {
         needsDisplay = true
-        return true
     }
 
+    /// Clicking another control (or closing the window) cancels a recording.
     override func resignFirstResponder() -> Bool {
-        needsDisplay = true
+        if isRecording { finishRecording(restoring: true) }
         return true
     }
 
     override func keyDown(with event: NSEvent) {
-        if !record(event) { reject() }
+        if !handle(event) { super.keyDown(with: event) }
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard isRecording else { return false }
-        return record(event)
+        isRecording && handle(event)
     }
 
-    /// Returns true when the event produced a usable hotkey.
-    @discardableResult
-    private func record(_ event: NSEvent) -> Bool {
-        let modifiers = Self.modifiers(from: event.modifierFlags)
-        guard let spec = HotkeySpec.captured(keyCode: UInt32(event.keyCode), modifiers: modifiers)
-        else {
+    /// Returns true when the event was consumed by the recording.
+    private func handle(_ event: NSEvent) -> Bool {
+        let action = SettingsKey.action(
+            isRecording: isRecording,
+            keyCode: UInt32(event.keyCode),
+            modifiers: Self.modifiers(from: event.modifierFlags)
+        )
+        switch action {
+        case .record(let recorded):
+            spec = recorded
+            finishRecording(restoring: false)
+            onRecord?(recorded)
+        case .reject:
+            reject()
+        case .cancelRecording:
+            finishRecording(restoring: true)
+        case .closeWindow, .pass:
             return false
         }
-        self.spec = spec
-        onRecord?(spec)
         return true
+    }
+
+    private func finishRecording(restoring: Bool) {
+        isRecording = false
+        if restoring {
+            spec = specBeforeRecording
+            onCancel?()
+        }
+        if window?.firstResponder === self { window?.makeFirstResponder(nil) }
+        needsDisplay = true
     }
 
     private func reject() {
@@ -104,7 +132,7 @@ final class HotkeyRecorderView: NSView {
         onReject?()
     }
 
-    private static func modifiers(from flags: NSEvent.ModifierFlags) -> Set<HotkeySpec.Modifier> {
+    static func modifiers(from flags: NSEvent.ModifierFlags) -> Set<HotkeySpec.Modifier> {
         let flags = flags.intersection(.deviceIndependentFlagsMask)
         var modifiers: Set<HotkeySpec.Modifier> = []
         if flags.contains(.control) { modifiers.insert(.control) }

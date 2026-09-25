@@ -102,6 +102,7 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   HotkeyConfiguration.swift    #   环境变量取值，非法时回落并上报
   OverlayDuration.swift        #   悬浮窗停留时长，同上
   OverlayToggle.swift          #   按快捷键时“显示还是收起”的决策
+  SettingsKey.swift            #   设置窗口按键路由：录制 / 取消录制 / ⌘W·Esc 关窗 / 放行
   LoginItem.swift              #   登录项状态 + 菜单勾选/提示的映射
   HotkeySettings.swift         #   换绑协调器（失败回滚）+ on/off 开关 + UserDefaults 存储
   AgentTask.swift              #   统一任务模型（agent / sessionID / title / cwd / completedAt / host / resume）+ TaskTitle 标题兑底
@@ -169,7 +170,7 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - **快捷键换绑**：`HotkeySettingsCoordinator` 保证"app 不会变成没有可用快捷键"——解析失败什么都不动；macOS 拒绝新键（被别的 app 占用）时会把旧键重新注册回来并提示。改这一块务必保住这条不变量
 - `HotkeySpec.displayString`（`⌃⌘,`，给人看）与 `HotkeySpec.specText`（`ctrl+cmd+,`，可持久化）是两个不同的东西。两者都能被 `parse` 接受，但落盘只写 `specText`
 - 设置窗口是全 app 唯一会主动抢焦点的东西（`NSApp.activate(ignoringOtherApps:)`）。它由用户点菜单触发，属于预期行为；悬浮窗绝不能这样
-- 设置窗口里录快捷键的是 `HotkeyRecorderView`：它成为 first responder 后捕获 `keyDown`，并吞掉 `performKeyEquivalent`，否则 `⌘Q` 之类会被 window/菜单先一步拿走。从 `NSEvent` 到 `HotkeySpec` 的映射在 `HotkeySpec.captured`（IslandCore，有测试）
+- 设置窗口里录快捷键的是 `HotkeyRecorderView`：**录制是显式的**——打开设置时不聚焦它（`makeFirstResponder(nil)`），点击才进入录制（`acceptsFirstResponder` 只在录制中为 true），录到一个组合即结束，Esc / 点别处取消并恢复原值（issue `settings-recorder-steals-keys`：以前一打开就在录制，⌘W 被录成快捷键）。录制中它吞掉 `performKeyEquivalent`，否则 `⌘Q` 之类会被 window/菜单先一步拿走。按键怎么处理由 `SettingsKey.action`（IslandCore，有测试）决定；island 没有主菜单，所以 `SettingsWindow` 自己处理 ⌘W / Esc 关窗。自动化测试点击这个自定义 view 要用 CGEvent，System Events 的 `click at` 送不到。从 `NSEvent` 到 `HotkeySpec` 的映射在 `HotkeySpec.captured`（IslandCore，有测试）
 - 快捷键 on/off 关闭时 `HotkeySettingsCoordinator.isEnabled == false`，不再注册全局键，但 `current` 与落盘配置都保留；重新打开会重新注册，被系统拒绝则保持关闭并在 UI 提示（不会假装成功）
 - 菜单栏图标有**两处真源**：设计资产在 `hai/reference/icon/menubar-icon.svg`，运行时绘制在 `Sources/Island/IslandGlyph.swift`。改图标必须同时改（AGENTS.md 禁止 reference 被编译或作为运行时依赖，所以不能直接读那个 SVG）
 - **agent 任务只算增量**：`AgentMonitor` 用启动时间卡一个 `completedAt >= startedAt` 过滤（在 `Sources/Island`，不在 IslandCore），所以历史 run 与重开 app 前的 run 一律不显示；`--scan-agents` 相反，故意列出全部已完成 run 供调试

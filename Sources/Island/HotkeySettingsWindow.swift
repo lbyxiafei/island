@@ -16,7 +16,7 @@ final class HotkeySettingsWindow: NSObject {
     private let onHintsChanged: (Bool) -> Void
     private let hintsToggle = NSButton(
         checkboxWithTitle: "Show keyboard hints", target: nil, action: nil)
-    private let window: NSWindow
+    private let window: SettingsWindow
     private let recorder: HotkeyRecorderView
     private let enabledToggle: NSButton
     private let feedback: NSTextField
@@ -36,7 +36,7 @@ final class HotkeySettingsWindow: NSObject {
         recorder = HotkeyRecorderView()
         enabledToggle = NSButton(checkboxWithTitle: "Enabled", target: nil, action: nil)
         feedback = NSTextField(labelWithString: "")
-        window = NSWindow(
+        window = SettingsWindow(
             contentRect: NSRect(x: 0, y: 0, width: 420, height: 330),
             styleMask: [.titled, .closable],
             backing: .buffered,
@@ -53,6 +53,9 @@ final class HotkeySettingsWindow: NSObject {
         }
         recorder.onReject = { [weak self] in
             self?.recorderDidReject()
+        }
+        recorder.onCancel = { [weak self] in
+            self?.refreshFromCoordinator()
         }
         enabledToggle.target = self
         enabledToggle.action = #selector(enabledToggled)
@@ -71,7 +74,8 @@ final class HotkeySettingsWindow: NSObject {
         NSApp.activate(ignoringOtherApps: true)
         window.center()
         window.makeKeyAndOrderFront(nil)
-        window.makeFirstResponder(recorder)
+        // Nothing focused: recording starts only when the field is clicked.
+        window.makeFirstResponder(nil)
     }
 
     // MARK: - Layout
@@ -81,7 +85,7 @@ final class HotkeySettingsWindow: NSObject {
         recorder.translatesAutoresizingMaskIntoConstraints = false
 
         let help = label(
-            "Click the field, then press a combination (at least one of ⌘⌃⌥⇧).",
+            "Click to record, then press ⌘⌃⌥⇧ + a key. Esc cancels.",
             font: .systemFont(ofSize: 11),
             color: .secondaryLabelColor
         )
@@ -255,5 +259,36 @@ final class HotkeySettingsWindow: NSObject {
         case .unknownModifier(let name): return "unknown modifier \"\(name)\""
         case .unknownKey(let name): return "unknown key \"\(name)\""
         }
+    }
+}
+
+/// island is an accessory app with no main menu, so nothing routes ⌘W to the
+/// window; this handles ⌘W and Esc itself (see `SettingsKey`). The recorder
+/// gets the keys first while it is recording.
+@MainActor
+final class SettingsWindow: NSWindow {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if super.performKeyEquivalent(with: event) { return true }
+        return closeIfAsked(by: event)
+    }
+
+    /// Esc (or ⌘W) that no control consumed — e.g. nothing is focused.
+    override func keyDown(with event: NSEvent) {
+        if !closeIfAsked(by: event) { super.keyDown(with: event) }
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        performClose(nil)
+    }
+
+    private func closeIfAsked(by event: NSEvent) -> Bool {
+        let action = SettingsKey.action(
+            isRecording: false,
+            keyCode: UInt32(event.keyCode),
+            modifiers: HotkeyRecorderView.modifiers(from: event.modifierFlags)
+        )
+        guard action == .closeWindow else { return false }
+        performClose(nil)
+        return true
     }
 }
