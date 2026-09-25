@@ -48,7 +48,8 @@ final class OverlayPanel: NSPanel {
         positionNearTopOfScreen()
     }
 
-    /// Centered horizontally, near the top of the screen — the "island" spot.
+    /// Centered horizontally and flush with the bottom of the menu bar, so the
+    /// capsule hangs from the top of the screen — the "island" spot.
     func positionNearTopOfScreen() {
         guard let screen = NSScreen.main else { return }
         let visible = screen.visibleFrame
@@ -56,7 +57,7 @@ final class OverlayPanel: NSPanel {
         setFrameOrigin(
             NSPoint(
                 x: visible.midX - size.width / 2,
-                y: visible.maxY - size.height - 60
+                y: visible.maxY - size.height
             )
         )
     }

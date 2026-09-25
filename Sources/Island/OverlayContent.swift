@@ -1,19 +1,21 @@
 import AppKit
 import IslandCore
 
-/// The overlay body, laid out like Alfred: a query field on top, then one row
-/// per finished agent run with its app icon, and `↩` / `⌘N` hints on the right.
+/// The overlay body: an island capsule hanging from the top of the screen.
+/// A `◉ island · N new` header, then one row per finished agent run with a
+/// number keycap, the agent's icon, title, `directory • agent`, and its age.
 ///
 /// Two modes (see `setKeyboardMode`): when summoned by the user the panel is
-/// key and the query field takes typing, arrows, Enter, ⌘1–9 and Esc; when it
-/// pops up by itself it never takes focus and rows are clicked with the mouse.
+/// key and a small search field in the header takes typing, arrows, Enter,
+/// ⌘1–9 and Esc; when it pops up by itself it never takes focus and rows are
+/// clicked with the mouse.
 @MainActor
 final class OverlayContentView: NSView, NSTextFieldDelegate {
-    static let width: CGFloat = 560
-    static let rowHeight: CGFloat = 50
-    private static let queryHeight: CGFloat = 52
+    static let width: CGFloat = 520
+    static let rowHeight: CGFloat = 52
+    private static let headerHeight: CGFloat = 40
+    private static let footerHeight: CGFloat = 22
     private static let padding: CGFloat = 10
-    private static let hintHeight: CGFloat = 22
 
     var onSelect: ((AgentInbox.Entry) -> Void)?
     var onHoverChange: ((Bool) -> Void)?
@@ -29,11 +31,15 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
     private var isKeyboardMode = false
 
     private let blurView = NSVisualEffectView()
-    private let tintView = NSView()
-    private let queryBox = NSView()
-    private let queryField = NSTextField()
+    private let shape = CapsuleShapeView()
+    private let dot = NSView()
+    private let heading = NSTextField(labelWithString: "")
+    private let searchIcon = NSImageView()
+    private let searchField = NSTextField()
+    private let hotkeyCap = KeycapView()
     private let list = NSStackView()
-    private let hint = NSTextField(labelWithString: "")
+    private let footer = NSTextField(labelWithString: "")
+    private var footerHeightConstraint: NSLayoutConstraint?
     private var rowViews: [OverlayTaskRowView] = []
     private var trackingArea: NSTrackingArea?
 
@@ -50,8 +56,8 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
 
     var preferredHeight: CGFloat {
         let rows = max(selection.rows.count, 1)
-        return Self.padding * 2 + Self.queryHeight + 6 + CGFloat(rows) * Self.rowHeight
-            + Self.hintHeight
+        return Self.headerHeight + CGFloat(rows) * Self.rowHeight
+            + (isKeyboardMode ? Self.footerHeight : 0) + Self.padding * 2
     }
 
     func update(entries: [AgentInbox.Entry], unread: Int, hotkey: HotkeySpec) {
@@ -69,16 +75,14 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
     /// Keyboard mode starts from an empty query with the first row highlighted.
     func setKeyboardMode(_ enabled: Bool) {
         isKeyboardMode = enabled
-        queryField.isEditable = enabled
-        queryField.isSelectable = enabled
-        queryField.stringValue = ""
+        searchField.stringValue = ""
         selection.setQuery("")
         render()
     }
 
-    /// Hands typing to the query field once the panel is key.
+    /// Hands typing to the search field once the panel is key.
     func focusQuery() {
-        window?.makeFirstResponder(queryField)
+        window?.makeFirstResponder(searchField)
     }
 
     // MARK: - Rendering
@@ -88,23 +92,12 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
         rowViews = []
 
         if selection.rows.isEmpty {
-            let text = selection.query.isEmpty ? "No finished agent runs yet" : "No matching tasks"
-            let label = NSTextField(labelWithString: text)
-            label.font = .systemFont(ofSize: 13)
-            label.textColor = NSColor(palette.subtitle)
-            label.translatesAutoresizingMaskIntoConstraints = false
-            let empty = NSView()
-            empty.addSubview(label)
-            list.addArrangedSubview(empty)
-            NSLayoutConstraint.activate([
-                empty.widthAnchor.constraint(equalTo: list.widthAnchor),
-                empty.heightAnchor.constraint(equalToConstant: Self.rowHeight),
-                label.centerXAnchor.constraint(equalTo: empty.centerXAnchor),
-                label.centerYAnchor.constraint(equalTo: empty.centerYAnchor),
-            ])
+            addEmptyRow()
         } else {
             for (index, entry) in selection.rows.enumerated() {
-                let row = OverlayTaskRowView(entry: entry, palette: palette)
+                let row = OverlayTaskRowView(
+                    entry: entry, keycap: OverlaySelection.keycapLabel(row: index),
+                    palette: palette)
                 row.onClick = { [weak self] picked in self?.onSelect?(picked) }
                 row.onHover = { [weak self] in self?.highlight(index) }
                 list.addArrangedSubview(row)
@@ -117,9 +110,25 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
         }
 
         refreshHighlight()
-        refreshPlaceholder()
-        hint.stringValue = hintText()
+        refreshHeader()
         onHeightChange?(preferredHeight)
+    }
+
+    private func addEmptyRow() {
+        let text = selection.query.isEmpty ? "Nothing has finished yet" : "No matches"
+        let label = NSTextField(labelWithString: text)
+        label.font = .systemFont(ofSize: 13)
+        label.textColor = NSColor(palette.muted)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        let empty = NSView()
+        empty.addSubview(label)
+        list.addArrangedSubview(empty)
+        NSLayoutConstraint.activate([
+            empty.widthAnchor.constraint(equalTo: list.widthAnchor),
+            empty.heightAnchor.constraint(equalToConstant: Self.rowHeight),
+            label.centerXAnchor.constraint(equalTo: empty.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: empty.centerYAnchor),
+        ])
     }
 
     private func highlight(_ index: Int) {
@@ -129,49 +138,55 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
 
     private func refreshHighlight() {
         for (index, row) in rowViews.enumerated() {
-            row.setSelected(
-                index == selection.selectedIndex,
-                shortcut: OverlaySelection.shortcutLabel(
-                    row: index, selectedRow: selection.selectedIndex)
-            )
+            row.setSelected(index == selection.selectedIndex)
         }
     }
 
-    private func refreshPlaceholder() {
-        let text: String
-        if isKeyboardMode {
-            text = "Search \(selection.rows.count) task\(selection.rows.count == 1 ? "" : "s")…"
-        } else {
-            text = unread > 0 ? "island — \(unread) unread" : "island"
-        }
-        queryField.placeholderAttributedString = NSAttributedString(
-            string: text,
+    private func refreshHeader() {
+        let heading = NSMutableAttributedString(
+            string: "island",
             attributes: [
-                .foregroundColor: NSColor(isKeyboardMode ? palette.subtitle : palette.queryText),
-                .font: queryField.font ?? NSFont.systemFont(ofSize: 24),
-            ]
-        )
-    }
-
-    private func hintText() -> String {
-        let hide = hotkey.map { " · \($0.displayString) to hide" } ?? ""
-        if isKeyboardMode {
-            return "↑↓ select · ↩ open · ⌘1–9 jump · esc close\(hide)"
+                .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
+                .foregroundColor: NSColor(palette.title),
+            ])
+        if unread > 0 {
+            heading.append(
+                NSAttributedString(
+                    string: "  ·  \(unread) new",
+                    attributes: [
+                        .font: NSFont.systemFont(ofSize: 13),
+                        .foregroundColor: NSColor(palette.subtitle),
+                    ]))
         }
-        return "click a task to jump back\(hide)"
+        self.heading.attributedStringValue = heading
+        dot.layer?.backgroundColor = NSColor(unread > 0 ? palette.accent : palette.muted).cgColor
+
+        searchIcon.isHidden = !isKeyboardMode
+        searchField.isHidden = !isKeyboardMode
+        searchField.isEditable = isKeyboardMode
+        hotkeyCap.isHidden = isKeyboardMode || hotkey == nil
+        hotkeyCap.set(text: hotkey?.displayString ?? "", palette: palette, fontSize: 11)
+        searchField.placeholderAttributedString = NSAttributedString(
+            string: "filter",
+            attributes: [
+                .foregroundColor: NSColor(palette.muted),
+                .font: NSFont.systemFont(ofSize: 13),
+            ])
+
+        footer.isHidden = !isKeyboardMode
+        footerHeightConstraint?.constant = isKeyboardMode ? Self.footerHeight : 0
+        footer.stringValue = "↑↓ move   ↩ open   ⌘1–9 jump   esc close"
     }
 
     private func applyPalette() {
         palette = theme.palette(systemIsDark: effectiveAppearance.isDark)
         blurView.appearance = NSAppearance(named: palette.isDark ? .darkAqua : .aqua)
         blurView.material = palette.isDark ? .hudWindow : .popover
-        blurView.layer?.cornerRadius = palette.cornerRadius
-        blurView.layer?.borderWidth = palette.borderWidth
-        blurView.layer?.borderColor = NSColor(palette.borderColor).cgColor
-        tintView.layer?.backgroundColor = NSColor(palette.background).cgColor
-        queryBox.layer?.backgroundColor = NSColor(palette.queryBackground).cgColor
-        queryField.textColor = NSColor(palette.queryText)
-        hint.textColor = NSColor(palette.hint)
+        shape.fill = NSColor(palette.background)
+        shape.stroke = NSColor(palette.border)
+        searchField.textColor = NSColor(palette.title)
+        searchIcon.contentTintColor = NSColor(palette.subtitle)
+        footer.textColor = NSColor(palette.muted)
         render()
     }
 
@@ -180,80 +195,98 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
         if theme == .system { applyPalette() }
     }
 
+    override func layout() {
+        super.layout()
+        blurView.maskImage = CapsuleShapeView.maskImage(size: bounds.size)
+    }
+
     // MARK: - Layout
 
     private func build() {
         blurView.blendingMode = .behindWindow
         blurView.state = .active
-        blurView.wantsLayer = true
-        blurView.layer?.masksToBounds = true
         blurView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(blurView)
+        shape.translatesAutoresizingMaskIntoConstraints = false
+        blurView.addSubview(shape)
 
-        tintView.wantsLayer = true
-        tintView.translatesAutoresizingMaskIntoConstraints = false
-        blurView.addSubview(tintView)
+        dot.wantsLayer = true
+        dot.layer?.cornerRadius = 4
+        dot.translatesAutoresizingMaskIntoConstraints = false
 
-        queryBox.wantsLayer = true
-        queryBox.layer?.cornerRadius = 6
-        queryBox.translatesAutoresizingMaskIntoConstraints = false
+        searchIcon.image = NSImage(
+            systemSymbolName: "magnifyingglass", accessibilityDescription: "filter")
+        searchIcon.symbolConfiguration = .init(pointSize: 12, weight: .medium)
+        searchField.font = .systemFont(ofSize: 13)
+        searchField.isBordered = false
+        searchField.drawsBackground = false
+        searchField.focusRingType = .none
+        searchField.cell?.usesSingleLineMode = true
+        searchField.lineBreakMode = .byTruncatingTail
+        searchField.delegate = self
 
-        queryField.font = .systemFont(ofSize: 24, weight: .regular)
-        queryField.isBordered = false
-        queryField.drawsBackground = false
-        queryField.focusRingType = .none
-        queryField.isEditable = false
-        queryField.isSelectable = false
-        queryField.lineBreakMode = .byTruncatingTail
-        queryField.cell?.usesSingleLineMode = true
-        queryField.delegate = self
-        queryField.translatesAutoresizingMaskIntoConstraints = false
-        queryBox.addSubview(queryField)
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow - 1, for: .horizontal)
+        let header = NSStackView(views: [
+            dot, heading, spacer, searchIcon, searchField, hotkeyCap,
+        ])
+        header.orientation = .horizontal
+        header.distribution = .fill
+        header.alignment = .centerY
+        header.spacing = 8
+        header.setCustomSpacing(4, after: searchIcon)
+        header.translatesAutoresizingMaskIntoConstraints = false
+        heading.setContentHuggingPriority(.required, for: .horizontal)
+        heading.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         list.orientation = .vertical
         list.alignment = .leading
         list.spacing = 0
         list.translatesAutoresizingMaskIntoConstraints = false
 
-        hint.font = .systemFont(ofSize: 11)
-        hint.lineBreakMode = .byTruncatingTail
-        hint.translatesAutoresizingMaskIntoConstraints = false
+        footer.font = .systemFont(ofSize: 10.5)
+        footer.alignment = .center
+        footer.translatesAutoresizingMaskIntoConstraints = false
 
-        for view in [queryBox, list, hint] { blurView.addSubview(view) }
+        for view in [header, list, footer] { blurView.addSubview(view) }
 
+        let footerHeight = footer.heightAnchor.constraint(equalToConstant: 0)
+        footerHeightConstraint = footerHeight
         let pad = Self.padding
         NSLayoutConstraint.activate([
             blurView.leadingAnchor.constraint(equalTo: leadingAnchor),
             blurView.trailingAnchor.constraint(equalTo: trailingAnchor),
             blurView.topAnchor.constraint(equalTo: topAnchor),
             blurView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            tintView.leadingAnchor.constraint(equalTo: blurView.leadingAnchor),
-            tintView.trailingAnchor.constraint(equalTo: blurView.trailingAnchor),
-            tintView.topAnchor.constraint(equalTo: blurView.topAnchor),
-            tintView.bottomAnchor.constraint(equalTo: blurView.bottomAnchor),
+            shape.leadingAnchor.constraint(equalTo: blurView.leadingAnchor),
+            shape.trailingAnchor.constraint(equalTo: blurView.trailingAnchor),
+            shape.topAnchor.constraint(equalTo: blurView.topAnchor),
+            shape.bottomAnchor.constraint(equalTo: blurView.bottomAnchor),
 
-            queryBox.leadingAnchor.constraint(equalTo: blurView.leadingAnchor, constant: pad),
-            queryBox.trailingAnchor.constraint(equalTo: blurView.trailingAnchor, constant: -pad),
-            queryBox.topAnchor.constraint(equalTo: blurView.topAnchor, constant: pad),
-            queryBox.heightAnchor.constraint(equalToConstant: Self.queryHeight),
-            queryField.leadingAnchor.constraint(equalTo: queryBox.leadingAnchor, constant: 12),
-            queryField.trailingAnchor.constraint(equalTo: queryBox.trailingAnchor, constant: -12),
-            queryField.centerYAnchor.constraint(equalTo: queryBox.centerYAnchor),
+            dot.widthAnchor.constraint(equalToConstant: 8),
+            dot.heightAnchor.constraint(equalToConstant: 8),
+            searchField.widthAnchor.constraint(equalToConstant: 180),
+            header.leadingAnchor.constraint(equalTo: blurView.leadingAnchor, constant: pad + 12),
+            header.trailingAnchor.constraint(
+                equalTo: blurView.trailingAnchor, constant: -pad - 12),
+            header.topAnchor.constraint(equalTo: blurView.topAnchor, constant: pad),
+            header.heightAnchor.constraint(equalToConstant: Self.headerHeight),
 
-            list.leadingAnchor.constraint(equalTo: queryBox.leadingAnchor),
-            list.trailingAnchor.constraint(equalTo: queryBox.trailingAnchor),
-            list.topAnchor.constraint(equalTo: queryBox.bottomAnchor, constant: 6),
+            list.leadingAnchor.constraint(equalTo: blurView.leadingAnchor, constant: pad),
+            list.trailingAnchor.constraint(equalTo: blurView.trailingAnchor, constant: -pad),
+            list.topAnchor.constraint(equalTo: header.bottomAnchor),
 
-            hint.leadingAnchor.constraint(equalTo: queryBox.leadingAnchor, constant: 4),
-            hint.trailingAnchor.constraint(equalTo: queryBox.trailingAnchor, constant: -4),
-            hint.bottomAnchor.constraint(equalTo: blurView.bottomAnchor, constant: -pad + 2),
+            footer.leadingAnchor.constraint(equalTo: list.leadingAnchor),
+            footer.trailingAnchor.constraint(equalTo: list.trailingAnchor),
+            footer.bottomAnchor.constraint(equalTo: blurView.bottomAnchor, constant: -pad),
+            footerHeight,
         ])
     }
 
     // MARK: - Keyboard
 
     func controlTextDidChange(_ notification: Notification) {
-        selection.setQuery(queryField.stringValue)
+        selection.setQuery(searchField.stringValue)
         render()
     }
 
@@ -277,7 +310,7 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
         return true
     }
 
-    /// ⌘1…⌘9 open the N-th visible row, like Alfred.
+    /// ⌘1…⌘9 open the row with that keycap.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard isKeyboardMode, modifiers == .command,
@@ -312,8 +345,93 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
     }
 }
 
-/// One task row: agent icon (with an unread dot), title, an
-/// `agent · time · directory` subtitle, and the shortcut hint on the right.
+/// The capsule outline: flat where it meets the top of the screen, generously
+/// rounded at the bottom, like an island hanging from the menu bar.
+@MainActor
+final class CapsuleShapeView: NSView {
+    static let bottomRadius: CGFloat = 26
+
+    var fill = NSColor.clear { didSet { needsDisplay = true } }
+    var stroke = NSColor.clear { didSet { needsDisplay = true } }
+
+    override func draw(_ dirtyRect: NSRect) {
+        fill.setFill()
+        Self.path(in: bounds, closed: true).fill()
+        stroke.setStroke()
+        let outline = Self.path(in: bounds.insetBy(dx: 0.5, dy: 0.5), closed: false)
+        outline.lineWidth = 1
+        outline.stroke()
+    }
+
+    /// Open paths leave out the top edge, which touches the menu bar.
+    static func path(in rect: NSRect, closed: Bool) -> NSBezierPath {
+        let radius = min(bottomRadius, rect.height / 2, rect.width / 2)
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: rect.minX, y: rect.maxY))
+        path.line(to: NSPoint(x: rect.minX, y: rect.minY + radius))
+        path.appendArc(
+            withCenter: NSPoint(x: rect.minX + radius, y: rect.minY + radius), radius: radius,
+            startAngle: 180, endAngle: 270)
+        path.line(to: NSPoint(x: rect.maxX - radius, y: rect.minY))
+        path.appendArc(
+            withCenter: NSPoint(x: rect.maxX - radius, y: rect.minY + radius), radius: radius,
+            startAngle: 270, endAngle: 360)
+        path.line(to: NSPoint(x: rect.maxX, y: rect.maxY))
+        if closed { path.close() }
+        return path
+    }
+
+    /// Clips the blur to the same shape (a layer mask does not clip
+    /// behind-window vibrancy).
+    static func maskImage(size: NSSize) -> NSImage {
+        NSImage(size: size, flipped: false) { rect in
+            NSColor.black.setFill()
+            path(in: rect, closed: true).fill()
+            return true
+        }
+    }
+}
+
+/// A small rounded keycap: the `1`…`9` on rows and the hotkey in the header.
+@MainActor
+final class KeycapView: NSView {
+    private let label = NSTextField(labelWithString: "")
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 5
+        label.alignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+        // Keycaps stay as small as their text; never take a stack's slack.
+        setContentHuggingPriority(.required, for: .horizontal)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("KeycapView is created in code only")
+    }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: max(20, label.intrinsicContentSize.width + 12), height: 20)
+    }
+
+    func set(text: String, palette: OverlayPalette, fontSize: CGFloat) {
+        defer { invalidateIntrinsicContentSize() }
+        label.stringValue = text
+        label.font = .monospacedDigitSystemFont(ofSize: fontSize, weight: .medium)
+        label.textColor = NSColor(palette.keycapText)
+        layer?.backgroundColor = NSColor(palette.keycapBackground).cgColor
+    }
+}
+
+/// One task row: number keycap, agent icon (with an unread dot), title,
+/// `directory • agent`, and a short age on the right.
 @MainActor
 final class OverlayTaskRowView: NSView {
     let entry: AgentInbox.Entry
@@ -321,90 +439,90 @@ final class OverlayTaskRowView: NSView {
     var onHover: (() -> Void)?
 
     private let palette: OverlayPalette
-    private let title = NSTextField(labelWithString: "")
-    private let subtitle = NSTextField(labelWithString: "")
-    private let shortcut = NSTextField(labelWithString: "")
     private var trackingArea: NSTrackingArea?
 
-    init(entry: AgentInbox.Entry, palette: OverlayPalette) {
+    init(entry: AgentInbox.Entry, keycap: String?, palette: OverlayPalette) {
         self.entry = entry
         self.palette = palette
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 6
-        build()
+        layer?.cornerRadius = 14
+        build(keycap: keycap)
     }
 
     required init?(coder: NSCoder) {
         fatalError("OverlayTaskRowView is created in code only")
     }
 
-    func setSelected(_ selected: Bool, shortcut label: String?) {
+    func setSelected(_ selected: Bool) {
         layer?.backgroundColor =
             selected ? NSColor(palette.selectionBackground).cgColor : NSColor.clear.cgColor
-        title.textColor = NSColor(selected ? palette.selectionTitle : palette.title)
-        subtitle.textColor = NSColor(selected ? palette.selectionSubtitle : palette.subtitle)
-        shortcut.textColor = NSColor(selected ? palette.selectionTitle : palette.shortcut)
-        shortcut.stringValue = label ?? ""
+        layer?.borderColor = NSColor(palette.selectionBorder).cgColor
+        layer?.borderWidth = selected ? 1 : 0
     }
 
-    private func build() {
+    private func build(keycap label: String?) {
+        let keycap = KeycapView()
+        keycap.set(text: label ?? "", palette: palette, fontSize: 11)
+        keycap.alphaValue = label == nil ? 0 : 1
+
         let icon = AgentIconView(agent: entry.task.agent, unread: !entry.isRead)
         icon.translatesAutoresizingMaskIntoConstraints = false
 
-        title.stringValue = entry.task.title
-        title.font = .systemFont(ofSize: 15, weight: entry.isRead ? .regular : .semibold)
+        let title = NSTextField(labelWithString: entry.task.title)
+        title.font = .systemFont(ofSize: 14, weight: entry.isRead ? .regular : .semibold)
+        title.textColor = NSColor(palette.title)
         title.lineBreakMode = .byTruncatingTail
         title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        subtitle.stringValue = Self.subtitle(for: entry.task)
+        let subtitle = NSTextField(labelWithString: Self.subtitle(for: entry.task))
         subtitle.font = .systemFont(ofSize: 11)
+        subtitle.textColor = NSColor(palette.subtitle)
         subtitle.lineBreakMode = .byTruncatingMiddle
         subtitle.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        shortcut.font = .systemFont(ofSize: 15, weight: .medium)
-        shortcut.alignment = .right
-        shortcut.setContentHuggingPriority(.required, for: .horizontal)
-        shortcut.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let age = NSTextField(labelWithString: ShortAge.text(since: entry.task.completedAt))
+        age.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        age.textColor = NSColor(palette.muted)
+        age.alignment = .right
+        age.setContentHuggingPriority(.required, for: .horizontal)
+        age.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         let text = NSStackView(views: [title, subtitle])
         text.orientation = .vertical
         text.alignment = .leading
-        text.spacing = 1
-        // The text column takes the slack so the shortcut hugs the right edge.
+        text.spacing = 2
+        // The text column takes the slack so the age hugs the right edge.
         text.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        let row = NSStackView(views: [icon, text, shortcut])
+        let row = NSStackView(views: [keycap, icon, text, age])
         row.orientation = .horizontal
         row.distribution = .fill
         row.alignment = .centerY
         row.spacing = 10
+        row.setCustomSpacing(12, after: keycap)
         row.translatesAutoresizingMaskIntoConstraints = false
         addSubview(row)
 
         NSLayoutConstraint.activate([
-            icon.widthAnchor.constraint(equalToConstant: 34),
-            icon.heightAnchor.constraint(equalToConstant: 34),
-            shortcut.widthAnchor.constraint(greaterThanOrEqualToConstant: 34),
-            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            title.widthAnchor.constraint(equalTo: text.widthAnchor),
+            subtitle.widthAnchor.constraint(equalTo: text.widthAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 26),
+            icon.heightAnchor.constraint(equalToConstant: 26),
+            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
             row.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }
 
+    /// `island • Claude Code`: where it ran first, then which agent.
     private static func subtitle(for task: AgentTask) -> String {
-        var pieces = [task.agent.displayName]
-        pieces.append(Self.relative(task.completedAt))
+        var pieces: [String] = []
         if let cwd = task.cwd, !cwd.isEmpty {
             pieces.append((cwd as NSString).lastPathComponent)
         }
-        return pieces.joined(separator: " · ")
-    }
-
-    private static func relative(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: Date())
+        pieces.append(task.agent.displayName)
+        return pieces.joined(separator: " • ")
     }
 
     // MARK: - Interaction
@@ -451,10 +569,8 @@ final class AgentIconView: NSView {
 
         let dot = NSView()
         dot.wantsLayer = true
-        dot.layer?.cornerRadius = 5
+        dot.layer?.cornerRadius = 4
         dot.layer?.backgroundColor = NSColor.systemRed.cgColor
-        dot.layer?.borderColor = NSColor.white.cgColor
-        dot.layer?.borderWidth = 1.5
         dot.isHidden = !unread
         dot.translatesAutoresizingMaskIntoConstraints = false
         addSubview(dot)
@@ -464,10 +580,10 @@ final class AgentIconView: NSView {
             image.trailingAnchor.constraint(equalTo: trailingAnchor),
             image.topAnchor.constraint(equalTo: topAnchor),
             image.bottomAnchor.constraint(equalTo: bottomAnchor),
-            dot.widthAnchor.constraint(equalToConstant: 10),
-            dot.heightAnchor.constraint(equalToConstant: 10),
-            dot.trailingAnchor.constraint(equalTo: trailingAnchor, constant: 1),
-            dot.topAnchor.constraint(equalTo: topAnchor, constant: -1),
+            dot.widthAnchor.constraint(equalToConstant: 8),
+            dot.heightAnchor.constraint(equalToConstant: 8),
+            dot.trailingAnchor.constraint(equalTo: trailingAnchor, constant: 2),
+            dot.topAnchor.constraint(equalTo: topAnchor, constant: -2),
         ])
     }
 
@@ -486,7 +602,7 @@ final class AgentIconView: NSView {
             appIcon
             ?? NSImage(
                 systemSymbolName: AgentIcon.symbolName(for: agent), accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 22, weight: .regular))
+            .withSymbolConfiguration(.init(pointSize: 18, weight: .regular))
             ?? NSImage()
         cache[agent] = image
         return image

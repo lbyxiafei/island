@@ -128,13 +128,35 @@ final class OverlaySelectionTests: XCTestCase {
         XCTAssertNil(selection.entry(forShortcut: 0))
     }
 
-    /// Alfred shows ↩ on the highlighted row and ⌘N on the others (N ≤ 9).
-    func testShortcutLabels() {
-        XCTAssertEqual(OverlaySelection.shortcutLabel(row: 0, selectedRow: 0), "↩")
-        XCTAssertEqual(OverlaySelection.shortcutLabel(row: 1, selectedRow: 0), "⌘2")
-        XCTAssertEqual(OverlaySelection.shortcutLabel(row: 0, selectedRow: 3), "⌘1")
-        XCTAssertEqual(OverlaySelection.shortcutLabel(row: 8, selectedRow: nil), "⌘9")
-        XCTAssertNil(OverlaySelection.shortcutLabel(row: 9, selectedRow: nil))
+    /// Rows carry a small number keycap (1…9) for ⌘N, whether or not selected.
+    func testKeycapLabels() {
+        XCTAssertEqual(OverlaySelection.keycapLabel(row: 0), "1")
+        XCTAssertEqual(OverlaySelection.keycapLabel(row: 8), "9")
+        XCTAssertNil(OverlaySelection.keycapLabel(row: 9))
+        XCTAssertNil(OverlaySelection.keycapLabel(row: -1))
+    }
+}
+
+final class ShortAgeTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_000_000)
+
+    private func age(_ seconds: TimeInterval) -> String {
+        ShortAge.text(since: now.addingTimeInterval(-seconds), now: now)
+    }
+
+    func testUnderAMinuteIsNow() {
+        XCTAssertEqual(age(0), "now")
+        XCTAssertEqual(age(59), "now")
+        XCTAssertEqual(age(-30), "now", "clock skew never shows a negative age")
+    }
+
+    func testMinutesHoursDays() {
+        XCTAssertEqual(age(60), "1m")
+        XCTAssertEqual(age(59 * 60 + 59), "59m")
+        XCTAssertEqual(age(3600), "1h")
+        XCTAssertEqual(age(23 * 3600 + 3599), "23h")
+        XCTAssertEqual(age(86400), "1d")
+        XCTAssertEqual(age(10 * 86400), "10d")
     }
 }
 

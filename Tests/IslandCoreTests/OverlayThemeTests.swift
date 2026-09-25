@@ -14,20 +14,28 @@ final class OverlayThemeTests: XCTestCase {
         }
     }
 
-    func testEveryThemeHasADistinctDisplayName() {
-        let names = OverlayTheme.allCases.map(\.displayName)
-        XCTAssertEqual(Set(names).count, names.count)
-        XCTAssertEqual(OverlayTheme.system.displayName, "System")
-        XCTAssertEqual(OverlayTheme.modernDark.displayName, "Modern Dark")
+    /// Themes saved before the island look (the Alfred-style names) map to
+    /// their closest island theme instead of silently resetting.
+    func testMigratesThemesStoredBeforeTheIslandLook() {
+        XCTAssertEqual(OverlayTheme.resolve(stored: "light"), .sand)
+        XCTAssertEqual(OverlayTheme.resolve(stored: "dark"), .midnight)
+        XCTAssertEqual(OverlayTheme.resolve(stored: "modern-dark"), .midnight)
+        XCTAssertEqual(OverlayTheme.resolve(stored: "frosty"), .lagoon)
+    }
+
+    func testThemeNamesAndOrder() {
+        XCTAssertEqual(
+            OverlayTheme.allCases.map(\.displayName),
+            ["System", "Lagoon", "Coral", "Sand", "Midnight"])
     }
 
     func testSystemFollowsTheAppearance() {
         XCTAssertEqual(
             OverlayTheme.system.palette(systemIsDark: false),
-            OverlayTheme.light.palette(systemIsDark: false))
+            OverlayTheme.sand.palette(systemIsDark: false))
         XCTAssertEqual(
             OverlayTheme.system.palette(systemIsDark: true),
-            OverlayTheme.dark.palette(systemIsDark: true))
+            OverlayTheme.lagoon.palette(systemIsDark: true))
     }
 
     func testFixedThemesIgnoreTheAppearance() {
@@ -36,23 +44,18 @@ final class OverlayThemeTests: XCTestCase {
         }
     }
 
-    /// The looks from the Alfred references: purple highlight on light, teal on
-    /// dark, and a visible border only on Modern Dark.
-    func testPalettesMatchTheirReferenceLooks() {
-        let light = OverlayTheme.light.palette(systemIsDark: false)
-        let dark = OverlayTheme.dark.palette(systemIsDark: false)
-        let modern = OverlayTheme.modernDark.palette(systemIsDark: false)
-        let frosty = OverlayTheme.frosty.palette(systemIsDark: false)
+    /// Sand is the only light theme; each theme has its own accent, and the
+    /// selection is a translucent tint of it rather than a solid bar.
+    func testPalettesHaveTheirOwnIdentity() {
+        let fixed = OverlayTheme.allCases.filter { $0 != .system }
+        let palettes = fixed.map { $0.palette(systemIsDark: false) }
 
-        XCTAssertFalse(light.isDark)
-        XCTAssertEqual(light.selectionBackground, ThemeColor(hex: 0x5E1D73))
-        XCTAssertTrue(dark.isDark)
-        XCTAssertEqual(dark.selectionBackground, ThemeColor(hex: 0x367F87))
-        XCTAssertGreaterThan(modern.borderWidth, 0)
-        XCTAssertEqual(light.borderWidth, 0)
-        XCTAssertGreaterThan(modern.cornerRadius, dark.cornerRadius)
-        XCTAssertTrue(frosty.isDark)
-        XCTAssertLessThan(frosty.background.alpha, dark.background.alpha)
+        XCTAssertEqual(fixed.filter { !$0.palette(systemIsDark: false).isDark }, [.sand])
+        XCTAssertEqual(Set(palettes.map(\.accent.hexValue)).count, palettes.count)
+        for palette in palettes {
+            XCTAssertLessThan(palette.selectionBackground.alpha, 0.5)
+            XCTAssertEqual(palette.selectionBackground.hexValue, palette.accent.hexValue)
+        }
     }
 
     func testThemeColorFromHex() {
@@ -62,6 +65,7 @@ final class OverlayThemeTests: XCTestCase {
         XCTAssertEqual(color.green, 128.0 / 255, accuracy: 0.0001)
         XCTAssertEqual(color.blue, 0, accuracy: 0.0001)
         XCTAssertEqual(color.alpha, 0.5)
+        XCTAssertEqual(color.hexValue, 0xFF8000)
     }
 }
 
@@ -83,10 +87,10 @@ final class UserDefaultsThemeStoreTests: XCTestCase {
     }
 
     func testSavedThemeSurvivesANewStoreInstance() {
-        UserDefaultsThemeStore(defaults: defaults).save(.modernDark)
+        UserDefaultsThemeStore(defaults: defaults).save(.coral)
 
-        XCTAssertEqual(UserDefaultsThemeStore(defaults: defaults).load(), .modernDark)
-        XCTAssertEqual(defaults.string(forKey: UserDefaultsThemeStore.key), "modern-dark")
+        XCTAssertEqual(UserDefaultsThemeStore(defaults: defaults).load(), .coral)
+        XCTAssertEqual(defaults.string(forKey: UserDefaultsThemeStore.key), "coral")
     }
 }
 

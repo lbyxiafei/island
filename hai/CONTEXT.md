@@ -115,7 +115,7 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
   main.swift                   #   入口 + --help / --print-config / --scan-agents / --reopen-plan
   AppDelegate.swift            #   启动、注册 hotkey、显示与自动隐藏
   OverlayPanel.swift           #   不抢焦点的悬浮 NSPanel
-  OverlayContent.swift         #   Alfred 式悬浮窗：查询框 + 行（agent 图标/未读点/↩ ⌘N）+ 键盘处理 + 主题上色
+  OverlayContent.swift         #   岛式悬浮窗：CapsuleShapeView（平顶圆底）+ 标题行内联搜索 + 行（键帽/agent 图标/未读点/短时间）+ 键盘处理 + 主题上色
   AgentReopenExecutor.swift    #   执行 reopen 计划：tmux select / 激活 app / 写剪贴板
   ProcessSQLite.swift          #   /usr/bin/sqlite3 -json 包装（Codex turn 历史用）
   HotkeyRegistrar.swift        #   Carbon RegisterEventHotKey 包装
@@ -181,9 +181,10 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - **任务标题的取值是 `title → 最后一条用户消息 → 目录名`**（`TaskTitle.resolve`，PLAN § Design / 下拉框 UX #1）。Claude：transcript 里的 `custom-title`（/rename）→ session json 里 `nameSource != "derived"` 的 `name` → `ai-title` → 最后一条用户 prompt（跳过 `isMeta`、sidechain、tool_result、`<command-…>` 包装、中断标记）。**`nameSource: "derived"` 的 `name`（如 `dotfiles-9e`）是 Claude 自动生成的占位名，不算标题**。pi：`session_info.name`（/name）→ 最后一条 user 文本。Codex：`threads.name` → 最后一条不以 `<` 开头的 `userMessage` → `threads.title`（首条用户消息）
 - **点任务后悬浮窗会立刻收起**（PLAN § Design / 下拉框 UX #2）：`selectTask` 先 `markRead` + `refreshAgentUI`，再 `hideOverlay(reason:)`，最后才 focus/跳转（顺序重要，否则聚焦那一刻悬浮窗还会闪）
 - **pi 没有 host pid 落盘**，`AgentReopenExecutor.resolveHost` 在点击时才反查：`ps -axo pid=,comm=` 筛命令名 `pi`，再 `lsof -a -p <pids> -d cwd -Fpn` 取 cwd，按 session 的 cwd 匹配。**`lsof -c pi` 不好使**——pi 是 node 脚本，lsof 看到的命令名是 node，必须先用 ps 拿到 pid 再 `lsof -p`
-- **悬浮窗两种模式**（issue `dropdown-alfred-ux`）：键盘模式（召唤）下查询框接收输入，↑↓ / ↩ / ⌘1–9 / esc 由 `OverlayContentView` 转给 `OverlaySelection`（IslandCore，有测试），没有自动隐藏计时，失焦（点别处）即收起（`OverlayPanel.onResignKey`）；被动模式（自动弹出）下查询框只显示 `island — N unread`，行用 `OverlayTaskRowView.mouseUp` 自己处理点击（不依赖窗口变 key），hover 时 `AppDelegate.setOverlayHovered` 取消自动隐藏，离开后重新计时。自动弹出不会把正在打字的键盘模式降级。`hideOverlay` 先清 `acceptsKeyboard` 再 `orderOut`，否则 `resignKey` 回调会重入。如果鼠标事件在非 key 窗口下有意外行为，菜单栏里同一份任务列表是保底入口（`StatusItemController.setTasks`）
+- **悬浮窗两种模式**（issue `dropdown-alfred-ux`）：键盘模式（召唤）下标题行右侧的小搜索框接收输入，↑↓ / ↩ / ⌘1–9 / esc 由 `OverlayContentView` 转给 `OverlaySelection`（IslandCore，有测试），没有自动隐藏计时，失焦（点别处）即收起（`OverlayPanel.onResignKey`）；被动模式（自动弹出）下搜索框隐藏、右侧显示快捷键键帽，行用 `OverlayTaskRowView.mouseUp` 自己处理点击（不依赖窗口变 key），hover 时 `AppDelegate.setOverlayHovered` 取消自动隐藏，离开后重新计时。自动弹出不会把正在打字的键盘模式降级。`hideOverlay` 先清 `acceptsKeyboard` 再 `orderOut`，否则 `resignKey` 回调会重入。如果鼠标事件在非 key 窗口下有意外行为，菜单栏里同一份任务列表是保底入口（`StatusItemController.setTasks`）
 - **Codex 桌面版与 CLI 共用 `state_5.sqlite` / `thread_history_1.sqlite`**，桌面线程只是 `threads.source` 不同；本机调研时最新线程停在 2026-09-11（`source='vscode'`），即桌面路径尚无真实数据验证。Claude 桌面版没有可读的任务列表，目前不支持
-- **主题**：`Settings…` 里的 `Overlay theme` 选 System / Light / Dark / Modern Dark / Frosty，立即生效并弹出被动预览，存在 `UserDefaults` key `IslandOverlayTheme`（缺省 `system`，跟随系统深浅色，由 `OverlayContentView.viewDidChangeEffectiveAppearance` 重新取色）。配色是 IslandCore 里的纯数据（`ThemeColor` 为 sRGB），AppKit 侧只做 `NSColor(ThemeColor)` 转换
+- **主题**：`Settings…` 里的 `Overlay theme` 选 System / Lagoon / Coral / Sand / Midnight，立即生效并弹出被动预览，存在 `UserDefaults` key `IslandOverlayTheme`（缺省 `system`：浅色 Sand、深色 Lagoon，由 `OverlayContentView.viewDidChangeEffectiveAppearance` 重新取色）。配色是 IslandCore 里的纯数据（`ThemeColor` 为 sRGB），AppKit 侧只做 `NSColor(ThemeColor)` 转换。**刻意不像 Alfred**（issue `island-capsule-look`，用户同时在用 Alfred）：不要再引入顶部大搜索框、整行实色高亮、右侧 ⌘N 或 Alfred 原版配色。旧的主题存值（`light` / `dark` / `modern-dark` / `frosty`）由 `OverlayTheme.resolve` 迁移到新主题
+- 面板形状：`OverlayPanel.positionNearTopOfScreen` 让面板上沿贴着 `visibleFrame.maxY`（菜单栏下沿）；`CapsuleShapeView` 画平顶、底部 26pt 圆角的形状，描边不画上沿；毛玻璃用 `NSVisualEffectView.maskImage` 裁形（layer mask 裁不住 behind-window 的 vibrancy）
 - 行图标：`AgentIcon.bundleIDs` 找已安装的 app 图标（Claude → `com.anthropic.claudefordesktop`，Codex → `com.openai.codex`，即 ChatGPT.app），找不到用 SF Symbol（pi 固定是 `terminal`）
 - 应用内改快捷键立即生效并写 `UserDefaults`（key `IslandHotkeyText`）；开关状态写 `IslandHotkeyEnabled`（缺省开启）。直接用 `defaults write` 改则要重启 app 才生效
 - 检查登录项是否真的注册了：`sfltool dumpbtm | grep -iA6 "Name: island"`（`Disposition: [enabled, ...]` 即已启用）

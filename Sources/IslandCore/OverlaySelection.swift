@@ -1,6 +1,6 @@
 import Foundation
 
-/// Alfred-style filtering for the overlay's query field.
+/// Filtering for the overlay's search field.
 public enum TaskFilter {
     /// True when every whitespace-separated word of `query` appears, ignoring
     /// case, in the task's title, directory name, or agent name.
@@ -44,7 +44,7 @@ public struct OverlaySelection: Equatable, Sendable {
         refilter(keeping: nil)
     }
 
-    /// Up/down arrows; stops at both ends like Alfred.
+    /// Up/down arrows; stops at both ends.
     public mutating func move(by delta: Int) {
         guard let selectedIndex else { return }
         self.selectedIndex = min(max(selectedIndex + delta, 0), rows.count - 1)
@@ -61,10 +61,9 @@ public struct OverlaySelection: Equatable, Sendable {
         rows.indices.contains(number - 1) ? rows[number - 1] : nil
     }
 
-    /// `↩` on the highlighted row, `⌘N` on the first nine others.
-    public static func shortcutLabel(row: Int, selectedRow: Int?) -> String? {
-        if row == selectedRow { return "↩" }
-        return row < 9 ? "⌘\(row + 1)" : nil
+    /// The number keycap on a row: `1`…`9` for the rows ⌘N can reach.
+    public static func keycapLabel(row: Int) -> String? {
+        (0..<9).contains(row) ? "\(row + 1)" : nil
     }
 
     private mutating func refilter(keeping id: String?) {
@@ -73,6 +72,19 @@ public struct OverlaySelection: Equatable, Sendable {
             selectedIndex = index
         } else {
             selectedIndex = rows.isEmpty ? nil : 0
+        }
+    }
+}
+
+/// Compact age for the right edge of a row: `now`, `3m`, `2h`, `4d`.
+public enum ShortAge {
+    public static func text(since date: Date, now: Date = Date()) -> String {
+        let seconds = max(0, Int(now.timeIntervalSince(date)))
+        switch seconds {
+        case ..<60: return "now"
+        case ..<3600: return "\(seconds / 60)m"
+        case ..<86400: return "\(seconds / 3600)h"
+        default: return "\(seconds / 86400)d"
         }
     }
 }

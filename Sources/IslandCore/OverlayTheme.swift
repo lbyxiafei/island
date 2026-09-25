@@ -13,137 +13,117 @@ public struct ThemeColor: Equatable, Sendable {
         blue = Double(hex & 0xFF) / 255
         self.alpha = alpha
     }
+
+    /// The `0xRRGGBB` this color was built from, ignoring alpha.
+    public var hexValue: UInt32 {
+        UInt32((red * 255).rounded()) << 16 | UInt32((green * 255).rounded()) << 8
+            | UInt32((blue * 255).rounded())
+    }
 }
 
-/// Everything the overlay needs to draw one theme.
+/// Everything the overlay needs to draw one theme. The shape is fixed (the
+/// island capsule); themes only change colors.
 public struct OverlayPalette: Equatable, Sendable {
     /// Picks the vibrancy material and the dark or light system appearance.
     public let isDark: Bool
-    /// Tint drawn over the blurred background; a low alpha lets the blur show.
+    /// Tint drawn over the blurred background; a lower alpha lets the blur show.
     public let background: ThemeColor
-    public let cornerRadius: Double
-    public let borderColor: ThemeColor
-    public let borderWidth: Double
-    public let queryBackground: ThemeColor
-    public let queryText: ThemeColor
+    public let border: ThemeColor
+    /// The theme's signature color: the header dot and the selection tint.
+    public let accent: ThemeColor
     public let title: ThemeColor
     public let subtitle: ThemeColor
+    /// Translucent capsule behind the selected row, plus its outline.
     public let selectionBackground: ThemeColor
-    public let selectionTitle: ThemeColor
-    public let selectionSubtitle: ThemeColor
-    public let shortcut: ThemeColor
-    public let hint: ThemeColor
+    public let selectionBorder: ThemeColor
+    public let keycapBackground: ThemeColor
+    public let keycapText: ThemeColor
+    /// Row ages and the footer.
+    public let muted: ThemeColor
 }
 
-/// The overlay looks users can pick in settings, modelled on Alfred's themes.
+/// The overlay looks users can pick in settings.
 public enum OverlayTheme: String, CaseIterable, Sendable {
     case system
-    case light
-    case dark
-    case modernDark = "modern-dark"
-    case frosty
+    case lagoon
+    case coral
+    case sand
+    case midnight
 
     public static let fallback = OverlayTheme.system
 
+    /// Values stored by the earlier themes (before the island look).
+    private static let legacy: [String: OverlayTheme] = [
+        "light": .sand, "dark": .midnight, "modern-dark": .midnight, "frosty": .lagoon,
+    ]
+
     public static func resolve(stored: String?) -> OverlayTheme {
-        stored.flatMap(OverlayTheme.init(rawValue:)) ?? fallback
+        guard let stored else { return fallback }
+        return OverlayTheme(rawValue: stored) ?? legacy[stored] ?? fallback
     }
 
     public var displayName: String {
         switch self {
         case .system: return "System"
-        case .light: return "Light"
-        case .dark: return "Dark"
-        case .modernDark: return "Modern Dark"
-        case .frosty: return "Frosty"
+        case .lagoon: return "Lagoon"
+        case .coral: return "Coral"
+        case .sand: return "Sand"
+        case .midnight: return "Midnight"
         }
     }
 
-    /// `system` follows the macOS appearance; the others are fixed.
+    /// `system` is Sand in light mode and Lagoon in dark mode.
     public func palette(systemIsDark: Bool) -> OverlayPalette {
         switch self {
-        case .system: return systemIsDark ? Self.darkPalette : Self.lightPalette
-        case .light: return Self.lightPalette
-        case .dark: return Self.darkPalette
-        case .modernDark: return Self.modernDarkPalette
-        case .frosty: return Self.frostyPalette
+        case .system: return systemIsDark ? Self.lagoonPalette : Self.sandPalette
+        case .lagoon: return Self.lagoonPalette
+        case .coral: return Self.coralPalette
+        case .sand: return Self.sandPalette
+        case .midnight: return Self.midnightPalette
         }
     }
 
-    private static let white = ThemeColor(hex: 0xFFFFFF)
-    private static let clear = ThemeColor(hex: 0x000000, alpha: 0)
+    /// Builds a palette around one accent; the selection is always a light
+    /// tint of the accent, never a solid bar.
+    private static func palette(
+        isDark: Bool, background: ThemeColor, accent: UInt32, title: ThemeColor,
+        subtitle: UInt32, muted: UInt32
+    ) -> OverlayPalette {
+        let ink: UInt32 = isDark ? 0xFFFFFF : 0x000000
+        return OverlayPalette(
+            isDark: isDark,
+            background: background,
+            border: ThemeColor(hex: ink, alpha: isDark ? 0.12 : 0.08),
+            accent: ThemeColor(hex: accent),
+            title: title,
+            subtitle: ThemeColor(hex: subtitle),
+            selectionBackground: ThemeColor(hex: accent, alpha: isDark ? 0.16 : 0.12),
+            selectionBorder: ThemeColor(hex: accent, alpha: 0.45),
+            keycapBackground: ThemeColor(hex: ink, alpha: isDark ? 0.1 : 0.07),
+            keycapText: ThemeColor(hex: subtitle),
+            muted: ThemeColor(hex: muted)
+        )
+    }
 
-    /// Alfred: pale translucent panel, deep purple highlight.
-    private static let lightPalette = OverlayPalette(
-        isDark: false,
-        background: ThemeColor(hex: 0xECEBEB, alpha: 0.88),
-        cornerRadius: 10,
-        borderColor: clear,
-        borderWidth: 0,
-        queryBackground: ThemeColor(hex: 0xD6CCCC, alpha: 0.8),
-        queryText: ThemeColor(hex: 0x111111),
-        title: ThemeColor(hex: 0x1A1A1A),
-        subtitle: ThemeColor(hex: 0x6E6E6E),
-        selectionBackground: ThemeColor(hex: 0x5E1D73),
-        selectionTitle: white,
-        selectionSubtitle: ThemeColor(hex: 0xFFFFFF, alpha: 0.85),
-        shortcut: ThemeColor(hex: 0x5E1D73),
-        hint: ThemeColor(hex: 0x8A8A8A)
-    )
+    /// Deep sea blue with a lagoon-teal accent.
+    private static let lagoonPalette = palette(
+        isDark: true, background: ThemeColor(hex: 0x071A24, alpha: 0.9), accent: 0x3DD6C8,
+        title: ThemeColor(hex: 0xF2FBFC), subtitle: 0x93B4BF, muted: 0x6A8C98)
 
-    /// Alfred Dark: near-black panel, teal highlight.
-    private static let darkPalette = OverlayPalette(
-        isDark: true,
-        background: ThemeColor(hex: 0x100808, alpha: 0.92),
-        cornerRadius: 10,
-        borderColor: clear,
-        borderWidth: 0,
-        queryBackground: ThemeColor(hex: 0x241010, alpha: 0.8),
-        queryText: white,
-        title: ThemeColor(hex: 0xF2F2F2),
-        subtitle: ThemeColor(hex: 0xA6A6A6),
-        selectionBackground: ThemeColor(hex: 0x367F87),
-        selectionTitle: white,
-        selectionSubtitle: ThemeColor(hex: 0xFFFFFF, alpha: 0.85),
-        shortcut: ThemeColor(hex: 0xA6A6A6),
-        hint: ThemeColor(hex: 0x7A7A7A)
-    )
+    /// Warm dusk red with a coral accent.
+    private static let coralPalette = palette(
+        isDark: true, background: ThemeColor(hex: 0x241012, alpha: 0.9), accent: 0xFF7F66,
+        title: ThemeColor(hex: 0xFFF4F0), subtitle: 0xC9A39C, muted: 0x9A7872)
 
-    /// Alfred Modern Dark: the dark look with rounder corners and an outline.
-    private static let modernDarkPalette = OverlayPalette(
-        isDark: true,
-        background: ThemeColor(hex: 0x14110F, alpha: 0.9),
-        cornerRadius: 18,
-        borderColor: ThemeColor(hex: 0x000000, alpha: 0.9),
-        borderWidth: 2,
-        queryBackground: ThemeColor(hex: 0x3A1616, alpha: 0.55),
-        queryText: white,
-        title: ThemeColor(hex: 0xF2F2F2),
-        subtitle: ThemeColor(hex: 0xB3B3B3),
-        selectionBackground: ThemeColor(hex: 0x367F87),
-        selectionTitle: white,
-        selectionSubtitle: ThemeColor(hex: 0xFFFFFF, alpha: 0.85),
-        shortcut: ThemeColor(hex: 0xB3B3B3),
-        hint: ThemeColor(hex: 0x808080)
-    )
+    /// Beach sand with a sea-green accent; the only light theme.
+    private static let sandPalette = palette(
+        isDark: false, background: ThemeColor(hex: 0xF7F1E6, alpha: 0.92), accent: 0x0F8F86,
+        title: ThemeColor(hex: 0x2A251E), subtitle: 0x7B705F, muted: 0x9C9282)
 
-    /// island's original HUD look: mostly blur, a faint teal tint.
-    private static let frostyPalette = OverlayPalette(
-        isDark: true,
-        background: ThemeColor(hex: 0x1E3A40, alpha: 0.25),
-        cornerRadius: 18,
-        borderColor: ThemeColor(hex: 0xFFFFFF, alpha: 0.12),
-        borderWidth: 1,
-        queryBackground: ThemeColor(hex: 0xFFFFFF, alpha: 0.08),
-        queryText: white,
-        title: ThemeColor(hex: 0xFFFFFF, alpha: 0.95),
-        subtitle: ThemeColor(hex: 0xFFFFFF, alpha: 0.6),
-        selectionBackground: ThemeColor(hex: 0x7FD1D8, alpha: 0.3),
-        selectionTitle: white,
-        selectionSubtitle: ThemeColor(hex: 0xFFFFFF, alpha: 0.8),
-        shortcut: ThemeColor(hex: 0xFFFFFF, alpha: 0.55),
-        hint: ThemeColor(hex: 0xFFFFFF, alpha: 0.4)
-    )
+    /// Near-black like the hardware Dynamic Island, periwinkle accent.
+    private static let midnightPalette = palette(
+        isDark: true, background: ThemeColor(hex: 0x000000, alpha: 0.95), accent: 0x9B9BFF,
+        title: ThemeColor(hex: 0xF5F5F7), subtitle: 0x8E8E93, muted: 0x6C6C70)
 }
 
 /// Remembers the picked theme across launches.

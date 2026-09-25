@@ -2,9 +2,9 @@
 type: feat
 name: island-capsule-look
 title: "[ux] overlay looks too much like alfred; switch to an island capsule look"
-status: in-progress
+status: solved
 created_ts: 2026-09-25T13:09:21-07:00
-updated_ts: 2026-09-25T13:09:29-07:00
+updated_ts: 2026-09-25T13:13:45-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -32,6 +32,17 @@ Scope-check: PLAN § Design / Island 下拉框 UX；依据用户会话中的明�
 
 - 全程在独立 worktree（`../.worktree/<repo>-<slug>`）中完成，合回 master 前 `make verify` 全过，流程见 AGENTS.md / Workflow / Worktree 与 Ship
 
+## 处理结果
+
+- 面板贴着菜单栏下沿垂下（平顶、底部 26pt 圆角，`CapsuleShapeView` + `maskImage`），宽 520
+- 标题行 `● island · N new`（圆点用主题强调色）；键盘模式右侧是内联小搜索框（放大镜 + `filter`），被动模式右侧显示快捷键键帽；去掉了顶部大搜索框
+- 行：左侧数字键帽 `1…9`（⌘N 直达）→ agent 图标（未读红点）→ 标题 / `目录 • agent` → 右侧短时间（`ShortAge`：now / 3m / 2h / 1d）；选中是强调色半透明胶囊 + 描边
+- 底部操作提示只在键盘模式出现
+- 主题：System（浅 Sand / 深 Lagoon）/ Lagoon / Coral / Sand / Midnight；旧存值 `light→sand`、`dark→midnight`、`modern-dark→midnight`、`frosty→lagoon`
+- 测试变更：`testShortcutLabels`（↩ / ⌘N 标注）随该样式删除，换成 `testKeycapLabels`；Alfred 配色断言 `testPalettesMatchTheirReferenceLooks` 随旧主题删除，换成 `testPalettesHaveTheirOwnIdentity` 与迁移测试
+
 # History
 
 ## 2026-09-25T13:09:29-07:00: new -> in-progress
+
+## 2026-09-25T13:13:45-07:00: in-progress -> solved

@@ -42,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlayContent = content
         let panel = OverlayPanel(contentView: content)
         panel.setContentSize(width: OverlayContentView.width, height: content.preferredHeight)
-        // Alfred-style: clicking anywhere else dismisses a summoned overlay.
+        // Clicking anywhere else dismisses a summoned overlay.
         panel.onResignKey = { [weak self] in
             // Hiding clears acceptsKeyboard first, so this does not re-enter.
             guard self?.panel?.acceptsKeyboard == true else { return }
