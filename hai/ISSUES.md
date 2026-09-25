@@ -4,6 +4,7 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
+| feat | [claude-desktop-source](./issue/2026-09-25-14-38-22-claude-desktop-source.md) | Claude 桌面版（聊天）完成后不弹 island：尚无数据源 | new | 2026-09-25T14:38:22-07:00 | 2026-09-25T14:46:11-07:00 |
 | chore | [brew-distribution](./issue/2026-09-13-14-20-51-brew-distribution.md) | 调研 brew install 分发路径（等本地 MVP 走通后再做） | new | 2026-09-13T14:20:51-07:00 | 2026-09-24T15:47:33-07:00 |
 | bug | [settings-recorder-steals-keys](./issue/2026-09-25-14-37-03-settings-recorder-steals-keys.md) | 打开 settings 时焦点在快捷键录制框，cmd+w 被录成快捷键 | solved | 2026-09-25T14:37:03-07:00 | 2026-09-25T14:40:01-07:00 |
 | feat | [overlay-header-and-hints](./issue/2026-09-25-14-26-45-overlay-header-and-hints.md) | [ux] drop the island label, fix footer spacing, cmd+comma settings, hints toggle | solved | 2026-09-25T14:26:45-07:00 | 2026-09-25T14:29:47-07:00 |
