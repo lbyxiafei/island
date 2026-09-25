@@ -103,6 +103,14 @@ public enum TerminalTabFocus: Equatable, Sendable {
     public static let vscodeBundleID = "com.microsoft.VSCode"
     public static let surfaceKey = "CMUX_SURFACE_ID"
 
+    /// Needs macOS automation consent for the host app.
+    public var usesAppleScript: Bool {
+        switch self {
+        case .scriptable, .appleTerminal, .iTerm: return true
+        case .vscode, .none: return false
+        }
+    }
+
     /// - Parameters:
     ///   - chain: the leaf's ancestors (`ProcessTree.ancestors`), leaf first.
     ///   - environment: the leaf's environment, at least `surfaceKey` if set.

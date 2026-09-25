@@ -13,7 +13,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var monitor: AgentMonitor?
     private var inbox: AgentInbox?
     private var overlayContent: OverlayContentView?
-    private let reopenExecutor = AgentReopenExecutor()
+    private var reopenExecutor: AgentReopenExecutor?
+    /// Serial, so two quick clicks cannot interleave their tmux/AppleScript steps.
+    private let reopenQueue = DispatchQueue(label: "island.reopen", qos: .userInitiated)
+    private var automationDenials = AutomationDenials()
     private let overlayStore = UserDefaultsOverlayStore()
     private var hideTask: Task<Void, Never>?
 
@@ -25,6 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         reportConfiguration()
         VSCodeExtensionInstaller.installIfNeeded()
+        reopenExecutor = AgentReopenExecutor { [weak self] check in
+            DispatchQueue.main.async { self?.recordAutomation(check) }
+        }
 
         let content = OverlayContentView(
             frame: NSRect(
@@ -165,9 +171,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refreshAgentUI()
         // PLAN § Design / 下拉框 UX #2: picking a task dismisses the list.
         hideOverlay(reason: "overlay hidden after selecting a task")
-        let action = reopenExecutor.plan(for: entry.task)
-        reopenExecutor.perform(action, for: entry.task)
-        log("selected \(entry.task.title) -> \(action)")
+        guard let executor = reopenExecutor else { return }
+        let task = entry.task
+        // Off the main thread: it shells out, and osascript waits for however
+        // long the user takes to answer the automation prompt.
+        reopenQueue.async {
+            let action = executor.plan(for: task)
+            executor.perform(action, for: task)
+            FileHandle.standardError.write(
+                Data("[island] selected \(task.title) -> \(action)\n".utf8))
+        }
+    }
+
+    private func recordAutomation(_ check: AutomationCheck) {
+        let before = automationDenials
+        automationDenials.record(check)
+        guard automationDenials != before else { return }
+        statusItem?.setAutomationHint(automationDenials.menuTitle)
+        log("automation for \(check.appName): \(check.authorized ? "allowed" : "denied")")
     }
 
     /// `interactive` (hotkey, menu): the panel takes the keyboard and stays until

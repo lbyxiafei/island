@@ -135,6 +135,15 @@ final class TerminalTabFocusTests: XCTestCase {
         }
     }
 
+    func testWhichFocusesNeedAutomationPermission() {
+        XCTAssertTrue(
+            TerminalTabFocus.scriptable(bundleID: "x", match: .terminalID("1")).usesAppleScript)
+        XCTAssertTrue(TerminalTabFocus.appleTerminal(tty: "/dev/ttys001").usesAppleScript)
+        XCTAssertTrue(TerminalTabFocus.iTerm(tty: "/dev/ttys001").usesAppleScript)
+        XCTAssertFalse(TerminalTabFocus.vscode(pids: [1]).usesAppleScript)
+        XCTAssertFalse(TerminalTabFocus.none.usesAppleScript)
+    }
+
     func testUnknownHostsOnlyGetActivated() {
         XCTAssertEqual(
             TerminalTabFocus.plan(

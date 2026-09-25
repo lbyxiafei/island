@@ -2,15 +2,24 @@
   "name": "island",
   "displayName": "island",
   "description": "Lets the island menu bar app bring an agent's terminal tab to the front.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "binyanli",
   "license": "UNLICENSED",
   "engines": {
     "vscode": "^1.80.0"
   },
   "main": "./extension.js",
+  "extensionKind": [
+    "ui"
+  ],
   "activationEvents": [
     "onStartupFinished"
   ],
-  "contributes": {}
+  "contributes": {},
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": true
+  }
 }

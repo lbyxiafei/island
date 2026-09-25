@@ -1,11 +1,18 @@
 import AppKit
 import IslandCore
 
+enum TabFocusResult: Equatable {
+    case focused
+    /// The tab was not found (or the app is not scriptable); activate the app.
+    case notFound
+    /// The user declined island in Privacy & Security → Automation.
+    case notAuthorized
+}
+
 /// Performs a `TerminalTabFocus`: brings the exact tab (or VS Code terminal)
-/// showing a task to the front. Returns false when the tab could not be found,
-/// so the caller can fall back to just activating the app.
-@MainActor
-struct TerminalTabFocuser {
+/// showing a task to the front. Blocks on `osascript` and on the VS Code
+/// handshake, so it runs off the main thread.
+struct TerminalTabFocuser: Sendable {
     /// Where the island VS Code extension (`vscode-extension/extension.js`) listens.
     static let vscodeDirectory = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/island/vscode", isDirectory: true)
@@ -13,45 +20,63 @@ struct TerminalTabFocuser {
     private static let vscodeResponseTimeout: TimeInterval = 1.0
     private static let pollInterval: TimeInterval = 0.05
 
-    func focus(_ focus: TerminalTabFocus) -> Bool {
+    func focus(_ focus: TerminalTabFocus) -> TabFocusResult {
         switch focus {
         case .scriptable(let bundleID, .terminalID(let id)):
-            return !Subprocess.appleScript(
-                TerminalScript.focus(bundleID: bundleID, match: .terminalID(id))
-            ).isEmpty
+            return result(
+                Subprocess.appleScript(
+                    TerminalScript.focus(bundleID: bundleID, match: .terminalID(id)))
+            ) { !$0.isEmpty }
         case .scriptable(let bundleID, .titleProbe(let tty)):
             return focusByTitleProbe(bundleID: bundleID, tty: tty)
         case .appleTerminal(let tty):
-            return Subprocess.appleScript(TerminalScript.appleTerminal(tty: tty)) == "true"
+            return result(Subprocess.appleScript(TerminalScript.appleTerminal(tty: tty))) {
+                $0 == "true"
+            }
         case .iTerm(let tty):
-            return Subprocess.appleScript(TerminalScript.iTerm(tty: tty)) == "true"
+            return result(Subprocess.appleScript(TerminalScript.iTerm(tty: tty))) {
+                $0 == "true"
+            }
         case .vscode(let pids):
-            return focusVSCodeTerminal(pids: pids)
+            return focusVSCodeTerminal(pids: pids) ? .focused : .notFound
         case .none:
-            return false
+            return .notFound
+        }
+    }
+
+    private func result(_ outcome: AppleScriptOutcome, matched: (String) -> Bool) -> TabFocusResult
+    {
+        switch outcome {
+        case .notAuthorized: return .notAuthorized
+        case .failed: return .notFound
+        case .output(let text): return matched(text) ? .focused : .notFound
         }
     }
 
     /// Ghostty cannot tell island which terminal owns a tty, so island marks
     /// the tty with a unique title, finds the terminal wearing it, and puts the
     /// original title back.
-    private func focusByTitleProbe(bundleID: String, tty: String) -> Bool {
-        let titles = TerminalScript.parseListing(
-            Subprocess.appleScript(TerminalScript.listTerminals(bundleID: bundleID)))
+    private func focusByTitleProbe(bundleID: String, tty: String) -> TabFocusResult {
+        // Ask first: without permission the probe title would be left behind.
+        let listing = Subprocess.appleScript(TerminalScript.listTerminals(bundleID: bundleID))
+        if listing == .notAuthorized { return .notAuthorized }
+        let titles = TerminalScript.parseListing(listing.text)
         let probe = "island-\(UUID().uuidString)"
-        guard write(TerminalScript.titleSequence(probe), to: tty) else { return false }
+        guard write(TerminalScript.titleSequence(probe), to: tty) else { return .notFound }
 
         var focusedID = ""
         for _ in 0..<5 where focusedID.isEmpty {
             Thread.sleep(forTimeInterval: Self.pollInterval)
-            focusedID = Subprocess.appleScript(
-                TerminalScript.focus(bundleID: bundleID, match: .titleProbe(tty: tty), probe: probe)
-            )
+            focusedID =
+                Subprocess.appleScript(
+                    TerminalScript.focus(
+                        bundleID: bundleID, match: .titleProbe(tty: tty), probe: probe)
+                ).text
         }
         // Unmatched means the tty is not in this app; clearing the title lets
         // the terminal fall back to its own.
         _ = write(TerminalScript.titleSequence(titles[focusedID] ?? ""), to: tty)
-        return !focusedID.isEmpty
+        return focusedID.isEmpty ? .notFound : .focused
     }
 
     private func write(_ text: String, to tty: String) -> Bool {

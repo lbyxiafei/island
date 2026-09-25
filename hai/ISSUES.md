@@ -5,6 +5,7 @@
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
 | chore | [brew-distribution](./issue/2026-09-13-14-20-51-brew-distribution.md) | 调研 brew install 分发路径（等本地 MVP 走通后再做） | new | 2026-09-13T14:20:51-07:00 | 2026-09-24T15:47:33-07:00 |
+| bug | [reopen-stranger-hardening](./issue/2026-09-25-16-24-20-reopen-stranger-hardening.md) | 点击跳转对陌生环境的加固：VS Code 受限模式/远程、主线程阻塞、自动化授权被拒无提示 | solved | 2026-09-25T16:24:20-07:00 | 2026-09-25T16:27:26-07:00 |
 | feat | [reopen-precise-terminal-tab](./issue/2026-09-25-15-43-43-reopen-precise-terminal-tab.md) | 点击任务精确跳到 tmux session / cmux tab / VS Code 终端 tab | solved | 2026-09-25T15:43:43-07:00 | 2026-09-25T16:07:45-07:00 |
 | feat | [codex-thread-deeplink](./issue/2026-09-25-15-23-52-codex-thread-deeplink.md) | 点击 Codex 任务直接打开对应对话（codex://threads/<id>） | solved | 2026-09-25T15:23:52-07:00 | 2026-09-25T15:24:17-07:00 |
 | feat | [claude-desktop-source](./issue/2026-09-25-14-38-22-claude-desktop-source.md) | Claude 桌面版（聊天）完成后不弹 island：尚无数据源 | solved | 2026-09-25T14:38:22-07:00 | 2026-09-25T15:02:31-07:00 |

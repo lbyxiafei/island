@@ -25,6 +25,9 @@ final class StatusItemController {
     /// into a log the user cannot see.
     private var lastError: String?
 
+    /// Set when a terminal refused automation; the item opens the settings pane.
+    private var automationHint: String?
+
     init(
         hotkey: HotkeySpec,
         hotkeySource: HotkeySource,
@@ -68,6 +71,11 @@ final class StatusItemController {
     }
 
     /// Called when the agent monitor sees a new finished run.
+    func setAutomationHint(_ hint: String?) {
+        automationHint = hint
+        rebuildMenu()
+    }
+
     func setUnreadCount(_ count: Int) {
         guard count != unreadCount else { return }
         unreadCount = count
@@ -126,6 +134,16 @@ final class StatusItemController {
                 item.toolTip = Self.toolTip(for: entry.task)
                 menu.addItem(item)
             }
+            menu.addItem(.separator())
+        }
+
+        if let automationHint {
+            let item = action(automationHint, #selector(openAutomationSettings), keyEquivalent: "")
+            item.image = NSImage(
+                systemSymbolName: "exclamationmark.triangle", accessibilityDescription: nil)
+            item.toolTip =
+                "island could only bring the app forward, not the exact tab. Turn island on for these apps in Privacy & Security → Automation."
+            menu.addItem(item)
             menu.addItem(.separator())
         }
 
@@ -208,6 +226,11 @@ final class StatusItemController {
     @objc private func selectTask(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
         onSelectTask(id)
+    }
+
+    @objc private func openAutomationSettings() {
+        guard let url = URL(string: AutomationDenials.settingsURL) else { return }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func openSettings() {

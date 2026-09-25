@@ -8,8 +8,10 @@ import IslandCore
 ///
 /// Everything here is best effort — PLAN § Design accepts "second best" — so a
 /// missing `tmux` or a dead app degrades to the next step instead of failing.
-@MainActor
-final class AgentReopenExecutor {
+///
+/// Every step shells out (`ps`, `tmux`, `osascript`, which waits on the macOS
+/// automation prompt), so callers run it off the main thread.
+final class AgentReopenExecutor: Sendable {
     private static let tmuxCandidates = [
         "/opt/homebrew/bin/tmux",
         "/usr/local/bin/tmux",
@@ -28,6 +30,12 @@ final class AgentReopenExecutor {
     ]
 
     private let tabFocuser = TerminalTabFocuser()
+    /// Reports whether a scriptable terminal let island control it.
+    private let onAutomation: @Sendable (AutomationCheck) -> Void
+
+    init(onAutomation: @escaping @Sendable (AutomationCheck) -> Void = { _ in }) {
+        self.onAutomation = onAutomation
+    }
 
     /// Builds the plan from this machine's live process and tmux state. Task
     /// hosts are resolved here (not in the sources) because only some agents
@@ -150,7 +158,12 @@ final class AgentReopenExecutor {
         let focus = TerminalTabFocus.plan(
             hostBundleID: host.bundleID, leaf: leaf, chain: chain, environment: environment)
         let name = host.bundleID ?? "pid \(host.pid)"
-        if tabFocuser.focus(focus) {
+        let result = tabFocuser.focus(focus)
+        if focus.usesAppleScript, result != .notFound {
+            let appName = app.localizedName ?? name
+            onAutomation(AutomationCheck(appName: appName, authorized: result == .focused))
+        }
+        if result == .focused {
             log("focused \(focus) in \(name) for pid \(leaf.pid)")
             return true
         }
@@ -161,7 +174,7 @@ final class AgentReopenExecutor {
         } else {
             app.activate()
         }
-        log("activated \(name) for pid \(leaf.pid) (tab not found: \(focus))")
+        log("activated \(name) for pid \(leaf.pid) (tab \(result): \(focus))")
         return true
     }
 
