@@ -7,6 +7,9 @@
 # timestamp, ready for scripts/release.sh to notarize), else ad-hoc ("-"),
 # which runs on this machine only. Building never needs an Apple account.
 #
+# Version: $ISLAND_VERSION (e.g. 0.2.0), else 0.0.0 for local builds.
+# Releases set it (scripts/publish.sh); `brew upgrade` needs it to grow.
+#
 # usage: scripts/build-app.sh [--debug]
 set -euo pipefail
 
@@ -20,7 +23,7 @@ fi
 
 app="$root/build/Island.app"
 bundle_id="com.commallama.island"
-version="0.1.0"
+version="${ISLAND_VERSION:-0.0.0}"
 
 swift build -c "$configuration"
 executable="$(swift build -c "$configuration" --show-bin-path)/Island"
@@ -51,7 +54,7 @@ cat >"$app/Contents/Info.plist" <<PLIST
     <key>CFBundleShortVersionString</key>
     <string>$version</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>$version</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <!-- Accessory app: no Dock icon, no menu bar. -->

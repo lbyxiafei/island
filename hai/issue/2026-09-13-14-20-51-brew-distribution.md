@@ -2,9 +2,9 @@
 type: chore
 name: brew-distribution
 title: "调研 brew install 分发路径（等本地 MVP 走通后再做）"
-status: new
+status: in-progress
 created_ts: 2026-09-13T14:20:51-07:00
-updated_ts: 2026-09-24T15:47:33-07:00
+updated_ts: 2026-09-26T15:41:48-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -29,6 +29,12 @@ updated_ts: 2026-09-24T15:47:33-07:00
 4. **自动更新**：`brew upgrade` 的语义、版本号策略（`CFBundleShortVersionString` 现在是写死的 `0.1.0`）
 5. **与"默认开机自启"的交互**：用户装了就被塞一个登录项是否合适，安装时要不要问
 6. **Ask first 提醒**：`publish / release / 打 tag` 属于 AGENTS.md § Boundaries 的 Ask first 条目，开工前需要明确授权
+
+## Decision
+
+- 2026-09-26，用户（binyan.li）在会话中选定方案 1 并授权「包圆儿」：源码仓库 `lbyxiafei/island` 保持私有；新建**公开**仓库 `lbyxiafei/homebrew-tap`，dmg 作为该仓库的 GitHub Release 资产上传，cask 放在其 `Casks/island.rb`；在 island 仓库打 tag `v<version>`。范围仅限以上，不包括把 island 源码公开、不包括提交官方 homebrew-cask
+
+Scope-check: 用户明确指令（PLAN POC #2「其他人可以通过 brew install 安装」）
 
 ## 备注
 
@@ -73,3 +79,13 @@ updated_ts: 2026-09-24T15:47:33-07:00
 - `publish / release / 打 tag` 属 AGENTS.md § Boundaries 的 Ask first；未获明确授权前本 issue 停在 `new`
 
 > 2026-09-24 会话：用户授权「把未完成的 issues 都自主处理」，但该授权带有「如果顺利」前提，而本 issue 的下一步是付费 + 公开发布，不属可自主执行范围，故只做到本机可验证的调研。
+
+# History
+
+## 2026-09-26T15:41:48-07:00: new -> open
+
+用户选定方案 1（私有源码 + 公开 homebrew-tap），授权建 tap、打 tag、上传 Release
+
+## 2026-09-26T15:41:48-07:00: open -> in-progress
+
+开始实现：版本号注入、cask 生成、publish 脚本

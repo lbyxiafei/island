@@ -9,14 +9,19 @@
 #
 # Steps: sign (build-app.sh) -> notarize + staple the app -> pack the dmg ->
 # sign + notarize + staple the dmg -> check both the way Gatekeeper will.
-# Publishing the dmg anywhere is a separate, manual step.
+# Publishing the dmg is scripts/publish.sh.
 #
-# usage: scripts/release.sh
+# usage: scripts/release.sh <version>      e.g. scripts/release.sh 0.2.0
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
+version="${1:-}"
+if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "usage: scripts/release.sh <major.minor.patch>" >&2
+    exit 2
+fi
 profile="${ISLAND_NOTARY_PROFILE:-notary}"
 identity="${ISLAND_SIGN_IDENTITY:-$(
     security find-identity -v -p codesigning 2>/dev/null |
@@ -31,9 +36,8 @@ if ! xcrun notarytool history --keychain-profile "$profile" >/dev/null 2>&1; the
     exit 1
 fi
 
-ISLAND_SIGN_IDENTITY="$identity" "$root/scripts/build-app.sh"
+ISLAND_SIGN_IDENTITY="$identity" ISLAND_VERSION="$version" "$root/scripts/build-app.sh"
 app="$root/build/Island.app"
-version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
 dist="$root/build/dist"
 rm -rf "$dist"
 mkdir -p "$dist"

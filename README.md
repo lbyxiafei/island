@@ -25,7 +25,15 @@
 - 支持开机 / 登录自启（`SMAppService`，可在系统设置的登录项里关掉）
 - 构建与运行只需要本机 Xcode，**不需要 Apple Developer 账号**（没有证书时 ad-hoc 签名，只能本机用）；有 Developer ID 证书时 `scripts/release.sh` 产出**已签名 + 已公证**的 dmg，别人下载后可直接打开，不会被 Gatekeeper 拦
 
-## 快速开始
+## 安装
+
+```bash
+brew install --cask lbyxiafei/tap/island
+```
+
+升级 `brew upgrade --cask island`，卸载 `brew uninstall --cask island`（加 `--zap` 连设置一起清掉）。app 已签名并公证，装完直接从「应用程序」启动即可。
+
+## 从源码构建
 
 要求 macOS 13+ 与 Xcode（本机在 macOS 26.6.2 / Xcode 26.6 / Swift 6.3.3 上验证过）。零第三方依赖。
 
@@ -47,8 +55,11 @@ open build/Island.app       # 启动，无日志输出
 ## 打包发布（给别人用）
 
 ```bash
-./scripts/release.sh        # -> build/dist/island-<version>.dmg，已签名、已公证、已 staple
+./scripts/release.sh 0.2.0  # -> build/dist/island-0.2.0.dmg，已签名、已公证、已 staple
+./scripts/publish.sh 0.2.0  # release.sh + 上传到 homebrew tap + 更新 cask + 打 tag v0.2.0
 ```
+
+源码仓库是私有的，dmg 和 cask 都放在公开的 [`lbyxiafei/homebrew-tap`](https://github.com/lbyxiafei/homebrew-tap)：dmg 是它的 Release `island-v<version>`，cask 是 `Casks/island.rb`。`publish.sh` 要在已 push 的干净 master 上跑。
 
 需要钥匙串里有 `Developer ID Application` 证书，以及 notarytool 的钥匙串 profile（默认名 `notary`，可用 `ISLAND_NOTARY_PROFILE` 改）。脚本最后用 `spctl` 按 Gatekeeper 的标准检查 app 和 dmg，两者都应是 `accepted, source=Notarized Developer ID`。别人拿到 dmg：打开 → 把 Island 拖进 Applications → 启动即可。
 

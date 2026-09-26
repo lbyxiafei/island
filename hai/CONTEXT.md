@@ -23,9 +23,10 @@ git clone https://github.com/lbyxiafei/island.git && cd island
 make hooks                         # 装 pre-push 钩子（每次 push 前跑 make verify）
 
 swift build                        # 编译
-./scripts/build-app.sh             # 打成 build/Island.app 并 ad-hoc 签名（release）
+./scripts/build-app.sh             # 打成 build/Island.app（Developer ID 优先，否则 ad-hoc）；版本号 $ISLAND_VERSION，缺省 0.0.0
 ./scripts/build-app.sh --debug     # 同上，debug 构建
-./scripts/release.sh               # 发布：签名 + 公证 + staple，产出 build/dist/island-<version>.dmg
+./scripts/release.sh 0.2.0         # 签名 + 公证 + staple，产出 build/dist/island-0.2.0.dmg
+./scripts/publish.sh 0.2.0         # 发布到 brew：release.sh + tap 仓库 Release + Casks/island.rb + tag v0.2.0
 
 # 运行
 ./build/Island.app/Contents/MacOS/Island    # 前台运行，配置与事件日志走 stderr
@@ -144,6 +145,7 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
 Tests/IslandCoreTests/         # IslandCore 的行为测试（XCTest）
 scripts/build-app.sh           # 打包 .app + 签名（Developer ID 优先，否则 ad-hoc）
 scripts/release.sh             # 签名 + 公证 + dmg
+scripts/publish.sh             # dmg -> lbyxiafei/homebrew-tap（Release + cask）+ tag
 scripts/Island.entitlements    # hardened runtime 下允许 Apple events（控制终端）
 scripts/coverage.sh            # 刷新 coverage.txt
 scripts/check-layering.sh      # 依赖方向检查
@@ -200,6 +202,7 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - **精确到 tab**（issue `reopen-precise-terminal-tab`，机制与实测细节见 `hai/reference/agents/README.md` § 5）：tmux 必须 `switch-client`，只 `select-window` 不会让 client 离开当前 session；叶子进程（agent 或 tmux client）的宿主 app 决定手段——cmux 读 `CMUX_SURFACE_ID` 走 AppleScript（**不走 cmux socket**，默认只许 cmux 内进程连）；Ghostty 往 tty 写 OSC 2 标题探针再按 name 找 terminal，找到后写回原标题；Terminal / iTerm2 按 tty（Terminal 要先 activate 再调窗口顺序）；VS Code 用自带扩展做**文件握手**（`~/Library/Application Support/island/vscode/focus-request.json` → `focus-response-<id>.json`），**不用 `vscode://` URI**，因为 VS Code 每次都弹确认框
 - AppleScript 用 `/usr/bin/osascript` 子进程跑，首次控制某个终端 app 时 macOS 弹一次自动化授权（`Info.plist` 的 `NSAppleEventsUsageDescription`）。**osascript 会阻塞到用户回答为止，所以点击任务后的整条链（`AgentReopenExecutor`）跑在 `AppDelegate.reopenQueue` 串行后台队列上，不要再把它放回主线程**。用户拒绝时 osascript 报 `-1743`（`AppleScriptOutcome.notAuthorized`），菜单栏出现 `Allow island to control <app>…`（`AutomationDenials`），点击打开 系统设置 → 自动化；同一 app 之后授权成功会自动消失。重置授权做测试：`tccutil reset AppleEvents com.commallama.island`。**签名**：`build-app.sh` 优先用 `$ISLAND_SIGN_IDENTITY`，否则自动找钥匙串里的 `Developer ID Application`（hardened runtime + 时间戳 + `scripts/Island.entitlements`），都没有才 ad-hoc。**hardened runtime 下必须有 entitlement `com.apple.security.automation.apple-events`，否则 osascript 控制终端会被拒**。ad-hoc 每次重新构建 cdhash 都变，授权会反复弹；Developer ID 签名不会
 - **发布**（issue `signed-notarized-release`）：`scripts/release.sh` = build-app（Developer ID）→ 公证 app 的 zip 并 staple → 打 dmg（app + Applications 快捷方式）→ 签名、公证、staple dmg → `spctl` 验证。公证凭据是钥匙串 profile `notary`（`ISLAND_NOTARY_PROFILE` 可改），账号与一次性配置记在 dotfiles 的 `macos-release` skill 与 `macos-signing` 脚本。2026-09-26 实测一次约 45 秒，两次提交都 Accepted
+- **brew 分发**（issue `brew-distribution`）：源码仓库 `lbyxiafei/island` 是**私有**的，cask 没法从私有仓库下载，所以 dmg 放在**公开**的 `lbyxiafei/homebrew-tap` 的 Release `island-v<version>` 里，cask 是该仓库的 `Casks/island.rb`（由 `scripts/publish.sh` 生成，别手改）。用户装：`brew install --cask lbyxiafei/tap/island`。版本号只从 `publish.sh <version>` 进来，必须比上一版大（`brew upgrade` 靠它）；本地构建是 `0.0.0`。cask 的 `uninstall quit:` 会在卸载时退出正在运行的 island
 - **bundle id 是 `com.commallama.island`**（2026-09-26 起；之前开发期是 `com.binyanli.island.poc`）。首次以新 id 启动时 `LegacySettings.migrate` 把旧域里的 4 个设置拷过来（只拷一次、不覆盖新值）。**对外发布后不要再改 bundle id**：授权、登录项、设置都绑在它上面。本机现在装的是 `/Applications/Island.app`（登录项指向它）；repo 里 `build/Island.app` 是同一个 bundle id，开发时先 `pkill -x Island` 再跑构建产物，别两个同时开。用户直接在 dmg 里双击会被 App Translocation 到随机只读路径（issue `move-to-applications-prompt`）
 - VS Code 扩展：`vscode-extension/package.json` 的 `version` 是唯一版本号，`build-app.sh` 写进 `Info.plist` 的 `IslandVSCodeExtensionVersion`；**改了 extension.js 必须 bump version**，否则已安装用户不会升级（安装器只比版本）。扩展声明了 `extensionKind: ["ui"]`（Remote 窗口里也在本地跑，pid 才对得上）和 `untrustedWorkspaces.supported`（受限模式下照常激活）。全新安装会在已打开的 VS Code 窗口里直接激活；同版本覆盖安装不会重新加载。扩展是 JS wiring，不在 Swift 覆盖率统计内
 - **任务标题的取值是 `title → 最后一条用户消息 → 目录名`**（`TaskTitle.resolve`，PLAN § Design / 下拉框 UX #1）。Claude：transcript 里的 `custom-title`（/rename）→ session json 里 `nameSource != "derived"` 的 `name` → `ai-title` → 最后一条用户 prompt（跳过 `isMeta`、sidechain、tool_result、`<command-…>` 包装、中断标记）。**`nameSource: "derived"` 的 `name`（如 `dotfiles-9e`）是 Claude 自动生成的占位名，不算标题**。pi：`session_info.name`（/name）→ 最后一条 user 文本。Codex：`threads.name` → 最后一条不以 `<` 开头的 `userMessage` → `threads.title`（首条用户消息）
