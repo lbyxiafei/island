@@ -22,7 +22,7 @@
 - 快捷键可以随时 on / off：关掉后键位还给系统，配置仍然保留，随时可以再打开
 - 改快捷键时直接**按组合键录制**（不用记语法），并有一键 `Clear` 清空
 - 支持开机 / 登录自启（`SMAppService`，可在系统设置的登录项里关掉）
-- 构建与运行只需要本机 Xcode，**不需要 Apple Developer 账号**（ad-hoc 签名）
+- 构建与运行只需要本机 Xcode，**不需要 Apple Developer 账号**（没有证书时 ad-hoc 签名，只能本机用）；有 Developer ID 证书时 `scripts/release.sh` 产出**已签名 + 已公证**的 dmg，别人下载后可直接打开，不会被 Gatekeeper 拦
 
 ## 快速开始
 
@@ -32,7 +32,7 @@
 git clone https://github.com/lbyxiafei/island.git
 cd island
 
-./scripts/build-app.sh      # 编译并打包成 build/Island.app（ad-hoc 签名）
+./scripts/build-app.sh      # 编译并打包成 build/Island.app（有 Developer ID 证书就用它签，否则 ad-hoc）
 open build/Island.app       # 启动，无日志输出
 
 # 或者前台运行，配置与事件日志直接打在终端：
@@ -42,6 +42,14 @@ open build/Island.app       # 启动，无日志输出
 启动时会先自动弹一次悬浮窗，之后按快捷键即可再次召唤。退出：点菜单栏 island 图标 → `Quit island`，或 `pkill -x Island`。
 
 > 想长期使用，建议把 `Island.app` 拷到 `/Applications` 再从那里启动——登录项记的是 app 的路径，放在构建目录里容易被后续构建或清理打扰。
+
+## 打包发布（给别人用）
+
+```bash
+./scripts/release.sh        # -> build/dist/island-<version>.dmg，已签名、已公证、已 staple
+```
+
+需要钥匙串里有 `Developer ID Application` 证书，以及 notarytool 的钥匙串 profile（默认名 `notary`，可用 `ISLAND_NOTARY_PROFILE` 改）。脚本最后用 `spctl` 按 Gatekeeper 的标准检查 app 和 dmg，两者都应是 `accepted, source=Notarized Developer ID`。别人拿到 dmg：打开 → 把 Island 拖进 Applications → 启动即可。
 
 ## 配置快捷键
 
@@ -62,8 +70,8 @@ open build/Island.app       # 启动，无日志输出
 
 ```bash
 # 恢复默认快捷键，并重新打开
-defaults delete com.binyanli.island.poc IslandHotkeyText
-defaults delete com.binyanli.island.poc IslandHotkeyEnabled
+defaults delete com.commallama.island IslandHotkeyText
+defaults delete com.commallama.island IslandHotkeyEnabled
 ```
 
 ## 配置

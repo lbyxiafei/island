@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 #
-# Assembles a real .app bundle from the SwiftPM executable and ad-hoc signs it.
-# This is the answer to POC question 1: building and running a macOS app needs
-# no Apple Developer account, no paid program, and no notarization — only a
-# local Xcode toolchain. The codesign summary printed at the end is the evidence.
+# Assembles a real .app bundle from the SwiftPM executable and signs it.
+#
+# Signing identity: $ISLAND_SIGN_IDENTITY if set, else the first
+# "Developer ID Application" certificate in the keychain (hardened runtime +
+# timestamp, ready for scripts/release.sh to notarize), else ad-hoc ("-"),
+# which runs on this machine only. Building never needs an Apple account.
 #
 # usage: scripts/build-app.sh [--debug]
 set -euo pipefail
@@ -17,7 +19,7 @@ if [[ "${1:-}" == "--debug" ]]; then
 fi
 
 app="$root/build/Island.app"
-bundle_id="com.binyanli.island.poc"
+bundle_id="com.commallama.island"
 version="0.1.0"
 
 swift build -c "$configuration"
@@ -66,10 +68,21 @@ cat >"$app/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# Ad-hoc signature ("-"): the app is signed by the build machine, not by an
-# Apple identity, which is enough for Gatekeeper to let it run locally.
-codesign --force --sign - "$app"
-codesign --verify --verbose=1 "$app"
+identity="${ISLAND_SIGN_IDENTITY:-$(
+    security find-identity -v -p codesigning 2>/dev/null |
+        sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1
+)}"
+entitlements="$root/scripts/Island.entitlements"
+if [[ -n "$identity" && "$identity" != "-" ]]; then
+    # Notarization requires the hardened runtime and a secure timestamp. A
+    # stable identity also keeps macOS permission grants across rebuilds.
+    codesign --force --options runtime --timestamp \
+        --entitlements "$entitlements" --sign "$identity" "$app"
+else
+    # Ad-hoc: runs locally; Gatekeeper rejects it anywhere else.
+    codesign --force --entitlements "$entitlements" --sign - "$app"
+fi
+codesign --verify --strict --verbose=1 "$app"
 
 echo "built $app"
 codesign -dvv "$app" 2>&1 | grep -E "^(Identifier|Format|CodeDirectory|Signature|TeamIdentifier)" || true

@@ -2,6 +2,18 @@ import AppKit
 import IslandCore
 
 let arguments = Set(CommandLine.arguments.dropFirst())
+
+// Before anything reads settings: carry them over from the pre-release bundle id.
+if Bundle.main.bundleIdentifier != LegacySettings.bundleID,
+    let legacy = UserDefaults(suiteName: LegacySettings.bundleID)
+{
+    let copied = LegacySettings.migrate(from: legacy, to: .standard)
+    if !copied.isEmpty {
+        FileHandle.standardError.write(
+            Data("[island] migrated settings from \(LegacySettings.bundleID): \(copied)\n".utf8))
+    }
+}
+
 let configuration = ResolvedConfiguration(environment: ProcessInfo.processInfo.environment)
 
 if arguments.contains("--help") || arguments.contains("-h") {
