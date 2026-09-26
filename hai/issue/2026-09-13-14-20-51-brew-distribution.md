@@ -1,10 +1,10 @@
 ---
 type: chore
 name: brew-distribution
-title: "调研 brew install 分发路径（等本地 MVP 走通后再做）"
-status: in-progress
+title: "brew install 分发：公开 homebrew-tap + 公证 dmg"
+status: solved
 created_ts: 2026-09-13T14:20:51-07:00
-updated_ts: 2026-09-26T15:41:48-07:00
+updated_ts: 2026-09-26T15:46:57-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -89,3 +89,7 @@ Scope-check: 用户明确指令（PLAN POC #2「其他人可以通过 brew insta
 ## 2026-09-26T15:41:48-07:00: open -> in-progress
 
 开始实现：版本号注入、cask 生成、publish 脚本
+
+## 2026-09-26T15:46:57-07:00: in-progress -> solved
+
+已发布 island 0.1.0：`brew install --cask lbyxiafei/tap/island`。2026-09-24 调研里「要不要买开发者账号」「curl 不带 quarantine」两个卡点已被 `signed-notarized-release` 消解。源码仓库保持私有，新建公开的 `lbyxiafei/homebrew-tap`：Release `island-v0.1.0` 挂公证过的 dmg，`Casks/island.rb` 由新脚本 `scripts/publish.sh <version>` 生成（release.sh → 上传 → 改 cask → island 打 tag `v0.1.0`）；版本号改为 `ISLAND_VERSION` 注入（本地构建 0.0.0）。验证：`brew style` / `brew audit --cask --online` 通过；本机真实 `brew install --cask --appdir=<临时目录>`，装出来的 app 带 quarantine，`spctl` 判 `accepted, source=Notarized Developer ID`，版本 0.1.0，可执行；`brew uninstall --cask` 正确退出 app 并删除。`make verify` 全过（273 个测试，覆盖率 100）。未覆盖：没在另一台干净 Mac 上从零装过（本机已信任该证书，首次启动的"来自互联网"确认框没点过）；本机 `/Applications/Island.app` 是手动装的，没交给 brew 管理。
