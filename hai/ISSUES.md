@@ -4,6 +4,7 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
+| chore | [notification-n-auto-hide](./issue/2026-09-26-14-02-22-notification-n-auto-hide.md) | [ux] make notification configurable and auto hide notification when user focus on ai agent panel | new | 2026-09-26T14:02:22-07:00 | 2026-09-26T14:02:22-07:00 |
 | feat | [move-to-applications-prompt](./issue/2026-09-26-14-01-51-move-to-applications-prompt.md) | 从 dmg 里或被系统迁移（App Translocation）运行时提示移到「应用程序」 | new | 2026-09-26T14:01:51-07:00 | 2026-09-26T14:01:51-07:00 |
 | feat | [island-notification](./issue/2026-09-25-15-13-05-island-notification.md) | [ux] refine island app notification w/ setting config | new | 2026-09-25T15:13:05-07:00 | 2026-09-25T15:13:05-07:00 |
 | chore | [brew-distribution](./issue/2026-09-13-14-20-51-brew-distribution.md) | 调研 brew install 分发路径（等本地 MVP 走通后再做） | new | 2026-09-13T14:20:51-07:00 | 2026-09-24T15:47:33-07:00 |
