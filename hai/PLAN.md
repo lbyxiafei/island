@@ -79,3 +79,6 @@
 |---|---|---|---|
 | | | | |
 
+# 开发指南
+
+每次开发完成，可以运行：`pkill -x Island; ./scripts/build-app.sh && open build/Island.app` 进行重启。
