@@ -34,6 +34,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         reportConfiguration()
+        // Before registering anything: a copy in /Applications takes over.
+        if ApplicationsMover.offerIfNeeded(log: { [weak self] in self?.log($0) }) {
+            NSApp.terminate(nil)
+            return
+        }
         VSCodeExtensionInstaller.installIfNeeded()
         reopenExecutor = AgentReopenExecutor { [weak self] check in
             DispatchQueue.main.async { self?.recordAutomation(check) }

@@ -92,7 +92,7 @@ defaults delete com.commallama.island IslandHotkeyEnabled   # 回到默认开启
 - 覆盖率：`./scripts/coverage.sh` 把**单行百分数**写进 `coverage.txt`；`make verify` 的 coverage gate 先刷新它，再与 `coverage-baseline.txt` 比对（当前基线 `100`，即 `IslandCore` 的 65 行全部被覆盖）
 - 覆盖率排除项声明在 **`coverage.config`**（`llvm-cov -ignore-filename-regex`，一行一条正则），理由如下：
   1. `Tests/`、`\.derived/runner\.swift` —— 测试自身与 SwiftPM 自动生成的测试入口（AGENTS 排除类 1：自动生成的代码）
-  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift` / `AgentReopenExecutor.swift` / `TerminalTabFocuser.swift` / `TaskVisibilityProbe.swift` / `Subprocess.swift` / `VSCodeExtensionInstaller.swift` / `ProcessSQLite.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
+  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift` / `AgentReopenExecutor.swift` / `TerminalTabFocuser.swift` / `TaskVisibilityProbe.swift` / `ApplicationsMover.swift` / `Subprocess.swift` / `VSCodeExtensionInstaller.swift` / `ProcessSQLite.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
   - 没有类 3（纯数据结构）、类 4（平台分支）的排除项
 - 增量覆盖率：本 repo 没有可用的 Swift delta-coverage 工具（`xcrun llvm-cov` 没有 diff 模式）。改动达到增量门槛时，用 `xcrun llvm-cov show` 人工核对改动行，并在 commit body 说明；`IslandCore` 的基线是 100%，任何新增未覆盖行都会在下次 `make verify` 里暴露
 
@@ -123,6 +123,7 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   OverlayTheme.swift           #   主题预设 → 配色（OverlayPalette）+ UserDefaults 存储 + agent 图标选择
   TaskVisibility.swift         #   “用户是否正看着这个任务”：TaskVisibility.plan（前台 app / tmux 当前 pane）+ FocusedTab（只读 AppleScript 问当前 tab）
   PopupSettings.swift          #   完成时的弹出：开关 + 秒数 + UserDefaults 存储（缺省回落到 ISLAND_OVERLAY_SECONDS）
+  AppLocation.swift            #   bundle 路径分类（translocated / dmg / installed）+ 移到 /Applications 的提示文案、xattr 与重启命令
 Sources/Island/                # 可执行 target：NSApplication / NSPanel / Carbon 装配
   main.swift                   #   入口 + --help / --print-config / --scan-agents / --reopen-plan
   AppDelegate.swift            #   启动、注册 hotkey、显示与自动隐藏
@@ -140,6 +141,7 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
   HotkeySettingsWindow.swift   #   设置窗口：录制快捷键 / 开关 / 清空
   HotkeyRecorderView.swift     #   点击录制：NSEvent -> HotkeySpec
   LoginItemController.swift    #   SMAppService.mainApp 包装
+  ApplicationsMover.swift      #   启动时从 dmg / 迁移路径运行则弹框：复制到 /Applications、去 quarantine、等本进程退出后重开
   AgentMonitor.swift           #   轮询 agent 落盘，把未读数推到菜单栏
   ResolvedConfiguration.swift  #   环境变量 -> 配置对象
 Tests/IslandCoreTests/         # IslandCore 的行为测试（XCTest）
@@ -204,7 +206,7 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - AppleScript 用 `/usr/bin/osascript` 子进程跑，首次控制某个终端 app 时 macOS 弹一次自动化授权（`Info.plist` 的 `NSAppleEventsUsageDescription`）。**osascript 会阻塞到用户回答为止，所以点击任务后的整条链（`AgentReopenExecutor`）跑在 `AppDelegate.reopenQueue` 串行后台队列上，不要再把它放回主线程**。用户拒绝时 osascript 报 `-1743`（`AppleScriptOutcome.notAuthorized`），菜单栏出现 `Allow island to control <app>…`（`AutomationDenials`），点击打开 系统设置 → 自动化；同一 app 之后授权成功会自动消失。重置授权做测试：`tccutil reset AppleEvents com.commallama.island`。**签名**：`build-app.sh` 优先用 `$ISLAND_SIGN_IDENTITY`，否则自动找钥匙串里的 `Developer ID Application`（hardened runtime + 时间戳 + `scripts/Island.entitlements`），都没有才 ad-hoc。**hardened runtime 下必须有 entitlement `com.apple.security.automation.apple-events`，否则 osascript 控制终端会被拒**。ad-hoc 每次重新构建 cdhash 都变，授权会反复弹；Developer ID 签名不会
 - **发布**（issue `signed-notarized-release`）：`scripts/release.sh` = build-app（Developer ID）→ 公证 app 的 zip 并 staple → 打 dmg（app + Applications 快捷方式）→ 签名、公证、staple dmg → `spctl` 验证。公证凭据是钥匙串 profile `notary`（`ISLAND_NOTARY_PROFILE` 可改），账号与一次性配置记在 dotfiles 的 `macos-release` skill 与 `macos-signing` 脚本。2026-09-26 实测一次约 45 秒，两次提交都 Accepted
 - **brew 分发**（issue `brew-distribution`）：源码仓库 `lbyxiafei/island` 是**私有**的，cask 没法从私有仓库下载，所以 dmg 放在**公开**的 `lbyxiafei/homebrew-tap` 的 Release `island-v<version>` 里，cask 是该仓库的 `Casks/island.rb`（由 `scripts/publish.sh` 生成，别手改）。用户装：`brew install --cask lbyxiafei/tap/island`。版本号只从 `publish.sh <version>` 进来，必须比上一版大（`brew upgrade` 靠它）；本地构建是 `0.0.0`。cask 的 `uninstall quit:` 会在卸载时退出正在运行的 island
-- **bundle id 是 `com.commallama.island`**（2026-09-26 起；之前开发期是 `com.binyanli.island.poc`）。首次以新 id 启动时 `LegacySettings.migrate` 把旧域里的 4 个设置拷过来（只拷一次、不覆盖新值）。**对外发布后不要再改 bundle id**：授权、登录项、设置都绑在它上面。本机现在装的是 `/Applications/Island.app`（登录项指向它）；repo 里 `build/Island.app` 是同一个 bundle id，开发时先 `pkill -x Island` 再跑构建产物，别两个同时开。用户直接在 dmg 里双击会被 App Translocation 到随机只读路径（issue `move-to-applications-prompt`）
+- **bundle id 是 `com.commallama.island`**（2026-09-26 起；之前开发期是 `com.binyanli.island.poc`）。首次以新 id 启动时 `LegacySettings.migrate` 把旧域里的 4 个设置拷过来（只拷一次、不覆盖新值）。**对外发布后不要再改 bundle id**：授权、登录项、设置都绑在它上面。本机现在装的是 `/Applications/Island.app`（登录项指向它）；repo 里 `build/Island.app` 是同一个 bundle id，开发时先 `pkill -x Island` 再跑构建产物，别两个同时开。用户直接在 dmg 里双击会被 App Translocation 到随机只读路径，或者跑在 `/Volumes/` 下（issue `move-to-applications-prompt`）：启动时 `ApplicationsMover` 先于一切注册弹框，选 `Move to Applications` 就把 bundle 复制到 `/Applications/<同名>.app`（已有旧版先移到废纸篓）、`xattr -dr com.apple.quarantine`（否则非 Finder 拷贝的隔离 app 会再次被迁移）、spawn 一个 `sh` 等当前 pid 退出后 `open` 新副本，然后本实例退出；`Not Now` 照常运行，每次启动都会再问。判定 `AppLocation.classify` 只看路径（含 `/AppTranslocation/` 或以 `/Volumes/` 开头）。**本地测它别点 Move**：目标写死 `/Applications`，会替换掉本机正在用的那份
 - VS Code 扩展：`vscode-extension/package.json` 的 `version` 是唯一版本号，`build-app.sh` 写进 `Info.plist` 的 `IslandVSCodeExtensionVersion`；**改了 extension.js 必须 bump version**，否则已安装用户不会升级（安装器只比版本）。扩展声明了 `extensionKind: ["ui"]`（Remote 窗口里也在本地跑，pid 才对得上）和 `untrustedWorkspaces.supported`（受限模式下照常激活）。全新安装会在已打开的 VS Code 窗口里直接激活；同版本覆盖安装不会重新加载。扩展是 JS wiring，不在 Swift 覆盖率统计内
 - **任务标题的取值是 `title → 最后一条用户消息 → 目录名`**（`TaskTitle.resolve`，PLAN § Design / 下拉框 UX #1）。Claude：transcript 里的 `custom-title`（/rename）→ session json 里 `nameSource != "derived"` 的 `name` → `ai-title` → 最后一条用户 prompt（跳过 `isMeta`、sidechain、tool_result、`<command-…>` 包装、中断标记）。**`nameSource: "derived"` 的 `name`（如 `dotfiles-9e`）是 Claude 自动生成的占位名，不算标题**。pi：`session_info.name`（/name）→ 最后一条 user 文本。Codex：`threads.name` → 最后一条不以 `<` 开头的 `userMessage` → `threads.title`（首条用户消息）
 - **点任务后悬浮窗会立刻收起**（PLAN § Design / 下拉框 UX #2）：`selectTask` 先 `markRead` + `refreshAgentUI`，再 `hideOverlay(reason:)`，最后才 focus/跳转（顺序重要，否则聚焦那一刻悬浮窗还会闪）
