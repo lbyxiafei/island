@@ -18,10 +18,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let reopenQueue = DispatchQueue(label: "island.reopen", qos: .userInitiated)
     private var automationDenials = AutomationDenials()
     private let overlayStore = UserDefaultsOverlayStore()
+    private let popupStore = UserDefaultsPopupStore()
+    /// Whether a finished run pops the overlay up, and for how long.
+    private var popup: PopupSettings
+    /// Separate from `reopenQueue`: a pending automation prompt there must not
+    /// stall the monitor.
+    private let visibilityQueue = DispatchQueue(label: "island.visibility", qos: .utility)
     private var hideTask: Task<Void, Never>?
 
     init(configuration: ResolvedConfiguration) {
         self.configuration = configuration
+        popup = popupStore.load(fallback: configuration.duration)
         super.init()
     }
 
@@ -94,13 +101,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             coordinator: settings,
             theme: content.theme,
             showsHints: content.showsHints,
+            popup: popup,
             onHotkeyChanged: { [weak self] spec, enabled in
                 self?.log("hotkey changed to \(spec.displayString) (enabled: \(enabled))")
                 self?.statusItem?.setHotkey(spec, source: .menu)
                 self?.statusItem?.setHotkeyEnabled(enabled)
             },
             onThemeChanged: { [weak self] theme in self?.setTheme(theme) },
-            onHintsChanged: { [weak self] shows in self?.setShowsHints(shows) }
+            onHintsChanged: { [weak self] shows in self?.setShowsHints(shows) },
+            onPopupChanged: { [weak self] popup in self?.setPopup(popup) }
         )
         self.settingsWindow = settingsWindow
 
@@ -108,7 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotkey: settings.current,
             hotkeySource: configuration.hotkey.source,
             hotkeyEnabled: settings.isEnabled,
-            durationSeconds: configuration.duration.seconds,
+            popup: popup,
             loginItem: LoginItemController(),
             onSummon: { [weak self] in self?.showOverlay(interactive: true) },
             onToggleHotkey: { [weak self] enabled in self?.setHotkeyEnabled(enabled) },
@@ -121,7 +130,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startAgentMonitor()
 
         // Show once at launch so the POC is visible without hunting for the hotkey.
-        showOverlay()
+        if popup.isEnabled { showOverlay() }
     }
 
     /// Watches the local agent session stores and mirrors the unread count into
@@ -131,15 +140,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let inbox = AgentInbox(limit: configuration.taskLimit)
         self.inbox = inbox
         let monitor = AgentMonitor(
-            scanner: .standard(sqlite: ProcessSQLiteQuerying()), inbox: inbox
-        ) { [weak self] in
-            // PLAN § Goal: a finished run pops the overlay with its summary.
-            self?.refreshAgentUI()
-            self?.showOverlay()
-        }
+            scanner: .standard(sqlite: ProcessSQLiteQuerying()),
+            inbox: inbox,
+            inView: { [weak self] tasks in await self?.tasksInView(tasks) ?? [] },
+            onChange: { [weak self] alerted in
+                self?.refreshAgentUI()
+                // PLAN § Goal: a finished run pops the overlay with its summary —
+                // unless the user watched it finish, or switched pop-ups off.
+                if alerted, self?.popup.isEnabled == true { self?.showOverlay() }
+            }
+        )
         self.monitor = monitor
         monitor.start()
         refreshAgentUI()
+        // Walking back to a finished task clears its dot promptly.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.monitor?.poll() }
+        }
+    }
+
+    /// Which of `tasks` the user is looking at: the frontmost app is read here,
+    /// on the main thread; the shelling out happens on `visibilityQueue`.
+    private func tasksInView(_ tasks: [AgentTask]) async -> Set<String> {
+        guard let executor = reopenExecutor else { return [] }
+        let frontmost = NSWorkspace.shared.frontmostApplication.map {
+            RunningApp(pid: $0.processIdentifier, bundleID: $0.bundleIdentifier)
+        }
+        let queue = visibilityQueue
+        return await withCheckedContinuation { continuation in
+            queue.async {
+                continuation.resume(returning: executor.tasksInView(tasks, frontmost: frontmost))
+            }
+        }
     }
 
     /// Pushes the inbox into the three places it shows up: the menu bar badge,
@@ -210,7 +244,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             log("overlay summoned for keyboard use")
         } else {
             panel.orderFrontRegardless()
-            log("overlay shown, hiding in \(configuration.duration.seconds)s")
+            log("overlay shown, hiding in \(ResolvedConfiguration.secondsText(popup.seconds))s")
             scheduleHide()
         }
     }
@@ -221,6 +255,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlayContent?.setTheme(theme)
         log("overlay theme: \(theme.rawValue)")
         showOverlay()
+    }
+
+    /// Settings changed the pop-up: remember it; the next pop-up uses it.
+    private func setPopup(_ popup: PopupSettings) {
+        self.popup = popup
+        popupStore.save(popup)
+        statusItem?.setPopup(popup)
+        log(
+            "pop-up: \(popup.isEnabled ? "on" : "off"), \(ResolvedConfiguration.secondsText(popup.seconds))s"
+        )
     }
 
     /// Settings switched the keyboard-mode footer on or off.
@@ -243,7 +287,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func scheduleHide(after seconds: TimeInterval? = nil) {
-        let seconds = seconds ?? configuration.duration.seconds
+        let seconds = seconds ?? popup.seconds
         hideTask?.cancel()
         hideTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(seconds))

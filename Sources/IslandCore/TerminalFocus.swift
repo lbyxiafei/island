@@ -298,6 +298,43 @@ public struct VSCodeFocusResponse: Equatable, Sendable {
     public var windowPath: String? { workspaceFile ?? folders.first }
 }
 
+/// What one VS Code window last published (`vscode-extension/extension.js`,
+/// `window-<pid>.json`): whether it has focus and which terminal is active.
+public struct VSCodeWindowState: Equatable, Sendable {
+    public static let filePrefix = "window-"
+
+    /// The window's extension host, so a crashed window's file can be ignored.
+    public let pid: Int32
+    public let isFocused: Bool
+    /// The shell of the active terminal, nil when the window has none.
+    public let terminalPID: Int32?
+
+    public init(pid: Int32, isFocused: Bool, terminalPID: Int32?) {
+        self.pid = pid
+        self.isFocused = isFocused
+        self.terminalPID = terminalPID
+    }
+
+    public static func decode(_ data: Data) -> VSCodeWindowState? {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let pid = object["pid"] as? Int
+        else { return nil }
+        return VSCodeWindowState(
+            pid: Int32(pid),
+            isFocused: object["focused"] as? Bool ?? false,
+            terminalPID: (object["terminalPid"] as? Int).map(Int32.init))
+    }
+
+    /// True when a focused window's active terminal runs the process whose
+    /// ancestor chain is `chain`.
+    public static func shows(_ chain: [Int32], in windows: [VSCodeWindowState]) -> Bool {
+        windows.contains { window in
+            guard window.isFocused, let terminal = window.terminalPID else { return false }
+            return chain.contains(terminal)
+        }
+    }
+}
+
 public enum VSCodeExtension {
     public static let id = "binyanli.island"
 

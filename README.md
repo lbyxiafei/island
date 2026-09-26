@@ -13,7 +13,8 @@
 - 菜单栏图标右侧显示**未读任务数**，菜单里也有一份同样的任务列表（点击即跳回）
 - 只统计 island 启动之后完成的 run，不看历史
 - 按 `⌃⌘,` 全局召唤屏幕顶部中央的悬浮窗，**不需要任何系统权限授权**（不弹输入监控 / 辅助功能对话框）；悬浮窗显示期间再按一次即可立即收起（toggle）
-- 自动弹出的悬浮窗 5 秒后消失（时长可配置，hover 暂停）；用快捷键召唤的则一直停留到你关闭
+- 自动弹出的悬浮窗 5 秒后消失（`Settings…` → `Notifications` 里可改秒数，也可以整个关掉弹出；hover 暂停）；用快捷键召唤的则一直停留到你关闭
+- **你正看着的任务不打扰**：任务完成时如果它所在的 tab / 窗口就在最前面（tmux 当前 pane、cmux / Ghostty / Terminal / iTerm2 当前 tab、VS Code 当前终端、桌面 app 在前台），不弹出、不计数，列表里照样有它但没有红点；你自己切回一个未读任务的窗口后，几秒内红点和计数也会自动消掉
 - 「岛」式外观：面板贴着菜单栏下沿垂下，底部大圆角；标题行：自动弹出时是 `● N new`（没有未读是 `All caught up`）+ 快捷键；召唤时整行就是搜索框，右侧是 `N new` 小胶囊；每行是数字键帽 + agent 图标（未读在图标角上带红点）+ 标题 + `目录 • agent` + 右侧短时间（now / 3m / 2h）；选中行是半透明描边胶囊
 - 用快捷键 / 菜单召唤时可以直接打字过滤任务，`↑↓` 选择、`↩` 打开、`⌘1–9` 直达、`⌘,` 打开设置、`esc` 或点别处关闭；任务完成自动弹出时不抢焦点，只能鼠标点
 - `Settings…` 里可以关掉底部的键盘提示（`Show keyboard hints`）；可选主题：System（浅色 Sand / 深色 Lagoon）/ Lagoon / Coral / Sand / Midnight，立即生效
@@ -81,7 +82,7 @@ defaults delete com.commallama.island IslandHotkeyEnabled
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
 | `ISLAND_HOTKEY` | `cmd+ctrl+,` | 召唤快捷键 |
-| `ISLAND_OVERLAY_SECONDS` | `5` | 悬浮窗停留秒数 |
+| `ISLAND_OVERLAY_SECONDS` | `5` | 自动弹出的停留秒数（`Settings…` 里改过则以设置为准） |
 | `ISLAND_TASK_LIMIT` | `10` | 悬浮窗展示的任务条数 |
 
 看一下本机现在检测到哪些已完成 run（不会开窗，纯调试）：
@@ -102,7 +103,7 @@ defaults delete com.commallama.island IslandHotkeyEnabled
 | `Summon overlay (⌃⌘,)` | 手动召唤一次（快捷键之外的备用入口） |
 | `Summon hotkey` | 召唤快捷键的 on / off 开关，勾选状态即真实状态 |
 | `hotkey ⌃⌘, · default` | 当前快捷键及其来源（应用内设置 / 环境变量 / 默认），关掉时显示 `hotkey off` |
-| `Settings…` | 录制快捷键、开关、清空；选择悬浮窗主题 |
+| `Settings…` | 录制快捷键、开关、清空；选择悬浮窗主题；任务完成时是否弹出、停留几秒 |
 | `Launch at login` | 开机自启开关，勾选状态即系统真实状态 |
 | `Quit island` | 退出 |
 

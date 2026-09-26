@@ -7,7 +7,7 @@ import IslandCore
 @MainActor
 final class StatusItemController {
     private let statusItem: NSStatusItem
-    private let durationSeconds: TimeInterval
+    private var popup: PopupSettings
     private let loginItem: LoginItemController
     private let onSummon: () -> Void
     private let onToggleHotkey: (Bool) -> Void
@@ -32,7 +32,7 @@ final class StatusItemController {
         hotkey: HotkeySpec,
         hotkeySource: HotkeySource,
         hotkeyEnabled: Bool,
-        durationSeconds: TimeInterval,
+        popup: PopupSettings,
         loginItem: LoginItemController,
         onSummon: @escaping () -> Void,
         onToggleHotkey: @escaping (Bool) -> Void,
@@ -40,7 +40,7 @@ final class StatusItemController {
         onOpenSettings: @escaping () -> Void,
         onQuit: @escaping () -> Void
     ) {
-        self.durationSeconds = durationSeconds
+        self.popup = popup
         self.loginItem = loginItem
         self.onSummon = onSummon
         self.onToggleHotkey = onToggleHotkey
@@ -67,6 +67,12 @@ final class StatusItemController {
     func setHotkeyEnabled(_ enabled: Bool) {
         hotkeyEnabled = enabled
         installButton()
+        rebuildMenu()
+    }
+
+    /// Called after the pop-up was changed in the settings window.
+    func setPopup(_ popup: PopupSettings) {
+        self.popup = popup
         rebuildMenu()
     }
 
@@ -122,7 +128,10 @@ final class StatusItemController {
             )
         )
         menu.addItem(
-            disabled("hides itself after \(ResolvedConfiguration.secondsText(durationSeconds))s"))
+            disabled(
+                popup.isEnabled
+                    ? "pops up for \(ResolvedConfiguration.secondsText(popup.seconds))s when a run finishes"
+                    : "pop-up off — the count still updates"))
         menu.addItem(.separator())
 
         if !taskEntries.isEmpty {

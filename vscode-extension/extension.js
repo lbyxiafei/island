@@ -4,6 +4,10 @@
 // terminal and answers with its workspace so island can raise the right window.
 // A file handshake instead of a vscode:// URI, because VS Code asks the user to
 // confirm every URI opened from outside.
+//
+// Each window also publishes whether it has focus and which terminal is active
+// (window-<pid>.json), so island can tell that the user is already looking at
+// an agent that just finished and skip the notification.
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -14,6 +18,23 @@ const requestName = "focus-request.json";
 const maxRequestAgeMs = 5000;
 
 let lastHandledID;
+
+// One extension host per window, so its pid names this window's state file.
+const stateFile = path.join(directory, `window-${process.pid}.json`);
+
+async function publishState() {
+  const terminal = vscode.window.activeTerminal;
+  const state = {
+    pid: process.pid,
+    focused: vscode.window.state.focused,
+    terminalPid: terminal ? (await terminal.processId) ?? null : null,
+  };
+  try {
+    fs.writeFileSync(stateFile, JSON.stringify(state));
+  } catch {
+    // island is best effort; a missing file only means "not in view".
+  }
+}
 
 function readRequest() {
   try {
@@ -51,6 +72,12 @@ function activate(context) {
     if (name === requestName) handleRequest();
   });
   context.subscriptions.push({ dispose: () => watcher.close() });
+  context.subscriptions.push(
+    vscode.window.onDidChangeWindowState(publishState),
+    vscode.window.onDidChangeActiveTerminal(publishState),
+    { dispose: () => fs.rmSync(stateFile, { force: true }) },
+  );
+  publishState();
 }
 
 module.exports = { activate };

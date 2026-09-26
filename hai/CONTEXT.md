@@ -54,12 +54,13 @@ defaults delete com.commallama.island IslandHotkeyEnabled   # 回到默认开启
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
 | `ISLAND_HOTKEY` | `cmd+ctrl+,` | 召唤快捷键。见下方语法；被应用内设置覆盖 |
-| `ISLAND_OVERLAY_SECONDS` | `5` | 悬浮窗停留秒数，正数 |
+| `ISLAND_OVERLAY_SECONDS` | `5` | 自动弹出的停留秒数，正数；被应用内设置（`IslandPopupSeconds`）覆盖 |
 | `ISLAND_TASK_LIMIT` | `10` | 悬浮窗展示的任务条数（PLAN § Design 里的 N），正数 |
 
 ```bash
 ./build/Island.app/Contents/MacOS/Island --print-config   # 只解析并打印配置后退出，不开窗
 ./build/Island.app/Contents/MacOS/Island --scan-agents    # 列出本机检测到的所有已完成 agent run（调试用）
+./build/Island.app/Contents/MacOS/Island --in-view <pid> [cwd]   # 此刻该 pid 的 tab 是否在用户眼前（先把宿主 app 切到前台再跑）
 ./build/Island.app/Contents/MacOS/Island --help
 
 # 登录项（开机自启）：必须用 .app 包内的可执行文件调用
@@ -90,7 +91,7 @@ defaults delete com.commallama.island IslandHotkeyEnabled   # 回到默认开启
 - 覆盖率：`./scripts/coverage.sh` 把**单行百分数**写进 `coverage.txt`；`make verify` 的 coverage gate 先刷新它，再与 `coverage-baseline.txt` 比对（当前基线 `100`，即 `IslandCore` 的 65 行全部被覆盖）
 - 覆盖率排除项声明在 **`coverage.config`**（`llvm-cov -ignore-filename-regex`，一行一条正则），理由如下：
   1. `Tests/`、`\.derived/runner\.swift` —— 测试自身与 SwiftPM 自动生成的测试入口（AGENTS 排除类 1：自动生成的代码）
-  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift` / `AgentReopenExecutor.swift` / `TerminalTabFocuser.swift` / `Subprocess.swift` / `VSCodeExtensionInstaller.swift` / `ProcessSQLite.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
+  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift` / `AgentReopenExecutor.swift` / `TerminalTabFocuser.swift` / `TaskVisibilityProbe.swift` / `Subprocess.swift` / `VSCodeExtensionInstaller.swift` / `ProcessSQLite.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
   - 没有类 3（纯数据结构）、类 4（平台分支）的排除项
 - 增量覆盖率：本 repo 没有可用的 Swift delta-coverage 工具（`xcrun llvm-cov` 没有 diff 模式）。改动达到增量门槛时，用 `xcrun llvm-cov show` 人工核对改动行，并在 commit body 说明；`IslandCore` 的基线是 100%，任何新增未覆盖行都会在下次 `make verify` 里暴露
 
@@ -119,6 +120,8 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   AgentInbox.swift             #   增量入库 + 已读/未读 + 排序 + 条数上限（N）
   OverlaySelection.swift       #   悬浮窗查询过滤（TaskFilter）+ 键盘选中行 / ⌘N / ↩ 标注
   OverlayTheme.swift           #   主题预设 → 配色（OverlayPalette）+ UserDefaults 存储 + agent 图标选择
+  TaskVisibility.swift         #   “用户是否正看着这个任务”：TaskVisibility.plan（前台 app / tmux 当前 pane）+ FocusedTab（只读 AppleScript 问当前 tab）
+  PopupSettings.swift          #   完成时的弹出：开关 + 秒数 + UserDefaults 存储（缺省回落到 ISLAND_OVERLAY_SECONDS）
 Sources/Island/                # 可执行 target：NSApplication / NSPanel / Carbon 装配
   main.swift                   #   入口 + --help / --print-config / --scan-agents / --reopen-plan
   AppDelegate.swift            #   启动、注册 hotkey、显示与自动隐藏
@@ -126,6 +129,7 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
   OverlayContent.swift         #   岛式悬浮窗：CapsuleShapeView（平顶圆底）+ 标题行（被动 `● N new` / 键盘模式整行搜索 + `N new` 胶囊）+ 行（键帽/agent 图标/未读点/短时间）+ 键盘处理 + 主题上色
   AgentReopenExecutor.swift    #   执行 reopen 计划：tmux select + switch-client / 找宿主 app / 写剪贴板
   TerminalTabFocuser.swift     #   执行 TerminalTabFocus：AppleScript（cmux/Ghostty/Terminal/iTerm2）、tty 标题探针、VS Code 文件握手
+  TaskVisibilityProbe.swift    #   执行 TaskVisibility：ps / tmux / 只读 AppleScript / VS Code window-<pid>.json，得出“在眼前”的任务 id
   VSCodeExtensionInstaller.swift # 启动时把包内 island-vscode.vsix 装/升级进 VS Code（版本不同才装）
   Subprocess.swift             #   子进程 + osascript 的公共封装
   ProcessSQLite.swift          #   /usr/bin/sqlite3 -json 包装（Codex turn 历史用）
@@ -213,3 +217,6 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - 先跑 `swift test`（不带 `--enable-code-coverage`）会让 `.build` 里的二进制失去插桩，之后直接调 `llvm-cov` 会报 `no coverage data found`。覆盖率只走 `scripts/coverage.sh`
 - `swift test` 会连带构建可执行 target，所以 `Sources/Island` 里的编译错误会以测试失败的形式出现
 - `swift-format` 默认 2 空格缩进，本 repo 在 `.swift-format` 里改成 4 空格；不加 `--configuration` 也能被发现，但换机器/换版本时留意
+- **通知分两种**（issue `notification-n-auto-hide`）：菜单栏未读数永远跟着未读走，不可关；完成时的弹出可在 `Settings…` → `Notifications` 开关、改秒数（`UserDefaults` key `IslandPopupEnabled` / `IslandPopupSeconds`，缺省开 / `ISLAND_OVERLAY_SECONDS` / 5），hover 暂停计时。弹出关掉后，启动时那一次弹出也不再出现；改主题的预览照常弹
+- **用户正看着的任务不通知**：`AgentMonitor` 每轮先 `AgentInbox.pending` 取出新 run，连同现有未读，一起交给 `TaskVisibilityProbe`（`AppDelegate.visibilityQueue`，与 reopen 队列分开）判断；`AgentInbox.update` 把“在眼前”的新 run 直接记为已读（不弹、不计数），并把用户自己切回去的未读项标已读。切换 app（`didActivateApplicationNotification`）会立刻补一轮。判据**宁可漏判不可误判**（误判=用户丢通知）：桌面 app 只能到 app 级（前台即算）；tmux 要求 pane 是其 session 的当前 pane、且有 client 挂在该 session、client 的宿主 app 在前台，再问宿主 tab；Terminal / iTerm2 比 tty；cmux 比 `CMUX_SURFACE_ID`；Ghostty 没有 id，只在“唯一一个 terminal”或“前台 terminal 是唯一一个 working directory == 任务 cwd 的”时才算；VS Code 靠扩展（0.2.0 起）写的 `~/Library/Application Support/island/vscode/window-<扩展宿主pid>.json`（`focused` + 当前终端 shell pid），pid 已死的文件忽略；装了新扩展的 VS Code 窗口要 reload 一次才会开始写
+- 可见性判断**绝不弹授权框**：AppleScript 之前先用 `AEDeterminePermissionToAutomateTarget(askUserIfNeeded: false)` 确认已授权，没授权就当“不在眼前”；也不做 Ghostty 的标题探针（会改用户看得到的标题）

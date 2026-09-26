@@ -72,14 +72,19 @@ public struct TmuxPane: Equatable, Sendable {
     public let pid: Int32
     public let windowTarget: String
     public let paneTarget: String
+    /// The active pane of its session's active window: what a client attached
+    /// to that session shows.
+    public let isCurrent: Bool
 
-    public init(pid: Int32, windowTarget: String, paneTarget: String) {
+    public init(pid: Int32, windowTarget: String, paneTarget: String, isCurrent: Bool = false) {
         self.pid = pid
         self.windowTarget = windowTarget
         self.paneTarget = paneTarget
+        self.isCurrent = isCurrent
     }
 
-    /// Parses `#{pane_pid} #{session_name}:#{window_index}.#{pane_index}`.
+    /// Parses `#{pane_pid} #{session_name}:#{window_index}.#{pane_index}`,
+    /// optionally followed by `#{window_active}#{pane_active}`.
     public static func parse(_ text: String) -> [TmuxPane] {
         text.split(separator: "\n").compactMap { line in
             let fields = line.split(whereSeparator: { $0 == " " || $0 == "\t" })
@@ -87,7 +92,9 @@ public struct TmuxPane: Equatable, Sendable {
             let paneTarget = String(fields[1])
             let windowTarget =
                 paneTarget.lastIndex(of: ".").map { String(paneTarget[..<$0]) } ?? paneTarget
-            return TmuxPane(pid: pid, windowTarget: windowTarget, paneTarget: paneTarget)
+            return TmuxPane(
+                pid: pid, windowTarget: windowTarget, paneTarget: paneTarget,
+                isCurrent: fields.count > 2 && fields[2] == "11")
         }
     }
 }

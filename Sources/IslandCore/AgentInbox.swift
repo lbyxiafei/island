@@ -38,18 +38,29 @@ public final class AgentInbox {
         self.capacity = max(self.limit, capacity)
     }
 
+    /// The runs `ingest` would add: newer than anything seen for their session.
+    public func pending(_ tasks: [AgentTask]) -> [AgentTask] {
+        var latest = known
+        return tasks.filter { task in
+            if let seen = latest[task.sessionKey], seen >= task.completedAt { return false }
+            latest[task.sessionKey] = task.completedAt
+            return true
+        }
+    }
+
     /// Adds newly finished runs; a newer run of a listed session replaces its row
-    /// and makes it unread again. Returns true when something changed, so the
-    /// caller can refresh the UI only when it matters.
+    /// and makes it unread again — unless its id is in `read`, a run the user
+    /// was already looking at when it finished. Returns true when something
+    /// changed, so the caller can refresh the UI only when it matters.
     @discardableResult
-    public func ingest(_ tasks: [AgentTask]) -> Bool {
+    public func ingest(_ tasks: [AgentTask], read: Set<String> = []) -> Bool {
         var added = false
         for task in tasks {
             let key = task.sessionKey
             if let seen = known[key], seen >= task.completedAt { continue }
             known[key] = task.completedAt
             entries.removeAll { $0.task.sessionKey == key }
-            entries.append(Entry(task: task, isRead: false))
+            entries.append(Entry(task: task, isRead: read.contains(task.id)))
             added = true
         }
         if added {
@@ -59,11 +70,34 @@ public final class AgentInbox {
         return added
     }
 
+    /// What one monitor tick did to the inbox.
+    public struct Change: Equatable, Sendable {
+        /// Something to redraw: a row arrived or a dot cleared.
+        public let changed: Bool
+        /// A run arrived that the user was not watching: worth a pop-up.
+        public let alerted: Bool
+    }
+
+    /// One monitor tick: `fresh` runs arrive (read when the user watched them
+    /// finish), and unread rows whose id is in `seen` — the user went back to
+    /// them without going through island — lose their dot.
+    public func update(fresh: [AgentTask], seen: Set<String>) -> Change {
+        let visited = unreadEntries.filter { seen.contains($0.id) }
+        for entry in visited { markRead(id: entry.id) }
+        let pending = pending(fresh)
+        let added = ingest(pending, read: seen)
+        return Change(
+            changed: added || !visited.isEmpty,
+            alerted: pending.contains { !seen.contains($0.id) })
+    }
+
     public var unreadCount: Int {
         entries.lazy.filter { !$0.isRead }.count
     }
 
     public var allEntries: [Entry] { entries }
+
+    public var unreadEntries: [Entry] { entries.filter { !$0.isRead } }
 
     /// What the overlay renders: the newest `limit` entries, unread on top.
     public var visibleEntries: [Entry] { Array(entries.prefix(limit)) }

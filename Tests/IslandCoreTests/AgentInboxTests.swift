@@ -153,6 +153,63 @@ final class AgentInboxTests: XCTestCase {
         XCTAssertTrue(inbox.allEntries.contains { $0.id == task("a", at: 3).id })
     }
 
+    func testRunsTheUserIsAlreadyLookingAtArriveRead() {
+        let inbox = AgentInbox()
+
+        XCTAssertTrue(
+            inbox.ingest([task("a", at: 1), task("b", at: 2)], read: [task("b", at: 2).id]))
+
+        XCTAssertEqual(inbox.unreadCount, 1)
+        XCTAssertEqual(inbox.unreadEntries.map(\.id), [task("a", at: 1).id])
+        XCTAssertEqual(inbox.visibleEntries.map(\.isRead), [false, true])
+    }
+
+    func testARunSeenInPlaceReplacesAnUnreadRowAsRead() {
+        let inbox = AgentInbox()
+        inbox.ingest([task("a", at: 1)])
+
+        inbox.ingest([task("a", at: 2)], read: [task("a", at: 2).id])
+
+        XCTAssertEqual(inbox.unreadCount, 0)
+        XCTAssertEqual(inbox.allEntries.map(\.id), [task("a", at: 2).id])
+    }
+
+    func testPendingListsOnlyTheRunsIngestWouldAdd() {
+        let inbox = AgentInbox()
+        inbox.ingest([task("a", at: 2)])
+
+        let pending = inbox.pending([
+            task("a", at: 1), task("a", at: 2), task("a", at: 3), task("b", at: 1),
+        ])
+
+        XCTAssertEqual(pending.map(\.id), [task("a", at: 3).id, task("b", at: 1).id])
+        XCTAssertEqual(inbox.allEntries.count, 1)
+    }
+
+    func testUpdateAlertsOnlyForRunsTheUserIsNotWatching() {
+        let inbox = AgentInbox()
+
+        let watched = inbox.update(fresh: [task("a", at: 1)], seen: [task("a", at: 1).id])
+        XCTAssertEqual(watched, AgentInbox.Change(changed: true, alerted: false))
+
+        let unseen = inbox.update(fresh: [task("b", at: 2)], seen: [])
+        XCTAssertEqual(unseen, AgentInbox.Change(changed: true, alerted: true))
+        XCTAssertEqual(inbox.unreadCount, 1)
+    }
+
+    func testUpdateMarksReadTheUnreadRunsTheUserWentBackTo() {
+        let inbox = AgentInbox()
+        inbox.ingest([task("a", at: 1), task("b", at: 2)])
+
+        let change = inbox.update(fresh: [], seen: [task("a", at: 1).id])
+
+        XCTAssertEqual(change, AgentInbox.Change(changed: true, alerted: false))
+        XCTAssertEqual(inbox.unreadEntries.map(\.id), [task("b", at: 2).id])
+        XCTAssertEqual(
+            inbox.update(fresh: [], seen: [task("a", at: 1).id]),
+            AgentInbox.Change(changed: false, alerted: false))
+    }
+
     private func task(_ sessionID: String, at seconds: TimeInterval) -> AgentTask {
         AgentTask(
             agent: .pi,

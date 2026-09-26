@@ -2,9 +2,9 @@
 type: chore
 name: notification-n-auto-hide
 title: "[ux] make notification configurable and auto hide notification when user focus on ai agent panel"
-status: new
+status: solved
 created_ts: 2026-09-26T14:02:22-07:00
-updated_ts: 2026-09-26T14:02:22-07:00
+updated_ts: 2026-09-26T15:24:09-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -26,3 +26,18 @@ updated_ts: 2026-09-26T14:02:22-07:00
 - 全程在独立 worktree（`../.worktree/<repo>-<slug>`）中完成，合回 master 前 `make verify` 全过，流程见 AGENTS.md / Workflow / Worktree 与 Ship
 
 # History
+
+## 2026-09-26T15:14:52-07:00: new -> in-progress
+
+Scope-check: PLAN § Design / Island 展示 UX（未读标记、菜单栏数字）与 § Goal（弹出 5 秒可配置）；用户在会话中明确要求实现。开始在 worktree 实现。
+
+## 2026-09-26T15:24:09-07:00: in-progress -> solved
+
+实现了两部分：
+
+1. **正看着的任务不通知**：`TaskVisibility`（IslandCore）+ `TaskVisibilityProbe`（Sources/Island）判断完成时任务所在 tab 是否就在眼前；是则直接记为已读——不弹出、不计数、列表里有但无红点。未读项每轮（3s）以及切换 app 时重查一次，用户自己切回去就自动消红点、菜单栏减一（advanced 要求）。判据宁可漏判：tmux（当前 pane + 挂着的 client + 宿主 tab）、cmux（surface id）、Terminal / iTerm2（tty）、Ghostty（唯一 cwd 匹配）、VS Code（扩展 0.2.0 发布窗口 focused + 当前终端 pid）、桌面 app（前台即算，只能到 app 级）。AppleScript 前先确认已授权，绝不弹授权框。
+2. **弹出可配置**：`Settings…` → `Notifications`：弹出开关 + 停留秒数（默认 5，覆盖 `ISLAND_OVERLAY_SECONDS`），hover 暂停沿用原逻辑；菜单栏计数不受开关影响。
+
+验证：`make verify` 全过（273+ 测试，覆盖率 100%）；`--in-view` 实测 VS Code（模拟 window 文件）、tmux-in-cmux（当前 pane 在眼前 / 无 client 的 session 不在）判断正确；设置窗口实测开关与秒数即时落盘。
+
+未覆盖：Ghostty 本机未运行，只有单测；VS Code 需 reload 一次窗口扩展才会开始发布状态；没有跑一次真实 agent 完成的端到端（会花 API 钱）；桌面 app 只到 app 级粒度（前台看的是别的对话也会算已读）。

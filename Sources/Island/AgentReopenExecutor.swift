@@ -75,7 +75,7 @@ final class AgentReopenExecutor: Sendable {
 
     /// Finds the running agent process for a task that has no pid, matching on
     /// working directory.
-    private func resolveHost(for task: AgentTask) -> AgentHost? {
+    func resolveHost(for task: AgentTask) -> AgentHost? {
         guard case .unknown = task.host else { return nil }
         let names = Set(task.agent.processNames)
         let processList = run(["/bin/ps", "-axo", "pid=,comm="]) ?? ""
@@ -210,11 +210,11 @@ final class AgentReopenExecutor: Sendable {
 
     // MARK: - Process plumbing
 
-    private static let paneFormat = "#{pane_pid}\t#{session_name}:#{window_index}.#{pane_index}"
-    private static let clientFormat =
+    static let paneFormat = "#{pane_pid}\t#{session_name}:#{window_index}.#{pane_index}"
+    static let clientFormat =
         "#{client_pid}\t#{client_tty}\t#{client_session}\t#{client_activity}"
 
-    private func tmuxArguments(_ arguments: [String]) -> [String] {
+    func tmuxArguments(_ arguments: [String]) -> [String] {
         [tmuxPath()] + arguments
     }
 
@@ -222,11 +222,11 @@ final class AgentReopenExecutor: Sendable {
         Self.tmuxCandidates.first { FileManager.default.isExecutableFile(atPath: $0) } ?? "tmux"
     }
 
-    private func run(_ arguments: [String]) -> String? {
+    func run(_ arguments: [String]) -> String? {
         Subprocess.run(arguments)
     }
 
-    private func log(_ message: String) {
+    func log(_ message: String) {
         FileHandle.standardError.write(Data("[island] \(message)\n".utf8))
     }
 }

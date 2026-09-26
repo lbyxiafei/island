@@ -25,12 +25,13 @@ if arguments.contains("--help") || arguments.contains("-h") {
 
         environment:
           ISLAND_HOTKEY=cmd+ctrl+,        hotkey that summons the overlay
-          ISLAND_OVERLAY_SECONDS=5        how long the overlay stays on screen
+          ISLAND_OVERLAY_SECONDS=5        how long the pop-up stays on screen (settings override it)
 
         flags (login-item flags must run from inside the app bundle):
           --print-config                  resolve the environment and exit
           --scan-agents                   list completed agent tasks and exit
           --reopen-plan <pid> [--perform] print how island would reopen a task on that pid (and do it)
+          --in-view <pid> [cwd]           whether a task on that pid is the tab in front of the user
           --login-item-status             report the launch-at-login state
           --login-item-enable             start at login from now on
           --login-item-disable            stop starting at login
@@ -77,47 +78,52 @@ if arguments.contains("--scan-agents") {
     exit(EXIT_SUCCESS)
 }
 
-if let flag = CommandLine.arguments.firstIndex(of: "--reopen-plan"),
-    flag + 1 < CommandLine.arguments.count
-{
-    // One argument: a pid to treat as the agent process. Two: an agent name and
-    // a working directory, which exercises the no-pid host resolution.
-    let executor = AgentReopenExecutor()
-    let first = CommandLine.arguments[flag + 1]
-    let task: AgentTask
+/// The task the debug flags act on. One argument: a pid to treat as the agent
+/// process (optionally followed by its working directory). Two: an agent name
+/// and a working directory, which exercises the no-pid host resolution.
+func debugTask(after flag: Int) -> AgentTask? {
+    let rest = Array(CommandLine.arguments.dropFirst(flag + 1).prefix(2))
+        .filter { !$0.hasPrefix("--") }
+    guard let first = rest.first else { return nil }
+    let cwd = rest.count > 1 && !rest[1].isEmpty ? rest[1] : nil
     if let pid = Int32(first) {
-        task = AgentTask(
-            agent: .claudeCode,
-            sessionID: "debug",
-            title: "debug",
-            cwd: nil,
-            completedAt: Date(),
-            host: .terminal(processID: pid),
-            resumeCommand: "claude --resume debug"
-        )
-    } else if flag + 2 < CommandLine.arguments.count,
-        let agent = AgentKind(rawValue: first),
-        !(CommandLine.arguments[flag + 2].isEmpty)
-    {
-        let cwd = CommandLine.arguments[flag + 2]
-        task = AgentTask(
-            agent: agent,
-            sessionID: "debug",
-            title: "debug",
-            cwd: cwd,
-            completedAt: Date(),
-            host: .unknown,
-            resumeCommand: "\(agent.rawValue) --resume debug"
-        )
-    } else {
+        return AgentTask(
+            agent: .claudeCode, sessionID: "debug", title: "debug", cwd: cwd,
+            completedAt: Date(), host: .terminal(processID: pid),
+            resumeCommand: "claude --resume debug")
+    }
+    guard let agent = AgentKind(rawValue: first), let cwd else { return nil }
+    return AgentTask(
+        agent: agent, sessionID: "debug", title: "debug", cwd: cwd, completedAt: Date(),
+        host: .unknown, resumeCommand: "\(agent.rawValue) --resume debug")
+}
+
+if let flag = CommandLine.arguments.firstIndex(of: "--reopen-plan") {
+    guard let task = debugTask(after: flag) else {
         print("usage: --reopen-plan <pid> | <agent: claude-code|pi|codex> <cwd> [--perform]")
         exit(EXIT_FAILURE)
     }
+    let executor = AgentReopenExecutor()
     let plan = executor.plan(for: task)
     print(plan)
     if CommandLine.arguments.contains("--perform") {
         executor.perform(plan, for: task)
     }
+    exit(EXIT_SUCCESS)
+}
+
+if let flag = CommandLine.arguments.firstIndex(of: "--in-view") {
+    guard let task = debugTask(after: flag) else {
+        print("usage: --in-view <pid> [cwd] | <agent: claude-code|pi|codex> <cwd>")
+        exit(EXIT_FAILURE)
+    }
+    let front = NSWorkspace.shared.frontmostApplication
+    let frontmost = front.map {
+        RunningApp(pid: $0.processIdentifier, bundleID: $0.bundleIdentifier)
+    }
+    let seen = AgentReopenExecutor().tasksInView([task], frontmost: frontmost)
+    print(
+        "frontmost \(front?.bundleIdentifier ?? "-"): \(seen.isEmpty ? "not in view" : "in view")")
     exit(EXIT_SUCCESS)
 }
 

@@ -3,12 +3,13 @@ import IslandCore
 
 /// The settings window behind the menu's `Settings…` item. Scope is deliberately
 /// minimal (PLAN § Scope #3, #5): record the summon hotkey by pressing it,
-/// switch it on or off, or clear it; and pick the overlay theme.
+/// switch it on or off, or clear it; pick the overlay theme; and set the pop-up
+/// shown when a run finishes.
 ///
 /// It is a regular, key-capable window — unlike the overlay — because the user
 /// has to be able to press keys into it.
 @MainActor
-final class HotkeySettingsWindow: NSObject {
+final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
     private let coordinator: HotkeySettingsCoordinator
     private let onHotkeyChanged: (HotkeySpec, Bool) -> Void
     private let onThemeChanged: (OverlayTheme) -> Void
@@ -16,6 +17,11 @@ final class HotkeySettingsWindow: NSObject {
     private let onHintsChanged: (Bool) -> Void
     private let hintsToggle = NSButton(
         checkboxWithTitle: "Show keyboard hints", target: nil, action: nil)
+    private let onPopupChanged: (PopupSettings) -> Void
+    private var popup: PopupSettings
+    private let popupToggle = NSButton(
+        checkboxWithTitle: "Pop up when an agent run finishes", target: nil, action: nil)
+    private let popupSeconds = NSTextField(string: "")
     private let window: SettingsWindow
     private let recorder: HotkeyRecorderView
     private let enabledToggle: NSButton
@@ -25,10 +31,14 @@ final class HotkeySettingsWindow: NSObject {
         coordinator: HotkeySettingsCoordinator,
         theme: OverlayTheme,
         showsHints: Bool,
+        popup: PopupSettings,
         onHotkeyChanged: @escaping (HotkeySpec, Bool) -> Void,
         onThemeChanged: @escaping (OverlayTheme) -> Void,
-        onHintsChanged: @escaping (Bool) -> Void
+        onHintsChanged: @escaping (Bool) -> Void,
+        onPopupChanged: @escaping (PopupSettings) -> Void
     ) {
+        self.popup = popup
+        self.onPopupChanged = onPopupChanged
         self.onHintsChanged = onHintsChanged
         self.coordinator = coordinator
         self.onHotkeyChanged = onHotkeyChanged
@@ -37,7 +47,7 @@ final class HotkeySettingsWindow: NSObject {
         enabledToggle = NSButton(checkboxWithTitle: "Enabled", target: nil, action: nil)
         feedback = NSTextField(labelWithString: "")
         window = SettingsWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 330),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 450),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -66,6 +76,10 @@ final class HotkeySettingsWindow: NSObject {
         hintsToggle.state = showsHints ? .on : .off
         hintsToggle.target = self
         hintsToggle.action = #selector(hintsToggled)
+        popupToggle.target = self
+        popupToggle.action = #selector(popupToggled)
+        popupSeconds.delegate = self
+        refreshPopup()
         refreshFromCoordinator()
     }
 
@@ -108,11 +122,27 @@ final class HotkeySettingsWindow: NSObject {
             color: .secondaryLabelColor
         )
 
+        let popupTitle = label("Notifications", font: .systemFont(ofSize: 13, weight: .semibold))
+        popupSeconds.alignment = .right
+        popupSeconds.widthAnchor.constraint(equalToConstant: 56).isActive = true
+        let secondsRow = NSStackView(views: [
+            label("Stay on screen for", font: .systemFont(ofSize: 13)), popupSeconds,
+            label("seconds", font: .systemFont(ofSize: 13)),
+        ])
+        secondsRow.orientation = .horizontal
+        secondsRow.spacing = 6
+        let popupHelp = label(
+            "Hovering the pop-up keeps it open. The menu bar counts unread runs either way;\nruns you watched finish are listed without a dot or a pop-up.",
+            font: .systemFont(ofSize: 11),
+            color: .secondaryLabelColor
+        )
+
         let stack = NSStackView(views: [
             title, recorder, help, enabledToggle, feedback, buttons, themeTitle, themePicker,
-            themeHelp, hintsToggle,
+            themeHelp, hintsToggle, popupTitle, popupToggle, secondsRow, popupHelp,
         ])
         stack.setCustomSpacing(20, after: buttons)
+        stack.setCustomSpacing(20, after: hintsToggle)
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
@@ -152,7 +182,34 @@ final class HotkeySettingsWindow: NSObject {
         }
     }
 
+    private func refreshPopup() {
+        popupToggle.state = popup.isEnabled ? .on : .off
+        popupSeconds.stringValue = ResolvedConfiguration.secondsText(popup.seconds)
+        popupSeconds.isEnabled = popup.isEnabled
+    }
+
     // MARK: - Actions
+
+    @objc private func popupToggled() {
+        popup.isEnabled = popupToggle.state == .on
+        refreshPopup()
+        onPopupChanged(popup)
+    }
+
+    /// Saves every usable value as it is typed: Return belongs to `Apply`, so
+    /// the field cannot wait for it.
+    func controlTextDidChange(_ notification: Notification) {
+        guard let seconds = PopupSettings.seconds(from: popupSeconds.stringValue),
+            seconds != popup.seconds
+        else { return }
+        popup.seconds = seconds
+        onPopupChanged(popup)
+    }
+
+    /// Leaving the field with an unusable value snaps it back.
+    func controlTextDidEndEditing(_ notification: Notification) {
+        refreshPopup()
+    }
 
     private func recorderDidRecord(_ spec: HotkeySpec) {
         feedback.textColor = .secondaryLabelColor

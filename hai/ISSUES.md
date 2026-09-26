@@ -4,10 +4,10 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
-| chore | [notification-n-auto-hide](./issue/2026-09-26-14-02-22-notification-n-auto-hide.md) | [ux] make notification configurable and auto hide notification when user focus on ai agent panel | new | 2026-09-26T14:02:22-07:00 | 2026-09-26T14:02:22-07:00 |
 | feat | [move-to-applications-prompt](./issue/2026-09-26-14-01-51-move-to-applications-prompt.md) | 从 dmg 里或被系统迁移（App Translocation）运行时提示移到「应用程序」 | new | 2026-09-26T14:01:51-07:00 | 2026-09-26T14:01:51-07:00 |
 | feat | [island-notification](./issue/2026-09-25-15-13-05-island-notification.md) | [ux] refine island app notification w/ setting config | new | 2026-09-25T15:13:05-07:00 | 2026-09-25T15:13:05-07:00 |
 | chore | [brew-distribution](./issue/2026-09-13-14-20-51-brew-distribution.md) | 调研 brew install 分发路径（等本地 MVP 走通后再做） | new | 2026-09-13T14:20:51-07:00 | 2026-09-24T15:47:33-07:00 |
+| chore | [notification-n-auto-hide](./issue/2026-09-26-14-02-22-notification-n-auto-hide.md) | [ux] make notification configurable and auto hide notification when user focus on ai agent panel | solved | 2026-09-26T14:02:22-07:00 | 2026-09-26T15:24:09-07:00 |
 | feat | [signed-notarized-release](./issue/2026-09-26-13-52-05-signed-notarized-release.md) | Developer ID 签名 + 公证 + dmg；bundle id 换成 com.commallama.island | solved | 2026-09-26T13:52:05-07:00 | 2026-09-26T14:01:52-07:00 |
 | bug | [reopen-stranger-hardening](./issue/2026-09-25-16-24-20-reopen-stranger-hardening.md) | 点击跳转对陌生环境的加固：VS Code 受限模式/远程、主线程阻塞、自动化授权被拒无提示 | solved | 2026-09-25T16:24:20-07:00 | 2026-09-25T16:27:26-07:00 |
 | feat | [reopen-precise-terminal-tab](./issue/2026-09-25-15-43-43-reopen-precise-terminal-tab.md) | 点击任务精确跳到 tmux session / cmux tab / VS Code 终端 tab | solved | 2026-09-25T15:43:43-07:00 | 2026-09-25T16:07:45-07:00 |
