@@ -5,7 +5,6 @@
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
 | feat | [move-to-applications-prompt](./issue/2026-09-26-14-01-51-move-to-applications-prompt.md) | 从 dmg 里或被系统迁移（App Translocation）运行时提示移到「应用程序」 | new | 2026-09-26T14:01:51-07:00 | 2026-09-26T14:01:51-07:00 |
-| feat | [island-notification](./issue/2026-09-25-15-13-05-island-notification.md) | [ux] refine island app notification w/ setting config | new | 2026-09-25T15:13:05-07:00 | 2026-09-25T15:13:05-07:00 |
 | chore | [brew-distribution](./issue/2026-09-13-14-20-51-brew-distribution.md) | brew install 分发：公开 homebrew-tap + 公证 dmg | solved | 2026-09-13T14:20:51-07:00 | 2026-09-26T15:46:57-07:00 |
 | chore | [notification-n-auto-hide](./issue/2026-09-26-14-02-22-notification-n-auto-hide.md) | [ux] make notification configurable and auto hide notification when user focus on ai agent panel | solved | 2026-09-26T14:02:22-07:00 | 2026-09-26T15:24:09-07:00 |
 | feat | [signed-notarized-release](./issue/2026-09-26-13-52-05-signed-notarized-release.md) | Developer ID 签名 + 公证 + dmg；bundle id 换成 com.commallama.island | solved | 2026-09-26T13:52:05-07:00 | 2026-09-26T14:01:52-07:00 |
@@ -32,3 +31,4 @@
 | feat | [launch-at-login](./issue/2026-09-13-14-08-40-launch-at-login.md) | island 不会开机自启，重启后需要手动拉起 | solved | 2026-09-13T14:08:40-07:00 | 2026-09-13T14:12:27-07:00 |
 | feat | [menubar-status-item](./issue/2026-09-13-14-00-51-menubar-status-item.md) | 无法感知 island 是否在运行，也没有退出入口 | solved | 2026-09-13T14:00:51-07:00 | 2026-09-13T14:12:26-07:00 |
 | feat | [poc-hotkey-overlay](./issue/2026-09-13-13-34-39-poc-hotkey-overlay.md) | POC: global hotkey 调出的悬浮窗 | solved | 2026-09-13T13:34:39-07:00 | 2026-09-13T13:49:41-07:00 |
+| feat | [island-notification](./issue/2026-09-25-15-13-05-island-notification.md) | [ux] refine island app notification w/ setting config | closed | 2026-09-25T15:13:05-07:00 | 2026-09-25T15:13:05-07:00 |

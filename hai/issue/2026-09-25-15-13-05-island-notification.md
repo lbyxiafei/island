@@ -2,7 +2,7 @@
 type: feat
 name: island-notification
 title: "[ux] refine island app notification w/ setting config"
-status: new
+status: closed
 created_ts: 2026-09-25T15:13:05-07:00
 updated_ts: 2026-09-25T15:13:05-07:00
 ---
