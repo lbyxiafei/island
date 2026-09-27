@@ -339,15 +339,19 @@ final class OverlayContentView: NSView, NSTextFieldDelegate {
     /// ⌘1…⌘9 open the row with that keycap; ⌘, opens settings.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if isKeyboardMode, modifiers == .command, event.charactersIgnoringModifiers == "," {
-            onOpenSettings?()
-            return true
-        }
-        guard isKeyboardMode, modifiers == .command,
-            let digit = event.charactersIgnoringModifiers.flatMap(Int.init),
-            let entry = selection.entry(forShortcut: digit)
+        guard isKeyboardMode,
+            let shortcut = OverlayShortcut.parse(
+                key: event.charactersIgnoringModifiers, isCommandOnly: modifiers == .command)
         else { return super.performKeyEquivalent(with: event) }
-        onSelect?(entry)
+        switch shortcut {
+        case .openSettings:
+            onOpenSettings?()
+        case .openRow(let digit):
+            guard let entry = selection.entry(forShortcut: digit) else {
+                return super.performKeyEquivalent(with: event)
+            }
+            onSelect?(entry)
+        }
         return true
     }
 

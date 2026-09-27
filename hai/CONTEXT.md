@@ -123,6 +123,7 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   SessionPresence.swift        #   session 是否还开着：ProcessInspecting（注入的进程探测）+ SessionPresence（按 agent 的 live 集合，缺席即“无法判断”）+ AgentActivityScanner.presence
   AgentInbox.swift             #   增量入库 + 已读/未读 + 排序 + 条数上限（N）
   OverlaySelection.swift       #   悬浮窗查询过滤（TaskFilter）+ 键盘选中行 / ⌘N / ↩ 标注
+  OverlayShortcut.swift        #   悬浮窗键盘模式的 ⌘, / ⌘1–9 判定（全角→半角归一，兼容 CJK 输入源）
   OverlayTheme.swift           #   主题预设 → 配色（OverlayPalette）+ UserDefaults 存储 + agent 图标选择
   TaskVisibility.swift         #   “用户是否正看着这个任务”：TaskVisibility.plan（前台 app / tmux 当前 pane）+ FocusedTab（只读 AppleScript 问当前 tab）
   PopupSettings.swift          #   完成时的弹出：开关 + 秒数 + UserDefaults 存储（缺省回落到 ISLAND_OVERLAY_SECONDS）
@@ -189,6 +190,7 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - Carbon 的 keycode 是 **US 布局**的物理键位；真正的产品阶段要考虑非 US 布局下的键位映射（POC 不管）
 - 悬浮窗靠 `NSPanel` + `.nonactivatingPanel` + `level = .statusBar` + `canJoinAllSpaces` 浮在最上层。**是否拿键盘由 `OverlayPanel.acceptsKeyboard` 决定**（`canBecomeKey` 读它）：热键 / 菜单 `Summon overlay` 召唤时为 true，面板 `makeKey` 但因为 non-activating 不会激活 island，底下的 app 仍是前台；任务完成自动弹出时为 false，绝不抢焦点。改这里务必保住"自动弹出不抢焦点"
 - 按键 toggle 的依据是 `panel.isVisible`（由 `OverlayToggle.hotkeyPress` 决策）：显示中则 `orderOut` 并取消 `hideTask`，否则走 `showOverlay` 重新计时。自动隐藏后 `isVisible` 变回 false，所以下一次按键又是"显示"
+- **悬浮窗里匹配 ⌘ 快捷键不要直接比 `charactersIgnoringModifiers`**：简体拼音等 CJK 输入源下 ⌘, 报的是全角 `"，"`（`characters` 反而是 `","`），直接 `== ","` 会静默失效。统一走 `OverlayShortcut.parse`，它先做全角→半角归一
 - 进程是 accessory（`LSUIElement=true` 且 `setActivationPolicy(.accessory)`）：**没有 Dock 图标**，唯一的界面是菜单栏 status item。退出走菜单的 `Quit island`，前台运行也可以 Ctrl-C，或者 `pkill -x Island`
 - 菜单栏 status item 是 2026-09-13 才加的。在那之前 app 完全不可见，导致"按快捷键没反应"时无法判断是没进程还是功能坏了（见 issue `menubar-status-item`）
 - 开机自启用 `SMAppService.mainApp`（不是 LaunchAgent plist）。已实测 **ad-hoc 签名 + 非 `/Applications` 路径下可用**，但：
