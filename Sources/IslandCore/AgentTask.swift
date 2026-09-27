@@ -1,30 +1,12 @@
 import Foundation
 
-/// The AI agents island knows how to watch.
+/// The AI agents island knows how to watch. Everything that differs between
+/// them is in `AgentProfile`.
 public enum AgentKind: String, Sendable, CaseIterable {
     case claudeCode = "claude-code"
     case claudeDesktop = "claude-desktop"
     case pi
     case codex
-
-    public var displayName: String {
-        switch self {
-        case .claudeCode: return "Claude Code"
-        case .claudeDesktop: return "Claude"
-        case .pi: return "pi"
-        case .codex: return "Codex"
-        }
-    }
-
-    /// Executable names to look for in `ps` when a task has no recorded host.
-    public var processNames: [String] {
-        switch self {
-        case .claudeCode: return ["claude"]
-        case .claudeDesktop: return ["Claude"]
-        case .pi: return ["pi"]
-        case .codex: return ["codex"]
-        }
-    }
 }
 
 /// Where a task runs, so island can decide how to bring it back to the front.
@@ -51,6 +33,9 @@ public struct AgentTask: Equatable, Sendable {
     /// A URL that opens this exact task in its app (Claude Desktop's
     /// `claude://` links), tried before merely activating the app.
     public let deepLink: String?
+    /// The `AgentScenario.id` this run belongs to; what Settings → Agents
+    /// switches on and off.
+    public let scenario: String
 
     public init(
         agent: AgentKind,
@@ -60,7 +45,8 @@ public struct AgentTask: Equatable, Sendable {
         completedAt: Date,
         host: AgentHost,
         resumeCommand: String?,
-        deepLink: String? = nil
+        deepLink: String? = nil,
+        scenario: String? = nil
     ) {
         self.agent = agent
         self.sessionID = sessionID
@@ -70,6 +56,7 @@ public struct AgentTask: Equatable, Sendable {
         self.host = host
         self.resumeCommand = resumeCommand
         self.deepLink = deepLink
+        self.scenario = scenario ?? agent.profile.primaryScenario.id
     }
 
     /// Identity of one *run*, not of the session: the same Claude Code session
@@ -92,7 +79,8 @@ public struct AgentTask: Equatable, Sendable {
             completedAt: completedAt,
             host: host,
             resumeCommand: resumeCommand,
-            deepLink: deepLink
+            deepLink: deepLink,
+            scenario: scenario
         )
     }
 

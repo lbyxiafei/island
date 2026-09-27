@@ -1,10 +1,11 @@
 import AppKit
 import IslandCore
 
-/// The settings window behind the menu's `Settings…` item. Scope is deliberately
-/// minimal (PLAN § Scope #3, #5): record the summon hotkey by pressing it,
-/// switch it on or off, or clear it; pick the overlay theme; and set the pop-up
-/// shown when a run finishes.
+/// The settings window behind the menu's `Settings…` item, one tab per topic:
+/// General (record the summon hotkey by pressing it, switch it on or off, or
+/// clear it — PLAN § Scope #3, #5), Appearance (overlay theme, keyboard
+/// hints), Notifications (the pop-up shown when a run finishes) and Agents
+/// (which agent scenarios island watches, see `AgentSettingsView`).
 ///
 /// It is a regular, key-capable window — unlike the overlay — because the user
 /// has to be able to press keys into it.
@@ -22,6 +23,7 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
     private let popupToggle = NSButton(
         checkboxWithTitle: "Pop up when an agent run finishes", target: nil, action: nil)
     private let popupSeconds = NSTextField(string: "")
+    private let agentsView: AgentSettingsView
     private let window: SettingsWindow
     private let recorder: HotkeyRecorderView
     private let enabledToggle: NSButton
@@ -32,10 +34,12 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         theme: OverlayTheme,
         showsHints: Bool,
         popup: PopupSettings,
+        scenarios: AgentScenarioSettings,
         onHotkeyChanged: @escaping (HotkeySpec, Bool) -> Void,
         onThemeChanged: @escaping (OverlayTheme) -> Void,
         onHintsChanged: @escaping (Bool) -> Void,
-        onPopupChanged: @escaping (PopupSettings) -> Void
+        onPopupChanged: @escaping (PopupSettings) -> Void,
+        onScenariosChanged: @escaping (AgentScenarioSettings) -> Void
     ) {
         self.popup = popup
         self.onPopupChanged = onPopupChanged
@@ -46,8 +50,9 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         recorder = HotkeyRecorderView()
         enabledToggle = NSButton(checkboxWithTitle: "Enabled", target: nil, action: nil)
         feedback = NSTextField(labelWithString: "")
+        agentsView = AgentSettingsView(settings: scenarios, onChange: onScenariosChanged)
         window = SettingsWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 450),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 500),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -95,6 +100,48 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
     // MARK: - Layout
 
     private func makeContentView() -> NSView {
+        let tabs = NSTabView()
+        tabs.translatesAutoresizingMaskIntoConstraints = false
+        for (title, view) in [
+            ("General", pane(generalSection())),
+            ("Appearance", pane(appearanceSection())),
+            ("Notifications", pane(notificationSection())),
+            ("Agents", agentsView as NSView),
+        ] {
+            let item = NSTabViewItem(identifier: title)
+            item.label = title
+            item.view = view
+            tabs.addTabViewItem(item)
+        }
+
+        let content = NSView()
+        content.addSubview(tabs)
+        NSLayoutConstraint.activate([
+            tabs.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
+            tabs.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
+            tabs.topAnchor.constraint(equalTo: content.topAnchor, constant: 12),
+            tabs.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -12),
+        ])
+        return content
+    }
+
+    /// A tab's contents, pinned to its top edge.
+    private func pane(_ stack: NSStackView) -> NSView {
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        let view = NSView()
+        view.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
+        ])
+        return view
+    }
+
+    private func generalSection() -> NSStackView {
         let title = label("Summon hotkey", font: .systemFont(ofSize: 13, weight: .semibold))
         recorder.translatesAutoresizingMaskIntoConstraints = false
 
@@ -115,14 +162,28 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         buttons.orientation = .horizontal
         buttons.spacing = 8
 
+        let stack = NSStackView(views: [title, recorder, help, enabledToggle, feedback, buttons])
+        NSLayoutConstraint.activate([
+            recorder.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            recorder.heightAnchor.constraint(equalToConstant: 44),
+        ])
+        return stack
+    }
+
+    private func appearanceSection() -> NSStackView {
         let themeTitle = label("Overlay theme", font: .systemFont(ofSize: 13, weight: .semibold))
         let themeHelp = label(
             "Applies immediately; the overlay shows a preview.",
             font: .systemFont(ofSize: 11),
             color: .secondaryLabelColor
         )
+        let stack = NSStackView(views: [themeTitle, themePicker, themeHelp, hintsToggle])
+        stack.setCustomSpacing(20, after: themeHelp)
+        return stack
+    }
 
-        let popupTitle = label("Notifications", font: .systemFont(ofSize: 13, weight: .semibold))
+    private func notificationSection() -> NSStackView {
+        let popupTitle = label("Pop-up", font: .systemFont(ofSize: 13, weight: .semibold))
         popupSeconds.alignment = .right
         popupSeconds.widthAnchor.constraint(equalToConstant: 56).isActive = true
         let secondsRow = NSStackView(views: [
@@ -136,28 +197,7 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
             font: .systemFont(ofSize: 11),
             color: .secondaryLabelColor
         )
-
-        let stack = NSStackView(views: [
-            title, recorder, help, enabledToggle, feedback, buttons, themeTitle, themePicker,
-            themeHelp, hintsToggle, popupTitle, popupToggle, secondsRow, popupHelp,
-        ])
-        stack.setCustomSpacing(20, after: buttons)
-        stack.setCustomSpacing(20, after: hintsToggle)
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 8
-        stack.translatesAutoresizingMaskIntoConstraints = false
-
-        let content = NSView()
-        content.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
-            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
-            stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 20),
-            recorder.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            recorder.heightAnchor.constraint(equalToConstant: 44),
-        ])
-        return content
+        return NSStackView(views: [popupTitle, popupToggle, secondsRow, popupHelp])
     }
 
     private func label(_ text: String, font: NSFont, color: NSColor = .labelColor) -> NSTextField {

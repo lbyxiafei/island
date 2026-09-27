@@ -4,7 +4,7 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
-| feat | [make-agent-optional](./issue/2026-09-27-13-46-09-make-agent-optional.md) | [ux] support agents in optional way | new | 2026-09-27T13:46:09-07:00 | 2026-09-27T13:46:09-07:00 |
+| feat | [make-agent-optional](./issue/2026-09-27-13-46-09-make-agent-optional.md) | [ux] support agents in optional way | solved | 2026-09-27T13:46:09-07:00 | 2026-09-27T14:16:55-07:00 |
 | feat | [move-to-applications-prompt](./issue/2026-09-26-14-01-51-move-to-applications-prompt.md) | 从 dmg 里或被系统迁移（App Translocation）运行时提示移到「应用程序」 | solved | 2026-09-26T14:01:51-07:00 | 2026-09-26T15:58:09-07:00 |
 | chore | [brew-distribution](./issue/2026-09-13-14-20-51-brew-distribution.md) | brew install 分发：公开 homebrew-tap + 公证 dmg | solved | 2026-09-13T14:20:51-07:00 | 2026-09-26T15:46:57-07:00 |
 | chore | [notification-n-auto-hide](./issue/2026-09-26-14-02-22-notification-n-auto-hide.md) | [ux] make notification configurable and auto hide notification when user focus on ai agent panel | solved | 2026-09-26T14:02:22-07:00 | 2026-09-26T15:24:09-07:00 |

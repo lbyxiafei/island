@@ -166,19 +166,10 @@ public enum OverlayStatus {
 /// SF Symbol.
 public enum AgentIcon {
     public static func bundleIDs(for agent: AgentKind) -> [String] {
-        switch agent {
-        case .claudeCode, .claudeDesktop: return ["com.anthropic.claudefordesktop"]
-        case .codex: return ["com.openai.codex"]
-        case .pi: return []
-        }
+        agent.profile.appBundleIDs
     }
 
     public static func symbolName(for agent: AgentKind) -> String {
-        switch agent {
-        case .claudeCode: return "sparkle"
-        case .claudeDesktop: return "bubble.left"
-        case .codex: return "chevron.left.forwardslash.chevron.right"
-        case .pi: return "terminal"
-        }
+        agent.profile.symbolName
     }
 }

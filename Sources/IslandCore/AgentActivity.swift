@@ -1,10 +1,13 @@
 import Foundation
 
 /// One agent's on-disk session store, reduced to the one question island asks:
-/// "which runs have finished?"
+/// "which runs have finished?" — the detection half of an agent integration;
+/// the declarative half is its `AgentProfile`.
 ///
 /// Implementations must be total: a missing directory, a half-written file or a
-/// malformed line yields fewer tasks, never a crash.
+/// malformed line yields fewer tasks, never a crash. Each task is tagged with
+/// one of `agent.profile.scenarios`, so the user can switch that kind of run
+/// off without the source knowing about settings.
 public protocol AgentActivitySource: Sendable {
     var agent: AgentKind { get }
     func completedTasks() -> [AgentTask]
@@ -32,8 +35,17 @@ public struct AgentActivityScanner: Sendable {
         ])
     }
 
-    public func completedTasks() -> [AgentTask] {
-        sources.flatMap { $0.completedTasks() }
+    /// Runs of switched-off scenarios are dropped, and an agent with every
+    /// scenario off is not read at all.
+    public func completedTasks(
+        settings: AgentScenarioSettings = AgentScenarioSettings()
+    ) -> [AgentTask] {
+        let agents = settings.enabledAgents
+        return
+            sources
+            .filter { agents.contains($0.agent) }
+            .flatMap { $0.completedTasks() }
+            .filter(settings.allows)
             .sorted { $0.completedAt > $1.completedAt }
     }
 }
@@ -107,8 +119,22 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
             cwd: state.cwd,
             completedAt: completedAt,
             host: state.pid.map(AgentHost.terminal) ?? .unknown,
-            resumeCommand: "claude --resume \(sessionID)"
+            resumeCommand: "claude --resume \(sessionID)",
+            scenario: scenario(entrypoint: state.entrypoint).id
         )
+    }
+
+    /// The session file's `entrypoint` says who started the process. Only
+    /// `cli` has been seen on this machine; the others follow Claude Code's
+    /// `CLAUDE_CODE_ENTRYPOINT` naming, and anything unknown lands in headless.
+    /// Files written before the field existed are terminal sessions.
+    static func scenario(entrypoint: String?) -> AgentScenario {
+        guard let entrypoint, entrypoint != "cli" else { return .claudeCodeTerminal }
+        if entrypoint.contains("desktop") { return .claudeCodeDesktop }
+        if entrypoint.contains("vscode") || entrypoint.contains("jetbrains") {
+            return .claudeCodeEditor
+        }
+        return .claudeCodeHeadless
     }
 
     struct ClaudeSessionState: Decodable {
@@ -119,6 +145,7 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
         let status: String?
         let updatedAt: Double?
         var nameSource: String? = nil
+        var entrypoint: String? = nil
     }
 
     /// What island needs from a transcript: the titles, what the user last

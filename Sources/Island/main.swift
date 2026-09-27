@@ -64,14 +64,17 @@ if arguments.contains("--login-item-enable") || arguments.contains("--login-item
 }
 
 if arguments.contains("--scan-agents") {
+    // Deliberately unfiltered: lists switched-off scenarios too, marked `off`.
     let tasks = AgentActivityScanner.standard(sqlite: ProcessSQLiteQuerying()).completedTasks()
+    let scenarios = UserDefaultsAgentScenarioStore().load()
     if tasks.isEmpty {
         print("no completed agent tasks found")
     } else {
         let formatter = ISO8601DateFormatter()
         for task in tasks {
+            let scenario = scenarios.allows(task) ? task.scenario : "\(task.scenario) (off)"
             print(
-                "\(formatter.string(from: task.completedAt))  \(task.agent.rawValue)  \(task.title)  [\(task.cwd ?? "-")]  \(task.host)  \(task.resumeCommand ?? "-")"
+                "\(formatter.string(from: task.completedAt))  \(scenario)  \(task.title)  [\(task.cwd ?? "-")]  \(task.host)  \(task.resumeCommand ?? "-")"
             )
         }
     }

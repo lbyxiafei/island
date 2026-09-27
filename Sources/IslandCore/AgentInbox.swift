@@ -110,6 +110,15 @@ public final class AgentInbox {
         sort()
     }
 
+    /// Drops the rows matching `shouldRemove` (a scenario was switched off).
+    /// Their runs stay known, so switching back on does not resurrect them.
+    @discardableResult
+    public func removeAll(where shouldRemove: (AgentTask) -> Bool) -> Bool {
+        let before = entries.count
+        entries.removeAll { shouldRemove($0.task) }
+        return entries.count != before
+    }
+
     private func sort() {
         entries.sort { lhs, rhs in
             if lhs.isRead != rhs.isRead { return !lhs.isRead }

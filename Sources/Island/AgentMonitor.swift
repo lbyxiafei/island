@@ -15,6 +15,8 @@ final class AgentMonitor {
     private let inbox: AgentInbox
     private let interval: TimeInterval
     private let startedAt: Date
+    /// Which scenarios to watch; Settings → Agents changes it live.
+    var scenarios: AgentScenarioSettings
     private let inView: InViewCheck
     private let onChange: (_ alerted: Bool) -> Void
     private var timer: Timer?
@@ -28,6 +30,7 @@ final class AgentMonitor {
         inbox: AgentInbox,
         interval: TimeInterval = 3,
         startedAt: Date = Date(),
+        scenarios: AgentScenarioSettings,
         inView: @escaping InViewCheck,
         onChange: @escaping (_ alerted: Bool) -> Void
     ) {
@@ -35,6 +38,7 @@ final class AgentMonitor {
         self.inbox = inbox
         self.interval = interval
         self.startedAt = startedAt
+        self.scenarios = scenarios
         self.inView = inView
         self.onChange = onChange
     }
@@ -59,7 +63,8 @@ final class AgentMonitor {
         guard !isChecking else { return }
         // PLAN: historical runs do not matter, only what finished after island
         // came up.
-        let fresh = inbox.pending(scanner.completedTasks().filter { $0.completedAt >= startedAt })
+        let fresh = inbox.pending(
+            scanner.completedTasks(settings: scenarios).filter { $0.completedAt >= startedAt })
         let unread = inbox.unreadEntries.map(\.task)
         guard !fresh.isEmpty || !unread.isEmpty else { return }
         isChecking = true

@@ -61,6 +61,7 @@ public struct CodexTurnActivitySource: AgentActivitySource {
                threads.name as name,
                threads.title as title,
                threads.cwd as cwd,
+               threads.source as source,
                max(history.thread_turns.completed_at) as completed_at,
                (select json_extract(items.item_json, '$.content[0].text')
                 from history.thread_items as items
@@ -101,8 +102,19 @@ public struct CodexTurnActivitySource: AgentActivitySource {
                 completedAt: Date(timeIntervalSince1970: seconds),
                 host: .desktop(bundleID: "com.openai.codex"),
                 resumeCommand: "codex resume \(id)",
-                deepLink: "codex://threads/\(id)"
+                deepLink: "codex://threads/\(id)",
+                scenario: scenario(source: row["source"] as? String).id
             )
+        }
+    }
+
+    /// `threads.source`: `cli` for the TUI, `exec` for headless runs, `vscode`
+    /// for both the desktop app and the IDE extension (they share it).
+    static func scenario(source: String?) -> AgentScenario {
+        switch source {
+        case "cli": return .codexCLI
+        case "exec": return .codexExec
+        default: return .codexApp
         }
     }
 }
@@ -148,7 +160,9 @@ public struct CodexIndexActivitySource: AgentActivitySource {
                 completedAt: updatedAt,
                 host: .desktop(bundleID: "com.openai.codex"),
                 resumeCommand: "codex resume \(id)",
-                deepLink: "codex://threads/\(id)"
+                deepLink: "codex://threads/\(id)",
+                // The index does not say where a thread ran.
+                scenario: AgentScenario.codexApp.id
             )
         }
     }

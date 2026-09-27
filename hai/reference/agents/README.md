@@ -10,8 +10,13 @@
 ## 0. 通用中间层（提议）
 
 ```
-AgentActivitySource (protocol)          # 每种 agent 一个实现，只负责「读出已完成任务」
+AgentProfile (per AgentKind)            # 声明式：名称 / ps 进程名 / 图标 / scenarios（2026-09-27 起）
+  └─ scenarios: [AgentScenario]         # 例：claude-code.terminal / .editor / .desktop / .headless，codex.app / .cli / .exec
+
+AgentActivitySource (protocol)          # 每种 agent 一个实现，只负责「读出已完成任务」并给每个 task 打 scenario
   └─ completedTasks() -> [AgentTask]
+
+AgentScenarioSettings                   # 用户在 Settings → Agents 关掉的场景；scanner 据此过滤
 
 AgentTask                               # 统一模型，UI 只认这个
   id            String                  # 全局唯一（agent + 原生 session id）
@@ -21,6 +26,7 @@ AgentTask                               # 统一模型，UI 只认这个
   completedAt   Date                    # 该次 turn 完成时间
   host          AgentHost               # .terminal(processID) / .desktop / .unknown
   resumeCommand String?                 # 兜底：贴到 clipboard 就能回到任务
+  scenario      String                  # AgentScenario.id，Settings → Agents 的开关粒度
 ```
 
 `AgentInbox` 负责「增量 + 已读/未读 + 排序 + 上限 N」这套纯逻辑（见 §5）。

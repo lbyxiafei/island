@@ -92,7 +92,7 @@ defaults delete com.commallama.island IslandHotkeyEnabled   # 回到默认开启
 - 覆盖率：`./scripts/coverage.sh` 把**单行百分数**写进 `coverage.txt`；`make verify` 的 coverage gate 先刷新它，再与 `coverage-baseline.txt` 比对（当前基线 `100`，即 `IslandCore` 的 65 行全部被覆盖）
 - 覆盖率排除项声明在 **`coverage.config`**（`llvm-cov -ignore-filename-regex`，一行一条正则），理由如下：
   1. `Tests/`、`\.derived/runner\.swift` —— 测试自身与 SwiftPM 自动生成的测试入口（AGENTS 排除类 1：自动生成的代码）
-  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift` / `AgentReopenExecutor.swift` / `TerminalTabFocuser.swift` / `TaskVisibilityProbe.swift` / `ApplicationsMover.swift` / `Subprocess.swift` / `VSCodeExtensionInstaller.swift` / `ProcessSQLite.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
+  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `AgentSettingsView.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift` / `AgentReopenExecutor.swift` / `TerminalTabFocuser.swift` / `TaskVisibilityProbe.swift` / `ApplicationsMover.swift` / `Subprocess.swift` / `VSCodeExtensionInstaller.swift` / `ProcessSQLite.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
   - 没有类 3（纯数据结构）、类 4（平台分支）的排除项
 - 增量覆盖率：本 repo 没有可用的 Swift delta-coverage 工具（`xcrun llvm-cov` 没有 diff 模式）。改动达到增量门槛时，用 `xcrun llvm-cov show` 人工核对改动行，并在 commit body 说明；`IslandCore` 的基线是 100%，任何新增未覆盖行都会在下次 `make verify` 里暴露
 
@@ -108,8 +108,9 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   SettingsKey.swift            #   设置窗口按键路由：录制 / 取消录制 / ⌘W·Esc 关窗 / 放行
   LoginItem.swift              #   登录项状态 + 菜单勾选/提示的映射
   HotkeySettings.swift         #   换绑协调器（失败回滚）+ on/off 开关 + UserDefaults 存储
-  AgentTask.swift              #   统一任务模型（agent / sessionID / title / cwd / completedAt / host / resume）+ TaskTitle 标题兑底
-  AgentActivity.swift          #   Claude Code / pi 的落盘解析 + AgentActivityScanner
+  AgentTask.swift              #   统一任务模型（agent / sessionID / title / cwd / completedAt / host / resume / scenario）+ TaskTitle 标题兑底
+  AgentProfile.swift           #   每个 agent 的差异集中处：AgentProfile（名称 / 进程名 / 图标 / scenarios）+ AgentScenario 目录 + AgentScenarioSettings（开关）+ UserDefaults 存储
+  AgentActivity.swift          #   Claude Code / pi 的落盘解析 + AgentActivityScanner（按 AgentScenarioSettings 过滤、跳过全关的 agent）
   ClaudeDesktopActivity.swift  #   Claude 桌面版：IndexedDB blob（react-query 缓存）-> 已完成的聊天
   Snappy.swift                 #   snappy 原始流解压 + ByteReader
   V8Value.swift                #   V8 structured clone 反序列化（只覆盖 island 用到的类型）
@@ -138,7 +139,8 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
   HotkeyRegistrar.swift        #   Carbon RegisterEventHotKey 包装
   StatusItemController.swift   #   菜单栏图标与菜单
   IslandGlyph.swift            #   菜单栏图标绘制（对应 reference/icon/menubar-icon.svg）
-  HotkeySettingsWindow.swift   #   设置窗口：录制快捷键 / 开关 / 清空
+  HotkeySettingsWindow.swift   #   设置窗口（NSTabView）：General 快捷键 / Appearance / Notifications / Agents
+  AgentSettingsView.swift      #   Settings → Agents：每个 agent 一个总开关（可 mixed）+ 每个场景一个开关，附检测方式与点击行为
   HotkeyRecorderView.swift     #   点击录制：NSEvent -> HotkeySpec
   LoginItemController.swift    #   SMAppService.mainApp 包装
   ApplicationsMover.swift      #   启动时从 dmg / 迁移路径运行则弹框：复制到 /Applications、去 quarantine、等本进程退出后重开
@@ -173,7 +175,7 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - Swift 6 严格并发：`AppKit` / `NSPanel` 相关代码都在 `MainActor` 上；`IslandCore` 的类型一律 `Sendable`，方便从任何上下文使用
 - 直接 touch AppKit 的代码一律放 `Sources/Island/`，并同步加进 `coverage.config` 的排除项
 - 所有行为开关走环境变量（`ISLAND_*`），不引入配置文件——POC 阶段要的是"改一个数就能重验"
-- **agent 检测分两层**：`IslandCore` 只做纯解析（`AgentActivitySource.completedTasks()` 吃 URL、只读文件，不碰 AppKit）；`Sources/Island/AgentMonitor.swift` 负责定时轮询。新增一个 agent 只需加一个 `AgentActivitySource` 并在 `AgentActivityScanner.standard(home:)` 里注册，UI 不用动
+- **agent 检测分两层**：`IslandCore` 只做纯解析（`AgentActivitySource.completedTasks()` 吃 URL、只读文件，不碰 AppKit）；`Sources/Island/AgentMonitor.swift` 负责定时轮询。**每个 agent 的差异只放两处**：声明式的 `AgentProfile`（名称、`ps` 进程名、图标、`scenarios`）和检测用的 `AgentActivitySource`（给每个 task 打上 `scenario`）。不要再在别处 `switch AgentKind`。新增一个 agent = `AgentKind` 加 case + `profile` 里加一项（至少一个 `AgentScenario`）+ 一个 source 并在 `AgentActivityScanner.standard(home:)` 注册，UI（含 Settings → Agents）不用动；新增场景 = 加一个 `AgentScenario` 静态值、放进 profile、让 source 按落盘字段归类
 - Swift 源码 4 空格缩进，格式由 `.swift-format` 定义；`swift-format` 随 Xcode 提供，不额外安装
 - comment / docstring / log 一律英文（见 AGENTS.md § Comments）；菜单项等 UI 字符串同样用英文，保持代码内单一语言
 - 新增 `Sources/Island/` 下的文件后，记得把路径加进 `coverage.config`，否则覆盖率基线（100）会掉
@@ -226,3 +228,5 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - **通知分两种**（issue `notification-n-auto-hide`）：菜单栏未读数永远跟着未读走，不可关；完成时的弹出可在 `Settings…` → `Notifications` 开关、改秒数（`UserDefaults` key `IslandPopupEnabled` / `IslandPopupSeconds`，缺省开 / `ISLAND_OVERLAY_SECONDS` / 5），hover 暂停计时。弹出关掉后，启动时那一次弹出也不再出现；改主题的预览照常弹
 - **用户正看着的任务不通知**：`AgentMonitor` 每轮先 `AgentInbox.pending` 取出新 run，连同现有未读，一起交给 `TaskVisibilityProbe`（`AppDelegate.visibilityQueue`，与 reopen 队列分开）判断；`AgentInbox.update` 把“在眼前”的新 run 直接记为已读（不弹、不计数），并把用户自己切回去的未读项标已读。切换 app（`didActivateApplicationNotification`）会立刻补一轮。判据**宁可漏判不可误判**（误判=用户丢通知）：桌面 app 只能到 app 级（前台即算）；tmux 要求 pane 是其 session 的当前 pane、且有 client 挂在该 session、client 的宿主 app 在前台，再问宿主 tab；Terminal / iTerm2 比 tty；cmux 比 `CMUX_SURFACE_ID`；Ghostty 没有 id，只在“唯一一个 terminal”或“前台 terminal 是唯一一个 working directory == 任务 cwd 的”时才算；VS Code 靠扩展（0.2.0 起）写的 `~/Library/Application Support/island/vscode/window-<扩展宿主pid>.json`（`focused` + 当前终端 shell pid），pid 已死的文件忽略；装了新扩展的 VS Code 窗口要 reload 一次才会开始写
 - 可见性判断**绝不弹授权框**：AppleScript 之前先用 `AEDeterminePermissionToAutomateTarget(askUserIfNeeded: false)` 确认已授权，没授权就当“不在眼前”；也不做 Ghostty 的标题探针（会改用户看得到的标题）
+- **Agent 场景开关**（issue `make-agent-optional`）：`Settings…` → `Agents` 按 `AgentProfile.all` 列出每个 agent 的 `AgentScenario`（id 形如 `claude-code.terminal`，**会落盘，不要改名**）。只存**被关掉的** id（`UserDefaults` key `IslandDisabledScenarios`，字符串数组），所以以后新加的场景默认开。关掉的场景：scanner 直接丢弃，整个 agent 全关时连 source 都不读（Codex 就不 spawn sqlite3）；已经在列表里的行由 `AgentInbox.removeAll(where:)` 立即清掉，但 `known` 保留，重新打开不会把旧 run 翻出来。`--scan-agents` 故意不过滤，每行打印场景 id，被关的标 `(off)`。归类依据：Claude Code 看 session json 的 `entrypoint`（本机只见过 `cli`；`*desktop*` / `*vscode*`·`*jetbrains*` / 其他分别归 Claude app / 编辑器 / SDK，**非 cli 的取值未实测**，没有该字段的旧文件算终端）；Codex 看 `threads.source`（`cli` / `exec` / 其余含 `vscode` 归桌面 app & IDE，index 兜底源也归 app）；pi、Claude 桌面版各只有一个场景
+- 设置窗口是 `NSTabView`：`General`（快捷键）/ `Appearance`（主题、键盘提示）/ `Notifications`（弹出）/ `Agents`。自动化测试可以用 System Events：`click radio button "Agents" of tab group 1 of window 1`，Agents 页的开关是 `checkbox "<标题>" of scroll area 1 of tab group 1 of window 1`（agent 总开关 value 为 2 表示 mixed）

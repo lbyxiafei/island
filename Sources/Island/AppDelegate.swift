@@ -19,6 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var automationDenials = AutomationDenials()
     private let overlayStore = UserDefaultsOverlayStore()
     private let popupStore = UserDefaultsPopupStore()
+    private let scenarioStore = UserDefaultsAgentScenarioStore()
+    /// Which agent scenarios island watches (Settings → Agents).
+    private var scenarios: AgentScenarioSettings
     /// Whether a finished run pops the overlay up, and for how long.
     private var popup: PopupSettings
     /// Separate from `reopenQueue`: a pending automation prompt there must not
@@ -29,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     init(configuration: ResolvedConfiguration) {
         self.configuration = configuration
         popup = popupStore.load(fallback: configuration.duration)
+        scenarios = scenarioStore.load()
         super.init()
     }
 
@@ -107,6 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             theme: content.theme,
             showsHints: content.showsHints,
             popup: popup,
+            scenarios: scenarios,
             onHotkeyChanged: { [weak self] spec, enabled in
                 self?.log("hotkey changed to \(spec.displayString) (enabled: \(enabled))")
                 self?.statusItem?.setHotkey(spec, source: .menu)
@@ -114,7 +119,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             onThemeChanged: { [weak self] theme in self?.setTheme(theme) },
             onHintsChanged: { [weak self] shows in self?.setShowsHints(shows) },
-            onPopupChanged: { [weak self] popup in self?.setPopup(popup) }
+            onPopupChanged: { [weak self] popup in self?.setPopup(popup) },
+            onScenariosChanged: { [weak self] scenarios in self?.setScenarios(scenarios) }
         )
         self.settingsWindow = settingsWindow
 
@@ -147,6 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let monitor = AgentMonitor(
             scanner: .standard(sqlite: ProcessSQLiteQuerying()),
             inbox: inbox,
+            scenarios: scenarios,
             inView: { [weak self] tasks in await self?.tasksInView(tasks) ?? [] },
             onChange: { [weak self] alerted in
                 self?.refreshAgentUI()
@@ -270,6 +277,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         log(
             "pop-up: \(popup.isEnabled ? "on" : "off"), \(ResolvedConfiguration.secondsText(popup.seconds))s"
         )
+    }
+
+    /// Settings → Agents switched scenarios: watch accordingly from the next
+    /// tick, and drop listed runs of what was switched off so the overlay
+    /// matches the settings right away.
+    private func setScenarios(_ scenarios: AgentScenarioSettings) {
+        self.scenarios = scenarios
+        scenarioStore.save(scenarios)
+        monitor?.scenarios = scenarios
+        if inbox?.removeAll(where: { !scenarios.allows($0) }) == true { refreshAgentUI() }
+        log("agent scenarios off: \(scenarios.disabled.sorted().joined(separator: ", "))")
     }
 
     /// Settings switched the keyboard-mode footer on or off.
