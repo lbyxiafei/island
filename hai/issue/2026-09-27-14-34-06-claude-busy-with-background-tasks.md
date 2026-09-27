@@ -2,9 +2,9 @@
 type: bug
 name: claude-busy-with-background-tasks
 title: "Claude Code 有后台任务时一轮结束不报 idle，island 漏检"
-status: new
+status: solved
 created_ts: 2026-09-27T14:34:06-07:00
-updated_ts: 2026-09-27T14:34:06-07:00
+updated_ts: 2026-09-27T14:39:46-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -22,3 +22,11 @@ updated_ts: 2026-09-27T14:34:06-07:00
 - 全程在独立 worktree（`../.worktree/<repo>-<slug>`）中完成，合回 master 前 `make verify` 全过，流程见 AGENTS.md / Workflow / Worktree 与 Ship
 
 # History
+
+## 2026-09-27T14:37:23-07:00: new -> in-progress
+
+Scope-check: PLAN § Design / Agents 交互 interface #1（扫描到 agent 完成任务）；用户明确要求修复。
+
+## 2026-09-27T14:39:46-07:00: in-progress -> solved
+
+根因：ClaudeCodeActivitySource 要求 session json 的 status == idle，而一轮结束时仍有后台任务在跑的 session 一直是 busy。修复：status 不再参与判断，完成只看 transcript（turn_duration 收尾、之后无新 user 输入、无中断）；为此 ClaudeTranscriptCache 改为增量解析（按字节 offset 只读追加部分，半行等换行，文件变小则重扫），避免 busy session 每 3 秒全量重读大 transcript（本机最大 852 MB）。验证：新增/调整 5 个测试，make verify 全过；--scan-agents 实测正处在一轮中间的 busy session 不会被误报。

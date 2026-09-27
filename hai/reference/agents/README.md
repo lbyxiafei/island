@@ -35,7 +35,7 @@ AgentTask                               # 统一模型，UI 只认这个
 
 | 项 | 值 |
 |---|---|
-| 完成信号 | `~/.claude/sessions/<pid>.json` 里 `status` 从 `busy` → `idle` |
+| 完成信号 | transcript 最后一轮以 `system/turn_duration` 收尾（之后无新的 user 输入、无中断标记）。`sessions/<pid>.json` 的 `status` **不可靠**：有后台任务时一轮结束仍是 `busy`（2026-09-27 实测，v2.1.283） |
 | 会话状态文件 | `~/.claude/sessions/<pid>.json`（每个活着的 claude 进程一份） |
 | 会话正文 | `~/.claude/projects/<slug>/<sessionId>.jsonl`，含 `ai-title` 条目 |
 | 身份 | `sessionId`（= 正文文件名） |

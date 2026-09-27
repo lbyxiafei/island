@@ -152,11 +152,18 @@ final class ClaudeCodeActivitySourceTests: XCTestCase {
         XCTAssertEqual(task.completedAt, Date(timeIntervalSince1970: 1_790_268_825))
     }
 
-    func testBusySessionIsNotATask() {
+    /// Issue claude-busy-with-background-tasks: a turn that ended while a
+    /// background task keeps the process `busy` is still a finished run; the
+    /// transcript decides, and a turn still in progress is not one.
+    func testBusySessionCountsOnlyWhenItsTurnFinished() throws {
         let state = State(
             pid: 1, sessionId: "s", cwd: nil, name: nil, status: "busy", updatedAt: nil)
+        let running = Transcript(
+            customTitle: nil, aiTitle: nil, lastPrompt: "go", isComplete: false, completedAt: nil)
 
-        XCTAssertNil(ClaudeCodeActivitySource.task(from: state, transcript: finished))
+        let task = try XCTUnwrap(ClaudeCodeActivitySource.task(from: state, transcript: finished))
+        XCTAssertEqual(task.completedAt, finished.completedAt)
+        XCTAssertNil(ClaudeCodeActivitySource.task(from: state, transcript: running))
     }
 
     func testSessionWithoutAnIDIsIgnored() {
@@ -302,6 +309,91 @@ final class ClaudeCodeActivitySourceTests: XCTestCase {
                 """, to: transcript)
 
         XCTAssertEqual(source.completedTasks().map(\.title), ["two"])
+    }
+
+    func testCompletedTasksReadsBusySessionsWhoseTurnEnded() throws {
+        let home = try makeTempHome()
+        let sessions = home.appendingPathComponent(".claude/sessions")
+        let project = home.appendingPathComponent(".claude/projects/-tmp-x")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        try write(
+            #"{"pid":7,"sessionId":"bg","cwd":"/tmp/x","status":"busy","updatedAt":1}"#,
+            to: sessions.appendingPathComponent("7.json"))
+        try write(
+            #"{"pid":8,"sessionId":"working","cwd":"/tmp/x","status":"busy","updatedAt":1}"#,
+            to: sessions.appendingPathComponent("8.json"))
+        try write(
+            """
+            {"type":"user","message":{"role":"user","content":"start a watcher"}}
+            {"type":"system","subtype":"turn_duration","timestamp":"2026-09-25T19:00:00.000Z"}
+            {"type":"queue-operation"}
+            """, to: project.appendingPathComponent("bg.jsonl"))
+        try write(
+            """
+            {"type":"user","message":{"role":"user","content":"one"}}
+            {"type":"system","subtype":"turn_duration","timestamp":"2026-09-25T19:00:00.000Z"}
+            {"type":"user","message":{"role":"user","content":"<task-notification>done</task-notification>"}}
+            """, to: project.appendingPathComponent("working.jsonl"))
+
+        let tasks = ClaudeCodeActivitySource.standard(home: home).completedTasks()
+
+        XCTAssertEqual(tasks.map(\.sessionID), ["bg"])
+    }
+
+    /// A transcript scanned in pieces reads the same as scanned whole, which
+    /// is what lets the cache parse only what was appended.
+    func testScanningInChunksMatchesScanningWhole() {
+        let lines = [
+            #"{"type":"custom-title","customTitle":"named"}"#,
+            #"{"type":"user","message":{"role":"user","content":"go"}}"#,
+            #"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]}}"#,
+            #"{"type":"system","subtype":"turn_duration","timestamp":"2026-09-25T19:00:00.000Z"}"#,
+            #"{"type":"user","message":{"role":"user","content":"again"}}"#,
+            #"{"type":"system","subtype":"turn_duration","timestamp":"2026-09-25T19:05:00.000Z"}"#,
+        ]
+        let whole = ClaudeCodeActivitySource.scanTranscript(lines.joined(separator: "\n"))
+        for split in 0...lines.count {
+            let head = ClaudeCodeActivitySource.scanTranscript(
+                lines.prefix(split).joined(separator: "\n"))
+            let both = ClaudeCodeActivitySource.scanTranscript(
+                lines.dropFirst(split).joined(separator: "\n"), continuing: head)
+            XCTAssertEqual(both, whole, "split at \(split)")
+        }
+        XCTAssertFalse(
+            ClaudeCodeActivitySource.scanTranscript(Array(lines.prefix(3)).joined(separator: "\n"))
+                .isComplete)
+    }
+
+    func testCacheParsesAppendsIncludingAHalfWrittenLine() throws {
+        let file = try makeTempHome().appendingPathComponent("s.jsonl")
+        let cache = ClaudeTranscriptCache()
+        let first = #"{"type":"user","message":{"role":"user","content":"one"}}"# + "\n"
+        let end =
+            #"{"type":"system","subtype":"turn_duration","timestamp":"2026-09-25T19:00:00.000Z"}"#
+        try write(first + String(end.prefix(20)), to: file)
+
+        XCTAssertEqual(cache.transcript(at: file)?.isComplete, false)
+
+        try write(first + end + "\n", to: file)
+        let appended = try XCTUnwrap(cache.transcript(at: file))
+        XCTAssertTrue(appended.isComplete)
+        XCTAssertEqual(appended.lastPrompt, "one")
+        XCTAssertEqual(appended, ClaudeCodeActivitySource.scanTranscript(first + end))
+    }
+
+    func testCacheStartsOverWhenTheFileShrinks() throws {
+        let file = try makeTempHome().appendingPathComponent("s.jsonl")
+        let cache = ClaudeTranscriptCache()
+        try write(
+            #"{"type":"user","message":{"role":"user","content":"a long first prompt"}}"# + "\n",
+            to: file)
+        XCTAssertEqual(cache.transcript(at: file)?.lastPrompt, "a long first prompt")
+
+        try write(#"{"type":"user","message":{"role":"user","content":"b"}}"# + "\n", to: file)
+
+        XCTAssertEqual(cache.transcript(at: file)?.lastPrompt, "b")
+        XCTAssertNil(cache.transcript(at: file.appendingPathExtension("missing")))
     }
 
     func testCompletedTasksOnAMissingDirectory() throws {

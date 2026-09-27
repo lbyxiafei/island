@@ -4,8 +4,8 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
-| bug | [claude-busy-with-background-tasks](./issue/2026-09-27-14-34-06-claude-busy-with-background-tasks.md) | Claude Code 有后台任务时一轮结束不报 idle，island 漏检 | new | 2026-09-27T14:34:06-07:00 | 2026-09-27T14:34:06-07:00 |
 | bug | [remove-closed-agent-title](./issue/2026-09-27-14-33-09-remove-closed-agent-title.md) | [chore] title should be removed from dropdown when agent task is closed | new | 2026-09-27T14:33:09-07:00 | 2026-09-27T14:33:09-07:00 |
+| bug | [claude-busy-with-background-tasks](./issue/2026-09-27-14-34-06-claude-busy-with-background-tasks.md) | Claude Code 有后台任务时一轮结束不报 idle，island 漏检 | solved | 2026-09-27T14:34:06-07:00 | 2026-09-27T14:39:46-07:00 |
 | feat | [make-agent-optional](./issue/2026-09-27-13-46-09-make-agent-optional.md) | [ux] support agents in optional way | solved | 2026-09-27T13:46:09-07:00 | 2026-09-27T14:16:55-07:00 |
 | feat | [move-to-applications-prompt](./issue/2026-09-26-14-01-51-move-to-applications-prompt.md) | 从 dmg 里或被系统迁移（App Translocation）运行时提示移到「应用程序」 | solved | 2026-09-26T14:01:51-07:00 | 2026-09-26T15:58:09-07:00 |
 | chore | [brew-distribution](./issue/2026-09-13-14-20-51-brew-distribution.md) | brew install 分发：公开 homebrew-tap + 公证 dmg | solved | 2026-09-13T14:20:51-07:00 | 2026-09-26T15:46:57-07:00 |

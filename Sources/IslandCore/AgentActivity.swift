@@ -53,9 +53,10 @@ public struct AgentActivityScanner: Sendable {
 // MARK: - Claude Code
 
 /// Claude Code keeps one live `~/.claude/sessions/<pid>.json` per running
-/// process. `status` flips `busy` -> `idle` whenever the process goes quiet,
-/// which also happens when a session is just opened or the user presses esc,
-/// so the transcript decides whether a turn actually finished.
+/// process. Its `status` is no completion signal: it goes `idle` when a
+/// session is just opened or the user presses esc, and stays `busy` after a
+/// turn ends while a background task it started is still running. So every
+/// session's transcript decides whether its latest turn finished.
 public struct ClaudeCodeActivitySource: AgentActivitySource {
     public let agent = AgentKind.claudeCode
 
@@ -83,7 +84,6 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
             .compactMap { url in
                 guard let data = try? Data(contentsOf: url),
                     let state = try? JSONDecoder().decode(ClaudeSessionState.self, from: data),
-                    state.status == "idle",
                     let sessionID = state.sessionId, !sessionID.isEmpty,
                     let file = Self.sessionFile(sessionID: sessionID, in: projectsDirectory)
                 else { return nil }
@@ -100,7 +100,7 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
     }
 
     static func task(from state: ClaudeSessionState, transcript: Transcript?) -> AgentTask? {
-        guard state.status == "idle", let sessionID = state.sessionId, !sessionID.isEmpty,
+        guard let sessionID = state.sessionId, !sessionID.isEmpty,
             let transcript, transcript.isComplete
         else { return nil }
         let completedAt =
@@ -142,6 +142,7 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
         let sessionId: String?
         let cwd: String?
         let name: String?
+        /// `idle` / `busy`; informational only, see the type's comment.
         let status: String?
         let updatedAt: Double?
         var nameSource: String? = nil
@@ -156,13 +157,18 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
         var lastPrompt: String?
         var isComplete: Bool
         var completedAt: Date?
+        /// The current turn was cut short; carried so a scan can resume.
+        var isInterrupted = false
     }
 
     /// A turn is finished when a `system/turn_duration` entry follows the last
     /// prompt and nothing in between says the user interrupted it.
-    static func scanTranscript(_ contents: String) -> Transcript {
-        var transcript = Transcript(isComplete: false)
-        var interrupted = false
+    /// `continuing` is the state after the lines before `contents`, so an
+    /// appended chunk can be scanned without rereading the whole file.
+    static func scanTranscript(
+        _ contents: String, continuing: Transcript = Transcript(isComplete: false)
+    ) -> Transcript {
+        var transcript = continuing
         for line in contents.split(separator: "\n") {
             guard let object = JSON.object(fromLine: String(line)) else { continue }
             switch object["type"] as? String {
@@ -171,7 +177,7 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
             case "ai-title":
                 transcript.aiTitle = object["aiTitle"] as? String ?? transcript.aiTitle
             case "system" where object["subtype"] as? String == "turn_duration":
-                transcript.isComplete = !interrupted
+                transcript.isComplete = !transcript.isInterrupted
                 transcript.completedAt =
                     (object["timestamp"] as? String).flatMap(AgentTimestamp.date(from:))
             case "user":
@@ -180,12 +186,12 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
                     let text = JSON.firstText(in: message["content"])
                 else { continue }
                 if text.hasPrefix("[Request interrupted by user") {
-                    interrupted = true
+                    transcript.isInterrupted = true
                     transcript.isComplete = false
                     continue
                 }
                 // A new turn starts, including one kicked off by a slash command.
-                interrupted = false
+                transcript.isInterrupted = false
                 transcript.isComplete = false
                 transcript.completedAt = nil
                 if !text.hasPrefix("<") { transcript.lastPrompt = text }
@@ -197,33 +203,55 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
     }
 }
 
-/// Transcripts grow to megabytes and are polled every few seconds, so each
-/// file is parsed again only when its size or modification date changes.
+/// Transcripts grow to hundreds of megabytes and a working session appends
+/// to its own every few seconds, so each file is parsed once and afterwards
+/// only its appended bytes are. A last line without its newline is consumed
+/// only once it parses (it may be half-written); a file that shrank was
+/// rewritten and is parsed again from the start.
 final class ClaudeTranscriptCache: @unchecked Sendable {
-    private struct Stamp: Equatable {
-        let size: Int
-        let modified: Date
+    private struct Entry {
+        /// Bytes consumed so far, always at a line boundary.
+        var offset: UInt64 = 0
+        var transcript = ClaudeCodeActivitySource.Transcript(isComplete: false)
     }
 
     private let lock = NSLock()
-    private var entries: [String: (stamp: Stamp, transcript: ClaudeCodeActivitySource.Transcript)] =
-        [:]
+    private var entries: [String: Entry] = [:]
 
+    /// nil when the file is missing or holds nothing readable yet.
     func transcript(at url: URL) -> ClaudeCodeActivitySource.Transcript? {
-        guard
-            let values = try? url.resourceValues(forKeys: [
-                .fileSizeKey, .contentModificationDateKey,
-            ]),
-            let size = values.fileSize, let modified = values.contentModificationDate
+        guard let handle = try? FileHandle(forReadingFrom: url),
+            let size = try? handle.seekToEnd()
         else { return nil }
-        let stamp = Stamp(size: size, modified: modified)
+        defer { try? handle.close() }
         lock.lock()
         defer { lock.unlock() }
-        if let cached = entries[url.path], cached.stamp == stamp { return cached.transcript }
-        guard let contents = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-        let transcript = ClaudeCodeActivitySource.scanTranscript(contents)
-        entries[url.path] = (stamp, transcript)
-        return transcript
+        var entry = entries[url.path] ?? Entry()
+        if size < entry.offset { entry = Entry() }
+        if size > entry.offset, (try? handle.seek(toOffset: entry.offset)) != nil,
+            let appended = try? handle.readToEnd()
+        {
+            let chunk = Self.readableLines(in: appended)
+            if let text = String(data: chunk, encoding: .utf8) {
+                entry.transcript = ClaudeCodeActivitySource.scanTranscript(
+                    text, continuing: entry.transcript)
+                entry.offset += UInt64(chunk.count)
+            }
+        }
+        entries[url.path] = entry
+        return entry.offset == 0 && size > 0 ? nil : entry.transcript
+    }
+
+    /// The newline-terminated lines of `data`, plus its unterminated tail
+    /// when that is already a whole JSON object.
+    private static func readableLines(in data: Data) -> Data {
+        let newline = data.lastIndex(of: UInt8(ascii: "\n"))
+        let tailStart = newline.map { data.index(after: $0) } ?? data.startIndex
+        let tail = data[tailStart...]
+        if !tail.isEmpty, (try? JSONSerialization.jsonObject(with: tail)) is [String: Any] {
+            return data
+        }
+        return data[data.startIndex..<tailStart]
     }
 }
 
