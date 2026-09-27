@@ -4,7 +4,7 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
-| refactor | [cache-pi-session-scans](./issue/2026-09-27-14-48-18-cache-pi-session-scans.md) | pi 每轮 poll 全量重读并解析最新 session 文件，CPU 偏高 | new | 2026-09-27T14:48:18-07:00 | 2026-09-27T14:48:18-07:00 |
+| refactor | [cache-pi-session-scans](./issue/2026-09-27-14-48-18-cache-pi-session-scans.md) | pi 每轮 poll 全量重读并解析最新 session 文件，CPU 偏高 | solved | 2026-09-27T14:48:18-07:00 | 2026-09-27T14:50:38-07:00 |
 | bug | [remove-closed-agent-title](./issue/2026-09-27-14-33-09-remove-closed-agent-title.md) | [chore] title should be removed from dropdown when agent task is closed | solved | 2026-09-27T14:33:09-07:00 | 2026-09-27T14:45:53-07:00 |
 | bug | [claude-busy-with-background-tasks](./issue/2026-09-27-14-34-06-claude-busy-with-background-tasks.md) | Claude Code 有后台任务时一轮结束不报 idle，island 漏检 | solved | 2026-09-27T14:34:06-07:00 | 2026-09-27T14:39:46-07:00 |
 | feat | [make-agent-optional](./issue/2026-09-27-13-46-09-make-agent-optional.md) | [ux] support agents in optional way | solved | 2026-09-27T13:46:09-07:00 | 2026-09-27T14:16:55-07:00 |

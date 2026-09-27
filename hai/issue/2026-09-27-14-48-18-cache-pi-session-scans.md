@@ -2,9 +2,9 @@
 type: refactor
 name: cache-pi-session-scans
 title: "pi 每轮 poll 全量重读并解析最新 session 文件，CPU 偏高"
-status: new
+status: solved
 created_ts: 2026-09-27T14:48:18-07:00
-updated_ts: 2026-09-27T14:48:18-07:00
+updated_ts: 2026-09-27T14:50:38-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -28,3 +28,11 @@ updated_ts: 2026-09-27T14:48:18-07:00
 - 全程在独立 worktree（`../.worktree/<repo>-<slug>`）中完成，合回 master 前 `make verify` 全过，流程见 AGENTS.md / Workflow / Worktree 与 Ship
 
 # History
+
+## 2026-09-27T14:49:32-07:00: new -> in-progress
+
+用户在会话中确认要做（「ok」）。Scope-check: 性能修复，属于 remove-closed-agent-title 的后续，落在 PLAN § Agents 交互 interface #1。
+
+## 2026-09-27T14:50:38-07:00: in-progress -> solved
+
+新增 PiScanCache：按 (path, mtime, size) 缓存 SessionScan，completedTasks 与 liveSessionIDs 共用。验证：新增单测覆盖命中 / mtime 变化 / size 变化 / 文件消失；临时基准在真实 ~/.pi（17 个项目，6.7 MB）上，首轮 376ms（debug），之后每轮约 4ms。make verify 全过。遗留：缓存每结束一个 session 留一条很小的条目，不做淘汰。

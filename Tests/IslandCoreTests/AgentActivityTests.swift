@@ -599,6 +599,36 @@ final class PiActivitySourceTests: XCTestCase {
         XCTAssertNil(source.liveSessionIDs(processes: StubProcesses(directories: nil)))
     }
 
+    /// Issue cache-pi-session-scans: session files run to megabytes and are
+    /// polled every few seconds, so one is parsed again only once it changes.
+    func testScansAreReusedUntilTheFileChanges() throws {
+        let home = try makeTempHome()
+        let file = home.appendingPathComponent("s.jsonl")
+        func rewrite(id: String, modified: TimeInterval) throws {
+            try write(#"{"type":"session","id":"\#(id)"}"#, to: file)
+            try FileManager.default.setAttributes(
+                [.modificationDate: Date(timeIntervalSince1970: modified)], ofItemAtPath: file.path)
+        }
+        let cache = PiScanCache()
+
+        try rewrite(id: "aaa", modified: 100)
+        XCTAssertEqual(cache.scan(at: file)?.sessionID, "aaa")
+
+        try rewrite(id: "bbb", modified: 100)
+        XCTAssertEqual(cache.scan(at: file)?.sessionID, "aaa")
+
+        try rewrite(id: "bbb", modified: 200)
+        XCTAssertEqual(cache.scan(at: file)?.sessionID, "bbb")
+
+        try write(#"{"type":"session","id":"longer"}"#, to: file)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSince1970: 200)], ofItemAtPath: file.path)
+        XCTAssertEqual(cache.scan(at: file)?.sessionID, "longer")
+
+        try FileManager.default.removeItem(at: file)
+        XCTAssertNil(cache.scan(at: file))
+    }
+
     func testIncompleteNewestSessionProducesNothing() throws {
         let home = try makeTempHome()
         let project = home.appendingPathComponent(".pi/agent/sessions/--tmp-island--")

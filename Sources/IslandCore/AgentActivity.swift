@@ -282,6 +282,7 @@ public struct PiActivitySource: AgentActivitySource {
     public let agent = AgentKind.pi
 
     private let sessionsRoot: URL
+    private let scans = PiScanCache()
 
     public init(sessionsRoot: URL) {
         self.sessionsRoot = sessionsRoot
@@ -327,9 +328,7 @@ public struct PiActivitySource: AgentActivitySource {
             let newest = AgentFiles.directoryContents(project)
                 .filter { $0.pathExtension == "jsonl" }
                 .max { Self.modifiedAt($0) < Self.modifiedAt($1) }
-            guard let newest, let contents = try? String(contentsOf: newest, encoding: .utf8)
-            else { return nil }
-            return Self.scan(contents: contents, fileModified: Self.modifiedAt(newest))
+            return newest.flatMap(scans.scan(at:))
         }
     }
 
@@ -398,6 +397,39 @@ public struct PiActivitySource: AgentActivitySource {
             completedAt: lastAssistantDate ?? lastTimestamp ?? fileModified,
             isComplete: lastAssistantStop == "stop"
         )
+    }
+}
+
+/// pi session files run to megabytes and are polled every few seconds, so a
+/// file is parsed again only when its modification date or size changes.
+/// Entries are a few strings each; one is left behind per finished session.
+final class PiScanCache: @unchecked Sendable {
+    private struct Entry {
+        let modified: Date
+        let size: Int
+        let scan: PiActivitySource.SessionScan?
+    }
+
+    private let lock = NSLock()
+    private var entries: [String: Entry] = [:]
+
+    func scan(at url: URL) -> PiActivitySource.SessionScan? {
+        // Straight from the file system: `URL.resourceValues` caches per URL
+        // instance and would hide a change.
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+            let modified = attributes[.modificationDate] as? Date,
+            let size = (attributes[.size] as? NSNumber)?.intValue
+        else { return nil }
+        lock.lock()
+        defer { lock.unlock() }
+        if let entry = entries[url.path], entry.modified == modified, entry.size == size {
+            return entry.scan
+        }
+        let scan = (try? String(contentsOf: url, encoding: .utf8)).flatMap {
+            PiActivitySource.scan(contents: $0, fileModified: modified)
+        }
+        entries[url.path] = Entry(modified: modified, size: size, scan: scan)
+        return scan
     }
 }
 
