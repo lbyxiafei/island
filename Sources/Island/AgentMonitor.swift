@@ -18,6 +18,7 @@ final class AgentMonitor {
     /// Which scenarios to watch; Settings → Agents changes it live.
     var scenarios: AgentScenarioSettings
     private let inView: InViewCheck
+    private let processes: any ProcessInspecting
     private let onChange: (_ alerted: Bool) -> Void
     private var timer: Timer?
     /// One visibility check at a time, so a slow one cannot ingest a run twice.
@@ -32,6 +33,7 @@ final class AgentMonitor {
         startedAt: Date = Date(),
         scenarios: AgentScenarioSettings,
         inView: @escaping InViewCheck,
+        processes: any ProcessInspecting = ProcessInspector(),
         onChange: @escaping (_ alerted: Bool) -> Void
     ) {
         self.scanner = scanner
@@ -40,6 +42,7 @@ final class AgentMonitor {
         self.startedAt = startedAt
         self.scenarios = scenarios
         self.inView = inView
+        self.processes = processes
         self.onChange = onChange
     }
 
@@ -60,6 +63,7 @@ final class AgentMonitor {
     /// Also run when the user switches apps, so walking back to a finished
     /// task clears its dot without waiting for the next tick.
     func poll() {
+        pruneClosed()
         guard !isChecking else { return }
         // PLAN: historical runs do not matter, only what finished after island
         // came up.
@@ -73,6 +77,23 @@ final class AgentMonitor {
             isChecking = false
             apply(fresh: fresh, seen: seen)
         }
+    }
+
+    /// Drops rows whose session is gone: its terminal was closed or its
+    /// conversation deleted (issue remove-closed-agent-title). Only agents
+    /// with rows are asked, so an empty list costs nothing.
+    func pruneClosed() {
+        let agents = Set(inbox.allEntries.map(\.task.agent))
+        guard !agents.isEmpty else { return }
+        let presence = scanner.presence(of: agents, processes: processes)
+        let gone = inbox.allEntries.filter { presence.isGone($0.task) }
+        guard !gone.isEmpty else { return }
+        for entry in gone {
+            FileHandle.standardError.write(
+                Data("[island] session closed, removed \"\(entry.task.title)\"\n".utf8))
+        }
+        inbox.removeAll(where: presence.isGone)
+        onChange(false)
     }
 
     private func apply(fresh: [AgentTask], seen: Set<String>) {

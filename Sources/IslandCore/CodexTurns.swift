@@ -50,6 +50,17 @@ public struct CodexTurnActivitySource: AgentActivitySource {
         return Self.parse(output)
     }
 
+    /// Deleting a thread in Codex archives it, so the open threads are the
+    /// unarchived ones.
+    public func liveSessionIDs(processes: any ProcessInspecting) -> Set<String>? {
+        guard
+            let output = runner.query(
+                database: threadsDatabase, sql: "select id from threads where archived = 0;"),
+            let rows = (try? JSONSerialization.jsonObject(with: Data(output.utf8))) as? [Any]
+        else { return nil }
+        return Set(rows.compactMap { ($0 as? [String: Any])?["id"] as? String })
+    }
+
     /// The thread metadata (title, cwd) and the turn history live in two files,
     /// so the query attaches one to the other. `name` is the short title Codex
     /// shows; `title` is the raw first user message; `last_prompt` is the last
@@ -193,5 +204,10 @@ public struct CodexActivitySource: AgentActivitySource {
     public func completedTasks() -> [AgentTask] {
         let fromTurns = turns.completedTasks()
         return fromTurns.isEmpty ? index.completedTasks() : fromTurns
+    }
+
+    /// Only the thread database knows about archiving; the index cannot tell.
+    public func liveSessionIDs(processes: any ProcessInspecting) -> Set<String>? {
+        turns.liveSessionIDs(processes: processes)
     }
 }

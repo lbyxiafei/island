@@ -402,6 +402,51 @@ final class ClaudeCodeActivitySourceTests: XCTestCase {
         XCTAssertTrue(ClaudeCodeActivitySource.standard(home: home).completedTasks().isEmpty)
     }
 
+    /// Issue remove-closed-agent-title: a session is open while its process
+    /// runs; a closed terminal leaves either no session file or a dead pid.
+    func testLiveSessionsAreThoseWhoseProcessStillRuns() throws {
+        let home = try makeTempHome()
+        let sessions = home.appendingPathComponent(".claude/sessions")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        try write(
+            #"{"pid":7,"sessionId":"open","status":"busy"}"#,
+            to: sessions.appendingPathComponent("7.json"))
+        try write(
+            #"{"pid":8,"sessionId":"crashed","status":"idle"}"#,
+            to: sessions.appendingPathComponent("8.json"))
+        try write(#"{"sessionId":"no-pid"}"#, to: sessions.appendingPathComponent("9.json"))
+        try write(#"{"pid":10}"#, to: sessions.appendingPathComponent("10.json"))
+        try write("secret", to: sessions.appendingPathComponent("7.abc.key"))
+
+        let live = ClaudeCodeActivitySource.standard(home: home)
+            .liveSessionIDs(processes: StubProcesses(running: [7, 10]))
+
+        XCTAssertEqual(live, ["open", "no-pid"])
+    }
+
+    /// A session file caught half-written cannot vouch for anything, so the
+    /// whole answer is "cannot tell" rather than "that session closed".
+    func testAnUnreadableSessionFileMeansCannotTell() throws {
+        let home = try makeTempHome()
+        let sessions = home.appendingPathComponent(".claude/sessions")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        try write(
+            #"{"pid":7,"sessionId":"open"}"#, to: sessions.appendingPathComponent("7.json"))
+        try write(#"{"pid":8,"sess"#, to: sessions.appendingPathComponent("8.json"))
+
+        XCTAssertNil(
+            ClaudeCodeActivitySource.standard(home: home)
+                .liveSessionIDs(processes: StubProcesses(running: [7, 8])))
+    }
+
+    func testNoSessionDirectoryMeansNothingIsOpen() throws {
+        let home = try makeTempHome()
+
+        XCTAssertEqual(
+            ClaudeCodeActivitySource.standard(home: home)
+                .liveSessionIDs(processes: StubProcesses()), [])
+    }
+
     private func makeTempHome() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("island-agents-\(UUID().uuidString)")
@@ -517,6 +562,41 @@ final class PiActivitySourceTests: XCTestCase {
 
         XCTAssertEqual(tasks.map(\.sessionID), ["new"])
         XCTAssertEqual(tasks.first?.resumeCommand, "pi --session new")
+    }
+
+    /// pi records no pid: its newest session per project is open while a pi
+    /// process works in that directory, whether or not its turn has ended.
+    func testLiveSessionsAreTheNewestOnesInADirectoryPiRunsIn() throws {
+        let home = try makeTempHome()
+        let root = home.appendingPathComponent(".pi/agent/sessions")
+        for (slug, id, cwd, stop) in [
+            ("--tmp-a--", "running", "/tmp/a", "toolUse"),
+            ("--tmp-b--", "closed", "/tmp/b", "stop"),
+        ] {
+            let project = root.appendingPathComponent(slug)
+            try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+            try write(
+                """
+                {"type":"session","id":"\(id)","cwd":"\(cwd)"}
+                {"type":"message","message":{"role":"assistant","stopReason":"\(stop)"}}
+                """, to: project.appendingPathComponent("s.jsonl"))
+        }
+        let unnamed = root.appendingPathComponent("--broken--")
+        try FileManager.default.createDirectory(at: unnamed, withIntermediateDirectories: true)
+        try write("no header", to: unnamed.appendingPathComponent("s.jsonl"))
+        let nowhere = root.appendingPathComponent("--nowhere--")
+        try FileManager.default.createDirectory(at: nowhere, withIntermediateDirectories: true)
+        try write(
+            #"{"type":"session","id":"no-cwd"}"#, to: nowhere.appendingPathComponent("s.jsonl"))
+        let empty = root.appendingPathComponent("--empty--")
+        try FileManager.default.createDirectory(at: empty, withIntermediateDirectories: true)
+        let source = PiActivitySource.standard(home: home)
+
+        XCTAssertEqual(
+            source.liveSessionIDs(processes: StubProcesses(directories: ["/tmp/a", "/tmp/c"])),
+            ["running"])
+        XCTAssertEqual(source.liveSessionIDs(processes: StubProcesses(directories: [])), [])
+        XCTAssertNil(source.liveSessionIDs(processes: StubProcesses(directories: nil)))
     }
 
     func testIncompleteNewestSessionProducesNothing() throws {
@@ -753,6 +833,32 @@ final class CodexActivitySourceTests: XCTestCase {
         )
 
         XCTAssertTrue(source.completedTasks().isEmpty)
+    }
+
+    /// Issue remove-closed-agent-title: deleting a thread in Codex archives
+    /// it, so the open threads are the unarchived ones.
+    func testLiveThreadsAreTheUnarchivedOnes() {
+        let runner = StubSQLite(rows: #"[{"id":"a"},{"id":"b"},{"name":"no id"},3]"#)
+        let source = CodexTurnActivitySource(
+            threadsDatabase: URL(fileURLWithPath: "/tmp/threads.sqlite"),
+            historyDatabase: URL(fileURLWithPath: "/tmp/history.sqlite"),
+            runner: runner
+        )
+
+        XCTAssertEqual(source.liveSessionIDs(processes: StubProcesses()), ["a", "b"])
+        XCTAssertTrue(runner.lastSQL?.contains("archived = 0") == true)
+    }
+
+    func testLiveThreadsAreUnknownWhenTheDatabaseCannotBeRead() {
+        func live(_ rows: String?) -> Set<String>? {
+            CodexActivitySource.standard(
+                home: URL(fileURLWithPath: "/nonexistent"), sqlite: StubSQLite(rows: rows)
+            ).liveSessionIDs(processes: StubProcesses())
+        }
+
+        XCTAssertNil(live(nil))
+        XCTAssertNil(live("not json"))
+        XCTAssertEqual(live("[]"), [])
     }
 
     func testTurnsWinOverTheIndex() throws {

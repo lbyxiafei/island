@@ -11,11 +11,14 @@ import Foundation
 public protocol AgentActivitySource: Sendable {
     var agent: AgentKind { get }
     func completedTasks() -> [AgentTask]
+    /// The ids of the sessions that are still open, or nil when the source
+    /// cannot tell (see `SessionPresence`).
+    func liveSessionIDs(processes: any ProcessInspecting) -> Set<String>?
 }
 
 /// Runs every source and returns their completed tasks, newest first.
 public struct AgentActivityScanner: Sendable {
-    private let sources: [any AgentActivitySource]
+    let sources: [any AgentActivitySource]
 
     public init(sources: [any AgentActivitySource]) {
         self.sources = sources
@@ -89,6 +92,22 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
                 else { return nil }
                 return Self.task(from: state, transcript: transcripts.transcript(at: file))
             }
+    }
+
+    /// A session is open while its `<pid>.json` exists and that pid runs; a
+    /// file that fails to decode (caught mid-write) makes the answer unknown.
+    public func liveSessionIDs(processes: any ProcessInspecting) -> Set<String>? {
+        var live: Set<String> = []
+        for url in AgentFiles.directoryContents(sessionsDirectory) where url.pathExtension == "json"
+        {
+            guard let data = try? Data(contentsOf: url),
+                let state = try? JSONDecoder().decode(ClaudeSessionState.self, from: data)
+            else { return nil }
+            guard let sessionID = state.sessionId, !sessionID.isEmpty else { continue }
+            if let pid = state.pid, !processes.isRunning(pid) { continue }
+            live.insert(sessionID)
+        }
+        return live
     }
 
     /// The transcript lives in `<projects>/<cwd-slug>/<sessionId>.jsonl`; the
@@ -275,19 +294,8 @@ public struct PiActivitySource: AgentActivitySource {
     }
 
     public func completedTasks() -> [AgentTask] {
-        AgentFiles.directoryContents(sessionsRoot).compactMap { project -> AgentTask? in
-            let files = AgentFiles.directoryContents(project)
-            // Only the newest session per project can be the one just finished.
-            let newest =
-                files
-                .filter { $0.pathExtension == "jsonl" }
-                .max { Self.modifiedAt($0) < Self.modifiedAt($1) }
-            guard let newest,
-                let contents = try? String(contentsOf: newest, encoding: .utf8),
-                let scan = Self.scan(contents: contents, fileModified: Self.modifiedAt(newest)),
-                scan.isComplete
-            else { return nil }
-            return AgentTask(
+        newestScans().filter(\.isComplete).map { scan in
+            AgentTask(
                 agent: .pi,
                 sessionID: scan.sessionID,
                 title: TaskTitle.resolve(
@@ -297,6 +305,31 @@ public struct PiActivitySource: AgentActivitySource {
                 host: .unknown,
                 resumeCommand: "pi --session \(scan.sessionID)"
             )
+        }
+    }
+
+    /// pi records no pid, so a session is open while a pi process works in its
+    /// directory and it is still that directory's newest session.
+    public func liveSessionIDs(processes: any ProcessInspecting) -> Set<String>? {
+        guard
+            let directories = processes.workingDirectories(
+                ofProcessesNamed: Set(agent.processNames))
+        else { return nil }
+        return Set(
+            newestScans()
+                .filter { $0.cwd.map(directories.contains) ?? false }
+                .map(\.sessionID))
+    }
+
+    /// Only the newest session per project can be the one just finished.
+    private func newestScans() -> [SessionScan] {
+        AgentFiles.directoryContents(sessionsRoot).compactMap { project in
+            let newest = AgentFiles.directoryContents(project)
+                .filter { $0.pathExtension == "jsonl" }
+                .max { Self.modifiedAt($0) < Self.modifiedAt($1) }
+            guard let newest, let contents = try? String(contentsOf: newest, encoding: .utf8)
+            else { return nil }
+            return Self.scan(contents: contents, fileModified: Self.modifiedAt(newest))
         }
     }
 

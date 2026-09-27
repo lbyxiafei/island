@@ -30,6 +30,7 @@ if arguments.contains("--help") || arguments.contains("-h") {
         flags (login-item flags must run from inside the app bundle):
           --print-config                  resolve the environment and exit
           --scan-agents                   list completed agent tasks and exit
+          --live-sessions                 list the sessions each agent reports as still open
           --reopen-plan <pid> [--perform] print how island would reopen a task on that pid (and do it)
           --in-view <pid> [cwd]           whether a task on that pid is the tab in front of the user
           --login-item-status             report the launch-at-login state
@@ -77,6 +78,22 @@ if arguments.contains("--scan-agents") {
                 "\(formatter.string(from: task.completedAt))  \(scenario)  \(task.title)  [\(task.cwd ?? "-")]  \(task.host)  \(task.resumeCommand ?? "-")"
             )
         }
+    }
+    exit(EXIT_SUCCESS)
+}
+
+if arguments.contains("--live-sessions") {
+    // What the monitor prunes against: rows whose session is not listed here
+    // leave the overlay; "cannot tell" agents keep all of theirs.
+    let presence = AgentActivityScanner.standard(sqlite: ProcessSQLiteQuerying())
+        .presence(of: Set(AgentKind.allCases), processes: ProcessInspector())
+    for agent in AgentKind.allCases {
+        guard let live = presence.live[agent] else {
+            print("\(agent.rawValue): cannot tell")
+            continue
+        }
+        print("\(agent.rawValue): \(live.count) open")
+        for id in live.sorted() { print("  \(id)") }
     }
     exit(EXIT_SUCCESS)
 }

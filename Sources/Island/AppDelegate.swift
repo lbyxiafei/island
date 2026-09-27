@@ -213,6 +213,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// PLAN § Design: opening a task marks it read (the red dot clears, the row
     /// stays) and then does its best to put the user back in that session.
     private func selectTask(_ entry: AgentInbox.Entry) {
+        // The session may have closed since the last poll; then the row just
+        // goes away instead of focusing a terminal that no longer shows it.
+        monitor?.pruneClosed()
+        guard inbox?.allEntries.contains(where: { $0.id == entry.id }) == true else {
+            hideOverlay(reason: "overlay hidden after selecting a closed task")
+            return
+        }
         inbox?.markRead(id: entry.id)
         refreshAgentUI()
         // PLAN § Design / 下拉框 UX #2: picking a task dismisses the list.

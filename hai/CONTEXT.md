@@ -61,6 +61,7 @@ defaults delete com.commallama.island IslandHotkeyEnabled   # 回到默认开启
 ```bash
 ./build/Island.app/Contents/MacOS/Island --print-config   # 只解析并打印配置后退出，不开窗
 ./build/Island.app/Contents/MacOS/Island --scan-agents    # 列出本机检测到的所有已完成 agent run（调试用）
+./build/Island.app/Contents/MacOS/Island --live-sessions  # 每个 agent 当前仍“开着”的 session（下拉框据此移除已关闭的行）
 ./build/Island.app/Contents/MacOS/Island --in-view <pid> [cwd]   # 此刻该 pid 的 tab 是否在用户眼前（先把宿主 app 切到前台再跑）
 ./build/Island.app/Contents/MacOS/Island --help
 
@@ -92,7 +93,7 @@ defaults delete com.commallama.island IslandHotkeyEnabled   # 回到默认开启
 - 覆盖率：`./scripts/coverage.sh` 把**单行百分数**写进 `coverage.txt`；`make verify` 的 coverage gate 先刷新它，再与 `coverage-baseline.txt` 比对（当前基线 `100`，即 `IslandCore` 的 65 行全部被覆盖）
 - 覆盖率排除项声明在 **`coverage.config`**（`llvm-cov -ignore-filename-regex`，一行一条正则），理由如下：
   1. `Tests/`、`\.derived/runner\.swift` —— 测试自身与 SwiftPM 自动生成的测试入口（AGENTS 排除类 1：自动生成的代码）
-  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `AgentSettingsView.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift` / `AgentReopenExecutor.swift` / `TerminalTabFocuser.swift` / `TaskVisibilityProbe.swift` / `ApplicationsMover.swift` / `Subprocess.swift` / `VSCodeExtensionInstaller.swift` / `ProcessSQLite.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
+  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `AgentSettingsView.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift` / `AgentReopenExecutor.swift` / `TerminalTabFocuser.swift` / `TaskVisibilityProbe.swift` / `ApplicationsMover.swift` / `Subprocess.swift` / `VSCodeExtensionInstaller.swift` / `ProcessSQLite.swift` / `ProcessInspector.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
   - 没有类 3（纯数据结构）、类 4（平台分支）的排除项
 - 增量覆盖率：本 repo 没有可用的 Swift delta-coverage 工具（`xcrun llvm-cov` 没有 diff 模式）。改动达到增量门槛时，用 `xcrun llvm-cov show` 人工核对改动行，并在 commit body 说明；`IslandCore` 的基线是 100%，任何新增未覆盖行都会在下次 `make verify` 里暴露
 
@@ -119,6 +120,7 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   LegacySettings.swift         #   旧 bundle id（com.binyanli.island.poc）的设置迁移，只跑一次
   AutomationPermission.swift   #   osascript 结果分类（-1743 = 未授权）+ 被拒 app 列表 → 菜单提示
   TerminalFocus.swift          #   精确到 tab：tmux client 挑选、按宿主选定位手段（TerminalTabFocus）、AppleScript 文本、VS Code 请求/响应、扩展版本判断
+  SessionPresence.swift        #   session 是否还开着：ProcessInspecting（注入的进程探测）+ SessionPresence（按 agent 的 live 集合，缺席即“无法判断”）+ AgentActivityScanner.presence
   AgentInbox.swift             #   增量入库 + 已读/未读 + 排序 + 条数上限（N）
   OverlaySelection.swift       #   悬浮窗查询过滤（TaskFilter）+ 键盘选中行 / ⌘N / ↩ 标注
   OverlayTheme.swift           #   主题预设 → 配色（OverlayPalette）+ UserDefaults 存储 + agent 图标选择
@@ -135,6 +137,7 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
   TaskVisibilityProbe.swift    #   执行 TaskVisibility：ps / tmux / 只读 AppleScript / VS Code window-<pid>.json，得出“在眼前”的任务 id
   VSCodeExtensionInstaller.swift # 启动时把包内 island-vscode.vsix 装/升级进 VS Code（版本不同才装）
   Subprocess.swift             #   子进程 + osascript 的公共封装
+  ProcessInspector.swift       #   ProcessInspecting 的实现：kill(pid, 0) 判活，ps + lsof 取进程 cwd
   ProcessSQLite.swift          #   /usr/bin/sqlite3 -json 包装（Codex turn 历史用）
   HotkeyRegistrar.swift        #   Carbon RegisterEventHotKey 包装
   StatusItemController.swift   #   菜单栏图标与菜单
@@ -144,7 +147,7 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
   HotkeyRecorderView.swift     #   点击录制：NSEvent -> HotkeySpec
   LoginItemController.swift    #   SMAppService.mainApp 包装
   ApplicationsMover.swift      #   启动时从 dmg / 迁移路径运行则弹框：复制到 /Applications、去 quarantine、等本进程退出后重开
-  AgentMonitor.swift           #   轮询 agent 落盘，把未读数推到菜单栏
+  AgentMonitor.swift           #   轮询 agent 落盘，把未读数推到菜单栏；每轮 pruneClosed 移除已关闭 session 的行
   ResolvedConfiguration.swift  #   环境变量 -> 配置对象
 Tests/IslandCoreTests/         # IslandCore 的行为测试（XCTest）
 scripts/build-app.sh           # 打包 .app + 签名（Developer ID 优先，否则 ad-hoc）
@@ -230,3 +233,4 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - 可见性判断**绝不弹授权框**：AppleScript 之前先用 `AEDeterminePermissionToAutomateTarget(askUserIfNeeded: false)` 确认已授权，没授权就当“不在眼前”；也不做 Ghostty 的标题探针（会改用户看得到的标题）
 - **Agent 场景开关**（issue `make-agent-optional`）：`Settings…` → `Agents` 按 `AgentProfile.all` 列出每个 agent 的 `AgentScenario`（id 形如 `claude-code.terminal`，**会落盘，不要改名**）。只存**被关掉的** id（`UserDefaults` key `IslandDisabledScenarios`，字符串数组），所以以后新加的场景默认开。关掉的场景：scanner 直接丢弃，整个 agent 全关时连 source 都不读（Codex 就不 spawn sqlite3）；已经在列表里的行由 `AgentInbox.removeAll(where:)` 立即清掉，但 `known` 保留，重新打开不会把旧 run 翻出来。`--scan-agents` 故意不过滤，每行打印场景 id，被关的标 `(off)`。归类依据：Claude Code 看 session json 的 `entrypoint`（本机只见过 `cli`；`*desktop*` / `*vscode*`·`*jetbrains*` / 其他分别归 Claude app / 编辑器 / SDK，**非 cli 的取值未实测**，没有该字段的旧文件算终端）；Codex 看 `threads.source`（`cli` / `exec` / 其余含 `vscode` 归桌面 app & IDE，index 兜底源也归 app）；pi、Claude 桌面版各只有一个场景
 - 设置窗口是 `NSTabView`：`General`（快捷键）/ `Appearance`（主题、键盘提示）/ `Notifications`（弹出）/ `Agents`。自动化测试可以用 System Events：`click radio button "Agents" of tab group 1 of window 1`，Agents 页的开关是 `checkbox "<标题>" of scroll area 1 of tab group 1 of window 1`（agent 总开关 value 为 2 表示 mixed）
+- **已关闭的 session 会从下拉框消失**（issue `remove-closed-agent-title`）：每轮 poll 先 `AgentMonitor.pruneClosed`，按 `AgentActivitySource.liveSessionIDs` 判断——Claude Code 看 `~/.claude/sessions/<pid>.json` 存在且 pid 活着（任一文件解不开就当“无法判断”，不误删）；Codex 看 `threads.archived = 0`（Codex 里删对话就是 archive）；pi 看是否仍有 `pi` 进程的 cwd 等于该项目最新 session 的 cwd；**Claude 桌面版无法判断**（聊天在服务端，本地缓存只有近期打开的），它的行永远保留。点击一行前也会先 prune 一次，已关闭的行直接消失、不再尝试聚焦。被移除的 run 仍在 `known` 里，只有同一 session 更新的一轮（如 `claude --resume`）才会重新出现
