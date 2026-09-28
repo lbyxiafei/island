@@ -4,6 +4,7 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
+| feat | [upgrade-n-feedback](./issue/2026-09-28-10-36-27-upgrade-n-feedback.md) | [feat] enable in-app upgrade and feedback channels | new | 2026-09-28T10:36:27-07:00 | 2026-09-28T10:36:27-07:00 |
 | docs | [video-settings-music](./issue/2026-09-28-10-13-50-video-settings-music.md) | 介绍视频加 Settings 场景与原创配乐 | solved | 2026-09-28T10:13:50-07:00 | 2026-09-28T10:16:40-07:00 |
 | docs | [demo-video-v3](./issue/2026-09-28-09-59-18-demo-video-v3.md) | 4K 模拟演示视频 v3，简化 brew 安装命令 | solved | 2026-09-28T09:59:18-07:00 | 2026-09-28T10:05:40-07:00 |
 | docs | [readme-bilingual](./issue/2026-09-27-22-47-18-readme-bilingual.md) | README 中英双语、发布文案与演示 GIF | solved | 2026-09-27T22:47:18-07:00 | 2026-09-27T23:42:42-07:00 |
