@@ -159,3 +159,11 @@ swift test         # 只跑测试
 | `hai/ISSUES.md` | issue 索引，由 `make issue-sync` 生成 | 工具 |
 
 代码分两层：`Sources/IslandCore`（纯逻辑，不与 UI 框架耦合，测试完整覆盖）与 `Sources/Island`（AppKit / Carbon 装配）。
+
+## 隐私
+
+island 只在本机读取各 agent 的 session / transcript 文件来判断任务是否完成，代码里没有任何网络请求，不上传、不收集数据。
+
+## License
+
+[MIT](LICENSE)

@@ -4,7 +4,7 @@
   "description": "Lets the island menu bar app bring an agent's terminal tab to the front.",
   "version": "0.2.0",
   "publisher": "binyanli",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.80.0"
   },
