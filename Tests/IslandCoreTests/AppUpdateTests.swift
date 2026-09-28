@@ -54,11 +54,22 @@ final class AppUpdateTests: XCTestCase {
     func testSourcesPointAtThePublicTap() {
         XCTAssertEqual(
             UpdateSource.caskURL.absoluteString,
-            "https://raw.githubusercontent.com/lbyxiafei/homebrew-tap/main/Casks/island.rb")
+            "https://api.github.com/repos/lbyxiafei/homebrew-tap/contents/Casks/island.rb")
         XCTAssertEqual(
             UpdateSource.releasesURL.absoluteString,
             "https://github.com/lbyxiafei/homebrew-tap/releases/latest")
         XCTAssertEqual(UpdateSource.cask, "lbyxiafei/tap/island")
+    }
+
+    /// raw.githubusercontent.com lagged a release by 5+ minutes; the contents
+    /// API serves the tap's git state (what `brew update` sees) as the raw file.
+    func testCaskRequestAsksTheAPIForTheRawFileAndSkipsLocalCache() {
+        let request = UpdateSource.caskRequest
+
+        XCTAssertEqual(request.url, UpdateSource.caskURL)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/vnd.github.raw")
+        XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalCacheData)
+        XCTAssertEqual(request.timeoutInterval, 15)
     }
 
     // MARK: - Status

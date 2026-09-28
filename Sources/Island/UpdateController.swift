@@ -54,8 +54,7 @@ final class UpdateController {
         guard force || store.loadAutoCheck(), !checkInFlight else { return }
         checkInFlight = true
         if !status.needsAttention { set(.checking) }
-        var request = URLRequest(url: UpdateSource.caskURL, timeoutInterval: 15)
-        request.cachePolicy = .reloadIgnoringLocalCacheData
+        let request = UpdateSource.caskRequest
         let current = current
         Task { [weak self] in
             let latest: AppVersion?

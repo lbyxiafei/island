@@ -69,7 +69,7 @@ gh release list --repo lbyxiafei/homebrew-tap
 
 开发机上跑的是 **brew 装的** island（见第 5 节）。新版发布后：
 
-1. 菜单栏菜单出现 `Update to x.y.z available…`，Settings 的 `Updates` tab 带 🔴。island 启动时和每 6 小时自动检查一次；等不及就点 `Check Now`（raw.githubusercontent 有约 5 分钟缓存）
+1. 菜单栏菜单出现 `Update to x.y.z available…`，Settings 的 `Updates` tab 带 🔴。island 启动时和每 6 小时自动检查一次；等不及就点 `Check Now`（0.2.2 起走 GitHub API，发布后约 1 分钟可见；0.2.0 / 0.2.1 走 raw.githubusercontent，可能要等 5–10 分钟）
 2. 点 `Upgrade to x.y.z & Relaunch`：island 退出，后台跑 `brew update` + `brew upgrade --cask lbyxiafei/tap/island`，完成后自动重开
 3. 重开后 Updates 显示 `island x.y.z is up to date.` 即升级链路正常；失败时 Updates 会提示，日志在 `~/Library/Logs/island-upgrade.log`
 4. 验收本次改动，通过就：

@@ -38,13 +38,23 @@ public struct AppVersion: Comparable, CustomStringConvertible, Sendable {
 }
 
 /// Where releases are announced: the cask in the public tap that
-/// `scripts/publish.sh` rewrites on every release.
+/// `scripts/publish.sh` rewrites on every release. Read through the contents
+/// API, not raw.githubusercontent.com, whose CDN kept serving the previous
+/// cask for 5+ minutes after a release.
 public enum UpdateSource {
     public static let cask = "lbyxiafei/tap/island"
     public static let caskURL = URL(
-        string: "https://raw.githubusercontent.com/lbyxiafei/homebrew-tap/main/Casks/island.rb")!
+        string: "https://api.github.com/repos/lbyxiafei/homebrew-tap/contents/Casks/island.rb")!
     public static let releasesURL = URL(
         string: "https://github.com/lbyxiafei/homebrew-tap/releases/latest")!
+
+    /// The cask file itself (not the API's JSON wrapper), fresh from the server.
+    public static var caskRequest: URLRequest {
+        var request = URLRequest(url: caskURL, timeoutInterval: 15)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("application/vnd.github.raw", forHTTPHeaderField: "Accept")
+        return request
+    }
 
     /// The `version "x.y.z"` stanza of a cask file.
     public static func version(fromCask text: String) -> AppVersion? {
