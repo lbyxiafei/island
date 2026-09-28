@@ -4,6 +4,7 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
+| chore | [dev-flow-brew-upgrade](./issue/2026-09-28-14-11-52-dev-flow-brew-upgrade.md) | 开发完成即发布到 brew，本地从 settings 升级验收 | in-progress | 2026-09-28T14:11:52-07:00 | 2026-09-28T14:12:01-07:00 |
 | feat | [upgrade-n-feedback](./issue/2026-09-28-10-36-27-upgrade-n-feedback.md) | [feat] enable in-app upgrade and feedback channels | solved | 2026-09-28T10:36:27-07:00 | 2026-09-28T12:26:51-07:00 |
 | docs | [video-settings-music](./issue/2026-09-28-10-13-50-video-settings-music.md) | 介绍视频加 Settings 场景与原创配乐 | solved | 2026-09-28T10:13:50-07:00 | 2026-09-28T10:16:40-07:00 |
 | docs | [demo-video-v3](./issue/2026-09-28-09-59-18-demo-video-v3.md) | 4K 模拟演示视频 v3，简化 brew 安装命令 | solved | 2026-09-28T09:59:18-07:00 | 2026-09-28T10:05:40-07:00 |
