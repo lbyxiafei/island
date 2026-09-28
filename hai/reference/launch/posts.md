@@ -2,6 +2,8 @@
 
 对外发布 island 用的草稿。发之前把 `<GIF>` 换成 README 里演示 GIF 的链接（或直接上传 GIF）。
 
+赞助页：https://github.com/sponsors/lbyxiafei （仓库已有 Sponsor 按钮，文案里不必强调）。
+
 发布节奏建议：先 V2EX / X 中文圈小范围试水、收一轮反馈修掉明显问题，再发 Show HN 和 Reddit。Show HN 在美西工作日早上 8–10 点发效果最好，发完前两小时守着回复评论。
 
 ---

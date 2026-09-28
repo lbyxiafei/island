@@ -168,6 +168,10 @@ swift test         # 只跑测试
 
 island 只在本机读取各 agent 的 session / transcript 文件来判断任务是否完成，代码里没有任何网络请求，不上传、不收集数据。
 
+## 支持
+
+island 免费开源（MIT）。如果它帮你省了时间，欢迎在 GitHub 上[赞助](https://github.com/sponsors/lbyxiafei)。
+
 ## License
 
 [MIT](LICENSE)

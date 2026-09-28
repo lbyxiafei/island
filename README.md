@@ -171,6 +171,10 @@ The code has two layers: `Sources/IslandCore` (pure logic, no UI framework coupl
 
 Project docs under `hai/` are mostly written in Chinese.
 
+## Support
+
+island is free and MIT licensed. If it saves you time, you can [sponsor its development on GitHub](https://github.com/sponsors/lbyxiafei).
+
 ## License
 
 [MIT](LICENSE)
