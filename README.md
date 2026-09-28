@@ -6,6 +6,10 @@ A macOS menu-bar app that watches the AI agents running on your machine — Clau
 
 Stop checking five terminals to see who's done.
 
+![island: tasks finish, click one to jump back to its terminal tab, or press ⌃⌘, and type to jump into the right tmux window](docs/demo.gif)
+
+▶ 60-second intro video: *(YouTube link coming soon)*
+
 > **Status: MVP.** The app shell (overlay, global hotkey, menu bar, launch at login, hotkey settings) is done; agent detection and the overlay UX are under active development. See `hai/PLAN.md`.
 
 ## Install

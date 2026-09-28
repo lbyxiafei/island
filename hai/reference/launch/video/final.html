@@ -1,0 +1,229 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0b0d14; }
+  body { font-family: -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif; color: #fff; -webkit-font-smoothing: antialiased; }
+  .abs { position: absolute; }
+  .layer { position: absolute; inset: 0; }
+
+  /* real footage + things pinned to it, moved together by the camera */
+  #cam { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  #raw { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+  #menubar { left: 0; top: 0; width: 1920px; height: 30px; background: rgba(18,20,32,.62); backdrop-filter: blur(20px);
+    display: flex; align-items: center; padding: 0 16px; font-size: 14px; font-weight: 500; color: #e9ebf5; }
+  #menubar .l b { margin-right: 22px; font-weight: 700; } #menubar .l span { margin-right: 18px; }
+  #menubar .r { margin-left: auto; display: flex; align-items: center; gap: 22px; }
+  .mi { width: 16px; height: 16px; border-radius: 4px; background: rgba(233,235,245,.55); }
+  #isl { display: flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: 5px; }
+  #badge { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #ripple { width: 44px; height: 44px; border-radius: 50%; border: 3px solid rgba(255,255,255,.95); }
+  .chip { background: rgba(143,155,255,.22); border: 1px solid rgba(160,170,255,.75); color: #eef0ff; padding: 7px 15px;
+    border-radius: 999px; font: 600 17px "SF Mono", Menlo, monospace; box-shadow: 0 10px 30px rgba(0,0,0,.45); white-space: nowrap; }
+
+  #vignette { background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,.35) 100%); pointer-events: none; }
+
+  #caption { left: 0; right: 0; bottom: 64px; display: flex; justify-content: center; z-index: 60; }
+  #caption div { background: rgba(10,12,20,.8); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.14);
+    padding: 18px 36px; border-radius: 18px; font-size: 40px; font-weight: 650; letter-spacing: -.3px; text-align: center;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4); }
+  #caption small { display: block; font-size: 22px; font-weight: 500; color: #aeb4cc; margin-top: 8px; letter-spacing: 0; }
+
+  #keys { left: 0; right: 0; top: 420px; display: flex; justify-content: center; gap: 22px; z-index: 55; }
+  .key { width: 128px; height: 128px; border-radius: 26px; background: linear-gradient(#2c3042, #1a1d29);
+    border: 1px solid rgba(255,255,255,.2); box-shadow: 0 10px 0 #0c0e15, 0 24px 50px rgba(0,0,0,.55);
+    display: flex; align-items: center; justify-content: center; font-size: 64px; font-weight: 500; color: #eef0ff; }
+
+  .card { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 70; }
+  .bg { background: radial-gradient(1000px 650px at 50% 42%, #202a55, #080a11); }
+  .logo { width: 132px; height: 132px; border-radius: 32px; background: linear-gradient(145deg, #8f9bff, #5b64d6);
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 30px 80px rgba(110,120,255,.35); }
+  .word { font-size: 124px; font-weight: 750; letter-spacing: -4px; margin-top: 34px; }
+  .tag { font-size: 44px; font-weight: 500; color: #c9cdea; margin-top: 12px; letter-spacing: -.5px; }
+  .sub { font-size: 24px; color: #8a90ad; margin-top: 30px; letter-spacing: .3px; }
+
+  #features { z-index: 65; display: flex; align-items: center; }
+  #fanned { position: relative; width: 860px; height: 700px; margin-left: 110px; }
+  #fanned img { position: absolute; width: 540px; border-radius: 0 0 28px 28px; box-shadow: 0 30px 70px rgba(0,0,0,.55); }
+  #fcap { position: absolute; left: 160px; bottom: 110px; font-size: 22px; color: #8a90ad; }
+  #flist { margin-left: 30px; }
+  .feat { display: flex; gap: 20px; margin: 28px 0; }
+  .feat i { width: 14px; height: 14px; border-radius: 50%; background: #8f9bff; display: block; flex: none; margin-top: 16px; }
+  .feat b { font-size: 40px; font-weight: 700; letter-spacing: -.6px; display: block; }
+  .feat span { font-size: 23px; color: #9ca2bf; display: block; margin-top: 6px; }
+
+  .cmd { margin-top: 44px; font-family: "SF Mono", Menlo, monospace; font-size: 36px; background: #121524;
+    border: 1px solid rgba(255,255,255,.14); border-radius: 16px; padding: 22px 36px; color: #e6e9ff; }
+  .cmd .dim { color: #6d7394; }
+  .url { font-size: 30px; color: #aab3ff; margin-top: 30px; font-weight: 600; }
+  .pills { display: flex; gap: 16px; margin-top: 30px; }
+  .pills span { border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 10px 22px; font-size: 22px; color: #c9cdea; }
+</style>
+</head>
+<body>
+
+<div class="layer" id="footage">
+  <div id="cam">
+    <img id="raw">
+    <div class="abs" id="menubar">
+      <div class="l"><b>Terminal</b><span>Shell</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+      <div class="r">
+        <div id="isl"><svg viewBox="0 0 18 18" width="18" height="18"><g fill="#eef0ff"><rect x="3.5" y="6.2" width="11" height="8" rx="2.6"/><rect x="2" y="2.2" width="14" height="2" rx="1"/></g></svg><span id="badge"></span></div>
+        <div class="mi" style=""></div><div class="mi" style="border-radius:50%"></div><div class="mi" style="width:22px"></div><div class="mi" style=""></div><div class="mi" style="border-radius:50%"></div><div class="mi" style="width:18px;border-radius:3px"></div><div class="mi" style=""></div>
+        <svg width="20" height="15" viewBox="0 0 20 15"><path d="M10 13.5l2.6-2.9a3.6 3.6 0 00-5.2 0zM4.7 8.1a7.6 7.6 0 0110.6 0l1.5-1.6a9.8 9.8 0 00-13.6 0zM1.8 5A11.8 11.8 0 0118.2 5l1.5-1.6a14 14 0 00-19.4 0z" fill="#e9ebf5"/></svg>
+        <svg width="28" height="14" viewBox="0 0 28 14"><rect x=".5" y=".5" width="23" height="13" rx="3.5" fill="none" stroke="#e9ebf5" opacity=".6"/><rect x="2.5" y="2.5" width="16" height="9" rx="2" fill="#e9ebf5"/><rect x="25" y="4.5" width="2" height="5" rx="1" fill="#e9ebf5" opacity=".6"/></svg>
+        <span>Tue 9:41 AM</span>
+      </div>
+    </div>
+    <div class="abs" id="ripple"></div>
+    <div class="abs chip" id="chipB">↳ Terminal · infra</div>
+    <div class="abs chip" id="chipA">↳ tmux · window 1 · api-server</div>
+  </div>
+  <div class="layer" id="vignette"></div>
+</div>
+
+<div class="layer bg" id="features">
+  <div id="fanned"><img id="f0" src="s4.png"><img id="f1" src="l4.png"><img id="f2" src="m4.png"><div id="fcap">5 themes · light &amp; dark</div></div>
+  <div id="flist">
+    <div class="feat" id="ft0"><i></i><div><b>Every agent, one list</b><span>Claude Code · Codex · pi · Claude desktop</span></div></div>
+    <div class="feat" id="ft1"><i></i><div><b>Jumps to the exact place</b><span>tmux · Terminal · iTerm2 · Ghostty · cmux · VS Code · desktop apps</span></div></div>
+    <div class="feat" id="ft2"><i></i><div><b>Quiet when you're watching</b><span>No popup if that tab is already in front of you</span></div></div>
+    <div class="feat" id="ft3"><i></i><div><b>No permissions, no network</b><span>Reads local session files only · native Swift · zero deps</span></div></div>
+  </div>
+</div>
+
+<div class="layer card bg" id="title">
+  <div class="logo"><svg viewBox="0 0 18 18" width="84" height="84"><g fill="#fff"><rect x="3.5" y="6.2" width="11" height="8" rx="2.6"/><rect x="2" y="2.2" width="14" height="2" rx="1"/></g></svg></div>
+  <div class="word">island</div>
+  <div class="tag">Know the moment your AI agents finish.</div>
+  <div class="sub">A tiny macOS menu-bar app for people who run coding agents in parallel</div>
+</div>
+
+<div class="layer card bg" id="end">
+  <div class="logo" style="width:96px;height:96px;border-radius:24px"><svg viewBox="0 0 18 18" width="60" height="60"><g fill="#fff"><rect x="3.5" y="6.2" width="11" height="8" rx="2.6"/><rect x="2" y="2.2" width="14" height="2" rx="1"/></g></svg></div>
+  <div class="word" style="font-size:88px;margin-top:22px">island</div>
+  <div class="cmd"><span class="dim">$ </span>brew install --cask lbyxiafei/tap/island</div>
+  <div class="url">github.com/lbyxiafei/island</div>
+  <div class="pills"><span>Free</span><span>Open source · MIT</span><span>macOS 13+</span></div>
+</div>
+
+<div id="keys" class="abs"><div class="key">⌃</div><div class="key">⌘</div><div class="key">,</div></div>
+<div class="abs" id="caption"><div id="captext"></div></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const ramp = (t, a, b) => ease((t - a) / (b - a));
+const win = (t, a, b, f = .4) => Math.min(ramp(t, a, a + f), 1 - ramp(t, b - f, b));
+const lerp = (a, b, k) => a + (b - a) * k;
+
+// video time -> raw footage time: 1:1, minus the dead air after the click
+const rawAt = t => t < 24.5 ? t - 3.0 : Math.min(t - 1.2, 35.9);
+
+// camera keyframes: [t, zoom, focusX, focusY] in raw pixels
+const CAM = [
+  [0, 1.15, 900, 610], [7.7, 1.2, 900, 610], [8.5, 2.0, 960, 270], [19.0, 2.0, 960, 270], [19.8, 1.85, 930, 300],
+  [21.9, 1.85, 930, 300], [23.0, 1.32, 1385, 660], [24.5, 1.34, 1385, 660],
+  [24.6, 1.34, 1385, 660], [25.3, 2.0, 960, 290], [29.4, 2.0, 960, 290], [30.4, 1.3, 600, 560], [37.5, 1.38, 600, 560],
+];
+function camAt(t) {
+  let [_, z, x, y] = CAM[0];
+  for (let i = 1; i < CAM.length; i++) {
+    const [t1, z1, x1, y1] = CAM[i], [t0, z0, x0, y0] = CAM[i - 1];
+    if (t >= t1) { z = z1; x = x1; y = y1; continue; }
+    const k = ease((t - t0) / (t1 - t0)); z = lerp(z0, z1, k); x = lerp(x0, x1, k); y = lerp(y0, y1, k); break;
+  }
+  // keep the view inside the frame
+  const hw = 960 / z, hh = 540 / z;
+  x = clamp(x, hw, 1920 - hw); y = clamp(y, hh, 1080 - hh);
+  return [z, x, y];
+}
+
+const CAPS = [
+  [5.0, 8.1, 'Your coding agents, working in parallel.'],
+  [8.6, 14.0, 'island drops down the moment one finishes.'],
+  [14.3, 19.4, 'Claude Code, Codex, pi — one list.', 'Unread first, newest on top'],
+  [19.8, 24.4, 'Click a task.', 'Its exact terminal tab comes to the front.'],
+  [25.4, 29.3, '⌃⌘, from anywhere. Type to filter.'],
+  [29.6, 36.8, '↩ — straight into the right tmux window.', 'Also Ghostty · iTerm2 · Terminal · cmux · VS Code · desktop apps'],
+];
+
+let current = -1;
+function show(n) {
+  if (n === current) return Promise.resolve();
+  current = n;
+  $('raw').src = `../../live/raw/${String(n).padStart(5, '0')}.jpg`;
+  return $('raw').decode().catch(() => {});
+}
+
+function render(t) {
+  // cards
+  $('title').style.opacity = 1 - ramp(t, 4.1, 4.9);
+  $('title').style.transform = `scale(${lerp(1, 1.05, ramp(t, 0, 4.9))})`;
+  const feat = ramp(t, 36.9, 37.7) * (1 - ramp(t, 48.6, 49.3));
+  $('features').style.opacity = feat;
+  $('end').style.opacity = ramp(t, 48.6, 49.3);
+
+  // footage
+  const rt = rawAt(t);
+  const p = show(clamp(Math.floor(rt * 30) + 1, 1, 1078));
+  const [z, fx, fy] = camAt(t);
+  $('cam').style.transform = `translate(${960 - fx * z}px, ${540 - fy * z}px) scale(${z})`;
+
+  // menu bar badge follows the real unread count
+  let n = '';
+  if (rt >= 5.3) n = '1'; if (rt >= 8.4) n = '2'; if (rt >= 11.3) n = '3'; if (rt >= 14.4) n = '5'; if (rt >= 18.9) n = '4'; if (rt >= 28.3) n = '3';
+  $('badge').textContent = n;
+  const flash = [5.3, 8.4, 11.3, 14.4].some(e => rt >= e && rt < e + .6);
+  $('isl').style.background = flash ? 'rgba(143,155,255,.5)' : 'transparent';
+
+  // click ripple on the "Migrate CI" row
+  const rp = rt >= 18.8 && rt < 19.3 ? (rt - 18.8) / .5 : 0;
+  $('ripple').style.opacity = rp ? 1 - rp : 0;
+  $('ripple').style.left = '878px'; $('ripple').style.top = '292px';
+  $('ripple').style.transform = `scale(${.4 + rp})`;
+
+  // where island took us
+  const cb = win(t, 22.6, 24.5, .35);
+  $('chipB').style.opacity = cb; $('chipB').style.left = '1500px'; $('chipB').style.top = `${lerp(300, 286, cb)}px`;
+  const ca = win(t, 30.3, 36.9, .4);
+  $('chipA').style.opacity = ca; $('chipA').style.left = '640px'; $('chipA').style.top = `${lerp(226, 212, ca)}px`;
+
+  // hotkey keycaps (the real press lands at ~24.9)
+  const k = win(t, 24.55, 25.7, .25);
+  $('keys').style.opacity = k;
+  $('keys').style.transform = `scale(${lerp(.86, 1, ease(k))})`;
+  [...document.querySelectorAll('.key')].forEach((el, i) => {
+    const down = t > 24.75 + i * .08 && t < 25.3;
+    el.style.transform = down ? 'translateY(8px)' : 'none';
+    el.style.boxShadow = down ? '0 2px 0 #0c0e15, 0 8px 20px rgba(0,0,0,.5)' : '';
+  });
+
+  // features
+  [[-7, 30, 170], [0, 170, 100], [7, 310, 30]].forEach(([r, x, y], i) => {
+    const kk = ramp(t, 37.4 + i * .25, 38.2 + i * .25);
+    const el = $('f' + i);
+    el.style.left = x + 'px'; el.style.top = (y + 60 * (1 - kk)) + 'px';
+    el.style.opacity = kk; el.style.transform = `rotate(${r * kk}deg)`;
+  });
+  for (let i = 0; i < 4; i++) {
+    const kk = ramp(t, 38.4 + i * .7, 39.0 + i * .7);
+    $('ft' + i).style.opacity = kk; $('ft' + i).style.transform = `translateX(${40 * (1 - kk)}px)`;
+  }
+
+  // caption
+  let cap = null, co = 0;
+  for (const [a, b, text, sub] of CAPS) if (t >= a && t < b) { cap = [text, sub]; co = win(t, a, b, .35); }
+  $('caption').style.opacity = co;
+  $('caption').style.transform = `translateY(${16 * (1 - co)}px)`;
+  if (cap) $('captext').innerHTML = cap[0] + (cap[1] ? `<small>${cap[1]}</small>` : '');
+  return p;
+}
+window.render = render;
+render(0);
+</script>
+</body>
+</html>

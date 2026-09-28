@@ -8,6 +8,35 @@
 
 ---
 
+## YouTube
+
+视频文件：`~/Movies/island/island-intro.mp4`（1920×1080，60 秒，无音轨，可以在 YouTube Studio 编辑器里从 Audio Library 加一段免费配乐）。封面候选：`~/Movies/island/thumbnail-title.jpg` / `thumbnail-panel.jpg`。最后 11 秒是静态片尾，正好放 End screen（订阅 + 链接到 repo）。
+
+**标题**：
+
+> island — a macOS "Dynamic Island" for Claude Code, Codex & pi (open source)
+
+**描述**：
+
+> Running several AI coding agents at once? island is a tiny macOS menu-bar app that drops down the moment Claude Code, Codex or pi finishes a task, and one click takes you back to the exact terminal tab, tmux window, VS Code terminal or desktop conversation.
+>
+> • Every agent, one list: Claude Code · Codex · pi · Claude desktop
+> • Jumps to the exact place: tmux · Terminal · iTerm2 · Ghostty · cmux · VS Code
+> • ⌃⌘, from anywhere: type to filter, ↩ to jump
+> • Quiet when you're already looking at that tab
+> • No permission prompts, no network: reads local session files only
+>
+> Install: brew install --cask lbyxiafei/tap/island
+> Source (MIT): https://github.com/lbyxiafei/island
+>
+> 0:00 Agents finishing in parallel
+> 0:19 Jump back: click, or ⌃⌘, and type
+> 0:37 Features & install
+
+**标签**：claude code, codex, ai agents, macos, menu bar app, tmux, developer tools, open source
+
+---
+
 ## Show HN
 
 **标题**（≤ 80 字符）：
@@ -43,6 +72,8 @@
 **正文**：
 
 > <GIF>
+>
+> 60-second demo: <VIDEO>
 >
 > If you run multiple agents in parallel you know the loop: tab through terminals, check who's done, repeat. Island watches Claude Code, Codex, pi and the Claude desktop app locally and pops a panel from the menu bar when one finishes. Click it to jump straight back to the right tmux pane / terminal tab / VS Code terminal / desktop chat.
 >
