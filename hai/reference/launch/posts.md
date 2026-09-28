@@ -12,7 +12,7 @@
 
 ## YouTube
 
-视频文件：`~/Movies/island/island-intro.mp4`（4K 3840×2160，60 秒，无音轨，可以在 YouTube Studio 编辑器里从 Audio Library 加一段免费配乐）。封面候选：`~/Movies/island/thumbnail-title.jpg` / `thumbnail-panel.jpg`。最后约 9 秒是静态片尾，正好放 End screen（订阅 + 链接到 repo）。
+视频文件：`~/Movies/island/island-intro.mp4`（4K 3840×2160，60 秒，带原创配乐，由 `video/simulated/music.py` 合成，无版权问题）。封面候选：`~/Movies/island/thumbnail-title.jpg` / `thumbnail-panel.jpg`。最后 5 秒是静态片尾，正好放 End screen（订阅 + 链接到 repo）。
 
 **标题**：
 
@@ -24,7 +24,8 @@
 >
 > • Every agent, one list: Claude Code · Codex · pi · Claude desktop
 > • Jumps to the exact place: tmux · Terminal · iTerm2 · Ghostty · cmux · VS Code
-> • ⌃⌘, from anywhere: type to filter, ↩ to jump
+> • ⌃⌘, from anywhere (or any hotkey you record): type to filter, ↩ to jump
+> • 5 themes, pop-up timing, and per-agent / per-scenario switches
 > • Quiet when you're already looking at that tab
 > • No permission prompts, no network: reads local session files only
 >
@@ -33,7 +34,7 @@
 >
 > 0:00 Ask Claude Code, pi and Codex anything
 > 0:17 island pops up — click or ⌃⌘, to jump back
-> 0:42 Features & install
+> 0:42 Make it yours: hotkey, themes, per-agent switches
 
 **标签**：claude code, codex, ai agents, macos, menu bar app, tmux, developer tools, open source
 

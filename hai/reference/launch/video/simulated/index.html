@@ -123,6 +123,52 @@ body { font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif; 
 .rw .tm { font-size: 12px; color: #77777f; }
 .hints { text-align: center; font-size: 11.5px; color: #6f6f79; padding: 8px 0 2px; word-spacing: 2px; }
 
+/* menu bar menu */
+#menu { position: absolute; top: 30px; width: 300px; background: rgba(246,246,248,.94); backdrop-filter: blur(30px); border-radius: 10px; padding: 5px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.35), 0 0 0 .5px rgba(0,0,0,.18); color: #1d1d1f; font-size: 13.5px; z-index: 60; transform-origin: top left; }
+#menu .mi2 { height: 24px; display: flex; align-items: center; padding: 0 10px 0 22px; border-radius: 5px; position: relative; }
+#menu .mi2 .k { margin-left: auto; color: #8a8a8e; } #menu .mi2.dis { color: #a0a0a4; }
+#menu .mi2 .ck { position: absolute; left: 7px; font-size: 12px; }
+#menu .mi2.hl { background: #0a64d9; color: #fff; } #menu .mi2.hl .k { color: #dfe9ff; }
+#menu .sp { height: 1px; background: rgba(0,0,0,.1); margin: 5px 10px; }
+#menu .dotr { width: 7px; height: 7px; border-radius: 50%; background: #ff5b4f; position: absolute; left: 9px; }
+
+/* settings window (light, like the real AppKit one) */
+#S { position: absolute; left: 610px; top: 250px; width: 700px; height: 430px; border-radius: 12px; overflow: hidden; background: #ececec; color: #1d1d1f; z-index: 55;
+  box-shadow: 0 30px 90px rgba(0,0,0,.55), 0 0 0 .5px rgba(0,0,0,.3); font-size: 13px; }
+#S .tb { height: 30px; display: flex; align-items: center; padding: 0 12px; }
+#S .tb .t { flex: 1; text-align: center; font-weight: 600; font-size: 13px; color: #3a3a3c; margin-right: 52px; }
+#S .seg { position: absolute; left: 50%; top: 44px; transform: translateX(-50%); display: flex; background: #dcdcdf; border-radius: 7px; padding: 2px; z-index: 2; }
+#S .seg div { padding: 4px 16px; border-radius: 5px; font-size: 13px; color: #3a3a3c; }
+#S .seg div.on { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.18); font-weight: 500; }
+#S .box { position: absolute; left: 20px; right: 20px; top: 56px; bottom: 20px; background: #e4e4e6; border: 1px solid #d3d3d6; border-radius: 9px; padding: 34px 26px 20px; }
+#S .spane { display: none; } #S .spane.on { display: block; }
+#S h4 { font-size: 13px; font-weight: 650; margin-bottom: 9px; }
+#S .help { font-size: 11px; color: #7a7a80; margin-top: 7px; line-height: 1.45; }
+#S .rec { height: 48px; border-radius: 8px; background: #fff; border: 1px solid #c7c7cc; display: flex; align-items: center; justify-content: center; font-size: 21px; letter-spacing: 4px; color: #1d1d1f; }
+#S .rec.recording { border-color: #0a64d9; box-shadow: 0 0 0 3.5px rgba(10,100,217,.35); color: #8a8a8e; font-size: 15px; letter-spacing: 0; }
+#S .cb { display: flex; align-items: center; gap: 7px; margin-top: 12px; }
+#S .cb i { width: 15px; height: 15px; border-radius: 4px; background: #0a64d9; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; font-style: normal; }
+#S .cb i.off { background: #fff; border: 1px solid #b8b8bd; color: transparent; }
+#S .btns { display: flex; gap: 8px; margin-top: 16px; }
+#S .btn { padding: 4px 14px; border-radius: 6px; background: #fff; border: .5px solid #c4c4c9; box-shadow: 0 1px 1.5px rgba(0,0,0,.1); font-size: 13px; }
+#S .btn.pri { background: #0a64d9; color: #fff; border-color: #0a64d9; }
+#S .fb { font-size: 11.5px; color: #1f8f3a; margin-top: 10px; height: 14px; }
+#S .pop { display: inline-flex; align-items: center; gap: 22px; padding: 4px 10px 4px 12px; background: #fff; border: .5px solid #c4c4c9; border-radius: 6px; box-shadow: 0 1px 1.5px rgba(0,0,0,.1); min-width: 170px; }
+#S .pop .ar { margin-left: auto; font-size: 10px; background: #0a64d9; color: #fff; border-radius: 4px; padding: 1px 4px; }
+#S .num { display: inline-block; width: 56px; text-align: right; padding: 3px 7px; background: #fff; border: 1px solid #c7c7cc; border-radius: 5px; margin: 0 6px; }
+#S .num.edit { border-color: #0a64d9; box-shadow: 0 0 0 3px rgba(10,100,217,.3); }
+#S .ag { display: flex; align-items: center; gap: 10px; margin: 2px 0 6px; font-weight: 650; }
+#S .ag img, #S .ag .pic { width: 20px; height: 20px; border-radius: 5px; }
+#S .sw { margin-left: auto; width: 32px; height: 19px; border-radius: 10px; background: #34c759; position: relative; }
+#S .sw::after { content: ''; position: absolute; right: 2px; top: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+#S .sc { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 5px 30px; font-size: 12px; }
+#S .sc i { margin-top: 1px; flex: none; width: 14px; height: 14px; border-radius: 4px; background: #0a64d9; color: #fff; font-size: 10px; display: flex; align-items: center; justify-content: center; font-style: normal; transition: none; }
+#S .sc i.off { background: #fff; border: 1px solid #b8b8bd; color: transparent; }
+#S .sc span { color: #7a7a80; }
+#S .agsep { height: 1px; background: #d3d3d6; margin: 8px 0 9px; }
+#preview { position: absolute; left: 700px; top: 28px; width: 520px; z-index: 46; transform-origin: top center; }
+
 /* overlays */
 #cursor { width: 24px; height: 34px; z-index: 80; }
 #ripple { width: 40px; height: 40px; border-radius: 50%; border: 3px solid rgba(255,255,255,.95); z-index: 79; }
@@ -219,6 +265,62 @@ body { font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif; 
   </div>
 
   <div id="panel"></div>
+  <div id="preview"></div>
+  <div id="menu">
+    <div class="mi2">Summon overlay<span class="k">⌃⌘,</span></div>
+    <div class="mi2"><span class="ck">✓</span>Summon hotkey</div>
+    <div class="mi2 dis">hotkey ⌃⌘, · default</div>
+    <div class="sp"></div>
+    <div class="mi2 dis" style="font-size:12px">Recent tasks</div>
+    <div class="mi2">Add unit tests for parseDate()</div>
+    <div class="mi2">Top 5 Hacker News stories today</div>
+    <div class="sp"></div>
+    <div class="mi2" id="mSettings">Settings…<span class="k">⌘,</span></div>
+    <div class="mi2"><span class="ck">✓</span>Launch at login</div>
+    <div class="sp"></div>
+    <div class="mi2">Quit island<span class="k">⌘Q</span></div>
+  </div>
+  <div id="S">
+    <div class="tb"><div class="tl"><i></i><i></i><i></i></div><div class="t">island settings</div></div>
+    <div class="seg"><div id="tab0" class="on">General</div><div id="tab1">Appearance</div><div id="tab2">Notifications</div><div id="tab3">Agents</div></div>
+    <div class="box">
+      <div class="spane on" id="pane0">
+        <h4>Summon hotkey</h4>
+        <div class="rec" id="rec">⌃ ⌘ ,</div>
+        <div class="help">Click to record, then press ⌘⌃⌥⇧ + a key. Esc cancels.</div>
+        <div class="cb"><i>✓</i>Enabled</div>
+        <div class="fb" id="fb"></div>
+        <div class="btns"><span class="btn">Clear</span><span class="btn">Reset to default</span><span class="btn pri" id="apply">Apply</span></div>
+      </div>
+      <div class="spane" id="pane1">
+        <h4>Overlay theme</h4>
+        <div class="pop"><span id="themeName">Midnight</span><span class="ar">⌃⌄</span></div>
+        <div class="help">Applies immediately; the overlay shows a preview.</div>
+        <div class="cb" style="margin-top:22px"><i>✓</i>Show keyboard hints</div>
+      </div>
+      <div class="spane" id="pane2">
+        <h4>Pop-up</h4>
+        <div class="cb" style="margin-top:0"><i>✓</i>Pop up when an agent run finishes</div>
+        <div style="margin-top:14px">Stay on screen for<span class="num" id="secs">5</span>seconds</div>
+        <div class="help">Hovering the pop-up keeps it open. The menu bar counts unread runs either way;<br>runs you watched finish are listed without a dot or a pop-up.</div>
+      </div>
+      <div class="spane" id="pane3" style="margin-top:-14px">
+        <div class="ag"><img src="assets/claude.png">Claude Code<span class="sw"></span></div>
+        <div class="sc"><i>✓</i><div>Terminal CLI <span>— tmux, cmux, Ghostty, Terminal, iTerm2, VS Code terminal</span></div></div>
+        <div class="sc"><i>✓</i><div>Editor extension <span>— VS Code or JetBrains panels</span></div></div>
+        <div class="sc"><i>✓</i><div>Code in the Claude app</div></div>
+        <div class="sc"><i>✓</i><div>SDK &amp; other entry points</div></div>
+        <div class="agsep"></div>
+        <div class="ag"><div class="pic" style="background:#1d1f2b;color:#b392f0;font:700 11px JBM,Menlo;display:flex;align-items:center;justify-content:center">pi</div>pi<span class="sw"></span></div>
+        <div class="sc"><i>✓</i><div>Terminal CLI <span>— matched to its process by working directory</span></div></div>
+        <div class="agsep"></div>
+        <div class="ag"><img src="assets/chatgpt.png">Codex<span class="sw"></span></div>
+        <div class="sc"><i>✓</i><div>Desktop app &amp; IDE</div></div>
+        <div class="sc"><i>✓</i><div>Terminal CLI</div></div>
+        <div class="sc" id="headless"><i id="hlbox">✓</i><div>Headless exec <span>— codex exec runs from scripts or CI</span></div></div>
+      </div>
+    </div>
+  </div>
   <div class="abs" id="ripple"></div>
  </div>
 </div>
@@ -477,7 +579,7 @@ function panelState(t) {
 }
 
 // ---- camera: [t, zoom, focusX, focusY] ----
-const CAM = [
+let CAM = [
   [4.0, 1.0, 960, 540], [4.7, 1.6, 520, 330], [6.3, 1.6, 520, 330], [6.7, 1.6, 1410, 330], [8.3, 1.6, 1410, 330],
   [8.9, 1.35, 1080, 780], [10.9, 1.35, 1080, 780], [11.8, 1.12, 1000, 560], [16.6, 1.14, 1000, 560],
   [17.2, 1.95, 960, 200], [24.2, 1.95, 960, 200], [25.0, 1.7, 1410, 390], [28.2, 1.74, 1410, 390],
@@ -499,7 +601,7 @@ function camAt(t) {
 
 // ---- cursor (scene coordinates) ----
 const ROW0 = [900, 28 + 54 + 26];
-const CUR = [[4, 1500, 1000], [16.8, 1500, 900], [22.6, 1500, 900], [23.8, ROW0[0], ROW0[1]], [24.5, ROW0[0], ROW0[1]], [26.0, 1650, 950], [60, 1650, 950]];
+let CUR = [[4, 1500, 1000], [16.8, 1500, 900], [22.6, 1500, 900], [23.8, ROW0[0], ROW0[1]], [24.5, ROW0[0], ROW0[1]], [26.0, 1650, 950]];
 function cursorAt(t) {
   for (let i = 1; i < CUR.length; i++) {
     const [t1, x1, y1] = CUR[i], [t0, x0, y0] = CUR[i - 1];
@@ -517,16 +619,49 @@ const CAPS = [
   [24.6, 28.3, 'Click it — you land in that exact tmux pane.'],
   [28.8, 33.5, '⌃⌘, from anywhere. Type. ↩.', 'Straight into the Codex conversation'],
   [34.2, 38.1, 'Already looking at it? island stays quiet.', 'No popup, no badge — the VS Code task finished in front of you'],
-  [38.5, 42.4, '⌘1–9: one keystroke per task.'],
+  [38.5, 42.2, '⌘1–9: one keystroke per task.'],
+  [44.1, 49.7, 'Make it yours.', 'Any hotkey · 5 themes · pop-up timing · per-agent switches'],
 ];
-const KEYS = [[B.sum1 - .35, B.sum1 + .7, ['⌃', '⌘', ',']], [B.switcher[0] - .1, B.switcher[1], ['⌘', '⇥']], [B.sum2 - .35, B.sum2 + .7, ['⌃', '⌘', ',']], [B.cmd1 - .3, B.cmd1 + .6, ['⌘', '1']]];
+const KEYS = [[44.85, 45.65, ['⌥', 'Space']], [B.sum1 - .35, B.sum1 + .7, ['⌃', '⌘', ',']], [B.switcher[0] - .1, B.switcher[1], ['⌘', '⇥']], [B.sum2 - .35, B.sum2 + .7, ['⌃', '⌘', ',']], [B.cmd1 - .3, B.cmd1 + .6, ['⌘', '1']]];
+
+// ---- settings beats ----
+const S = { menuClick: 42.95, setClick: 43.8, open: 43.85, recClick: 44.55, keys: 45.1, apply: 45.7,
+  tab1: 46.1, th1: 46.55, th2: 47.0, th3: 47.45, tab2: 47.75, secs: 48.15, tab3: 48.55, hl: 49.2, close: 49.75 };
+const CLICKS = [S.menuClick, S.setClick, S.recClick, S.apply, S.tab1, S.tab2, S.tab3, S.hl];
+const center = el => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+let POS = null;
+function measure() {
+  $('menu').style.left = '0px';
+  const isl = center($('isl'));
+  $('menu').style.left = (isl[0] - 22) + 'px';
+  const at = i => { for (let j = 0; j < 4; j++) $('pane' + j).classList.toggle('on', j === i); };
+  const rec = center($('rec')), apply = center($('apply'));
+  at(2); const secs = center($('secs'));
+  at(3); const hl = center($('hlbox'));
+  at(0);
+  POS = { isl, set: center($('mSettings')), rec, apply, secs, hl, tab1: center($('tab1')), tab2: center($('tab2')), tab3: center($('tab3')) };
+  CUR.push([42.1, 1650, 950], [42.85, ...POS.isl], [43.1, ...POS.isl], [43.65, POS.set[0] - 60, POS.set[1]], [44.0, POS.set[0] - 60, POS.set[1]],
+    [44.45, ...POS.rec], [45.25, ...POS.rec], [45.6, ...POS.apply], [45.8, ...POS.apply], [46.05, ...POS.tab1], [47.6, ...POS.tab1],
+    [47.7, ...POS.tab2], [48.05, ...POS.secs], [48.3, ...POS.secs], [48.5, ...POS.tab3], [48.9, ...POS.tab3], [49.15, ...POS.hl], [60, ...POS.hl]);
+  CAM.push([42.9, 1.6, POS.isl[0] - 120, 230], [43.75, 1.6, POS.isl[0] - 120, 230], [44.3, 1.22, 960, 450], [49.8, 1.24, 960, 450]);
+}
+const THEMES = { Midnight: ['#050507', '#f2f2f4', '#8e8e98', '#16162a', '#45478a', '#1e1e22', '#9f93ff'],
+  Lagoon: ['#152a35', '#e9f3f7', '#8fb3c2', '#1d3b48', '#3d7383', '#1e3a47', '#5fd1c1'],
+  Sand: ['#f3efe6', '#1f1d1a', '#6b675f', '#e6e1d6', '#c9c1b1', '#e3ded3', '#9f93ff'] };
+function themed(name) {
+  const [bg, fg, sub, selBg, selBd, num, dot] = THEMES[name];
+  const rows = [['Seattle weather this weekend', 'home • Claude Code', 'claude'], ['Add unit tests for parseDate()', 'web-app • Claude Code', 'claude'], ['Top 5 Hacker News stories today', 'news • pi', 'pi']];
+  return `<div class="box" style="background:${bg};border-color:rgba(127,127,127,.18)"><div class="ph"><span class="dot" style="background:${dot}"></span><span class="n" style="color:${fg}">1 new</span><span class="kc" style="background:${num};color:${sub}">⌥Space</span></div>` +
+    rows.map(([a, b, ic], j) => `<div class="rw${j === 0 ? ' sel' : ''}" style="${j === 0 ? `background:${selBg};border-color:${selBd}` : ''}"><span class="num" style="background:${num};color:${sub}">${j + 1}</span><span class="ico">${ICON[ic]}${j === 0 ? `<span class="rd" style="border-color:${bg}"></span>` : ''}</span><div class="tx"><div class="tt" style="color:${fg}">${a}</div><div class="st" style="color:${sub}">${b}</div></div><span class="tm" style="color:${sub}">now</span></div>`).join('') + '</div>';
+}
 
 function render(t) {
+  if (!POS) measure();
   // cards
   $('title').style.opacity = 1 - ramp(t, 3.6, 4.4);
   $('title').style.transform = `scale(${lerp(1, 1.05, ramp(t, 0, 4.4))})`;
-  $('features').style.opacity = ramp(t, 42.4, 43.2) * (1 - ramp(t, 51.2, 51.9));
-  $('end').style.opacity = ramp(t, 51.2, 51.9);
+  $('features').style.opacity = ramp(t, 49.9, 50.6) * (1 - ramp(t, 55.0, 55.6));
+  $('end').style.opacity = ramp(t, 55.0, 55.6);
 
   // windows
   const f = front(t);
@@ -570,6 +705,29 @@ function render(t) {
   $('badge').textContent = n ? n : '';
   $('isl').style.background = [B.wDone, B.cDone, B.nDone].some(e => t >= e && t < e + .6) ? 'rgba(143,155,255,.5)' : 'transparent';
 
+  // menu bar menu + settings window
+  const mOn = t >= S.menuClick && t < S.setClick + .15;
+  $('menu').style.opacity = mOn ? 1 : 0;
+  $('menu').style.transform = `scale(${mOn ? lerp(.96, 1, ramp(t, S.menuClick, S.menuClick + .15)) : 1})`;
+  $('mSettings').classList.toggle('hl', t >= 43.55 && t < S.setClick + .15);
+  const sOn = ramp(t, S.open, S.open + .3) * (1 - ramp(t, S.close, S.close + .3));
+  $('S').style.opacity = sOn; $('S').style.transform = `scale(${lerp(.96, 1, sOn)})`;
+  const tab = t >= S.tab3 ? 3 : t >= S.tab2 ? 2 : t >= S.tab1 ? 1 : 0;
+  for (let i = 0; i < 4; i++) { $('tab' + i).classList.toggle('on', i === tab); $('pane' + i).classList.toggle('on', i === tab); }
+  const recording = t >= S.recClick && t < S.keys;
+  $('rec').classList.toggle('recording', recording);
+  $('rec').textContent = recording ? 'Press a combination…' : t >= S.keys ? '⌥ Space' : '⌃ ⌘ ,';
+  $('fb').textContent = t >= S.apply ? 'Hotkey set to ⌥Space.' : '';
+  const theme = t >= S.th3 ? 'Midnight' : t >= S.th2 ? 'Sand' : t >= S.th1 ? 'Lagoon' : 'Midnight';
+  $('themeName').textContent = theme;
+  const pv = tab === 1 && t < S.tab2 ? ramp(t, S.tab1, S.tab1 + .35) * (1 - ramp(t, S.tab2 - .2, S.tab2)) : 0;
+  $('preview').style.opacity = pv ? 1 : 0;
+  if (pv) { $('preview').innerHTML = themed(theme); $('preview').style.transform = `translateY(${lerp(-105, 0, outBack(pv))}%)`; }
+  $('secs').textContent = t >= S.secs ? '8' : '5';
+  $('secs').classList.toggle('edit', t >= S.secs - .25 && t < S.tab3);
+  $('hlbox').classList.toggle('off', t >= S.hl);
+  if (t >= S.open && t < S.close + .2) $('app').textContent = 'island';
+
   // camera
   const [z, fx, fy] = camAt(t);
   $('cam').style.transform = `translate(${960 - fx * z}px, ${540 - fy * z}px) scale(${z})`;
@@ -577,10 +735,12 @@ function render(t) {
   // cursor + click ripple (scene -> screen)
   const [cx, cy] = cursorAt(t), sx = 960 + (cx - fx) * z, sy = 540 + (cy - fy) * z;
   $('cursor').style.left = sx + 'px'; $('cursor').style.top = sy + 'px';
-  $('cursor').style.opacity = t > 16.8 && t < 27 ? 1 : 0;
-  const rp = t >= B.click && t < B.click + .5 ? (t - B.click) / .5 : 0;
+  $('cursor').style.opacity = (t > 16.8 && t < 27) || (t > 42.15 && t < S.close) ? 1 : 0;
+  const ct = [B.click, ...CLICKS].find(c => t >= c && t < c + .5);
+  const rp = ct !== undefined ? (t - ct) / .5 : 0;
+  const rpos = ct === B.click || ct === undefined ? ROW0 : cursorAt(ct);
   $('ripple').style.opacity = rp ? 1 - rp : 0;
-  $('ripple').style.left = (ROW0[0] - 20) + 'px'; $('ripple').style.top = (ROW0[1] - 20) + 'px';
+  $('ripple').style.left = (rpos[0] - 20) + 'px'; $('ripple').style.top = (rpos[1] - 20) + 'px';
   $('ripple').style.transform = `scale(${.4 + rp})`;
 
   // app switcher
@@ -604,7 +764,7 @@ function render(t) {
 
   // features + themes
   for (let i = 0; i < 4; i++) {
-    const k = ramp(t, 43.0 + i * .7, 43.6 + i * .7);
+    const k = ramp(t, 50.4 + i * .5, 51.0 + i * .5);
     $('ft' + i).style.opacity = k; $('ft' + i).style.transform = `translateX(${-40 * (1 - k)}px)`;
   }
   if (!$('themes').innerHTML) {
@@ -616,7 +776,7 @@ function render(t) {
       </div></div>`).join('');
   }
   [[-6, 0, 170], [0, 170, 90], [6, 340, 10]].forEach(([r, x, y], i) => {
-    const k = ramp(t, 42.8 + i * .3, 43.6 + i * .3), el = $('th' + i);
+    const k = ramp(t, 50.2 + i * .25, 50.9 + i * .25), el = $('th' + i);
     el.style.left = x + 'px'; el.style.top = (y + 60 * (1 - k)) + 'px'; el.style.opacity = k; el.style.transform = `rotate(${r * k}deg)`;
   });
 

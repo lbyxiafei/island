@@ -3,9 +3,15 @@
 `~/Movies/island/island-intro.mp4` 用的就是这一版（2026-09-28）：3840×2160，30fps，60 秒。整片由 `index.html` 画出来，里面的 `render(t)` 按时间线决定每一帧；`render.mjs` 通过 CDP 让 headless Chrome 以 2× 设备像素比逐帧截图，再用管道交给 ffmpeg 编码。零依赖，只要 Node 和 Chrome。
 
 ```bash
-node render.mjs stills ./st "6,17.5,24.3"          # 检查几个关键帧
-node render.mjs video ./island-intro-4k.mp4 60       # 渲染全片
+node render.mjs stills ./st "6,17.5,24.3"                        # 检查几个关键帧
+node render.mjs video ./silent-4k.mp4 60                           # 渲染画面
+uv run --with numpy --with scipy python music.py                   # 合成配乐 → music.wav
+ffmpeg -i silent-4k.mp4 -i music.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 320k -shortest island-intro.mp4
 ```
+
+## 配乐
+
+`music.py` 从零合成，原创、无版权问题：120 BPM，D 大调，和声走 Gmaj7 → F#m7 → Em9 → A7sus4，结尾落在 Dmaj9。配器有 detune 锯齿波 Pad、带乒乓延迟的拨弦琶音、正弦贝斯、合成鼓组，外加一个短混响。小节线从 1 秒开始，每 2 秒一小节，这样 17.0 秒（第一个任务完成、浮窗弹出）正好落在强拍上，鼓在这里进来；55 秒片尾时鼓退出。UI 音效（浮窗弹出的「叮」、鼠标点击、按键帽、打字声）按 index.html 里 `B` / `S` 的时间点放置，改时间线时两边要一起改。成品响度约 -14 LUFS，对齐 YouTube 的标准。
 
 ## 为什么全模拟，不用实录
 
@@ -13,6 +19,7 @@ node render.mjs video ./island-intro-4k.mp4 60       # 渲染全片
 
 - Ghostty + tmux 左右分屏：左边 Claude Code（v2 的像素 logo、输入框、状态行），右边 pi（启动头、`[Context]`、底部状态）
 - VS Code：编辑器 + 集成终端里跑 Claude Code
+- Settings：点菜单栏图标 → Settings…，依次演示录制新快捷键（⌥Space）、切主题并实时预览浮窗、改弹出时长、按场景关掉 Codex headless exec。窗口结构和文案照 `Sources/Island/HotkeySettingsWindow.swift` 和 `AgentProfile.swift` 还原
 - Codex 桌面版：浅色侧栏 + 对话 + 底部 composer，照着真实截图还原
 - 任务选人人看得懂的：西雅图周末天气、HN 今日 Top 5、东京 3 日游、给 `parseDate()` 写单测
 
@@ -33,4 +40,4 @@ done
 
 ## 时间线
 
-片头 0–4 → tmux 里问天气、问 HN（4–8.5）→ Codex 问东京（8.5–11.5）→ 回到 VS Code 干活（11.5–17）→ 天气 / 东京 / HN 陆续完成，浮窗弹出（17–24）→ 点 HN 那一行，跳进 tmux 右侧窗格（24.3）→ `⌃⌘,` 输入 `tok` 回车，打开 Codex 对话（28.6–31）→ `⌘⇥` 切回 VS Code，测试完成但不弹出（34–38）→ `⌃⌘,` 再按 `⌘1` 回到天气（38.3–42）→ 功能页（42.4–51.2）→ 片尾安装命令（51.2–60，给 YouTube 结束画面留位置）。
+片头 0–4 → tmux 里问天气、问 HN（4–8.5）→ Codex 问东京（8.5–11.5）→ 回到 VS Code 干活（11.5–17）→ 天气 / 东京 / HN 陆续完成，浮窗弹出（17–24）→ 点 HN 那一行，跳进 tmux 右侧窗格（24.3）→ `⌃⌘,` 输入 `tok` 回车，打开 Codex 对话（28.6–31）→ `⌘⇥` 切回 VS Code，测试完成但不弹出（34–38）→ `⌃⌘,` 再按 `⌘1` 回到天气（38.3–42）→ 菜单栏打开 Settings，演示可配置性（42.2–49.8）→ 功能页（50–55）→ 片尾安装命令（55–60，给 YouTube 结束画面留位置）。
