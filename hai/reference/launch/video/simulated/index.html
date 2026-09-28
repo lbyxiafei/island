@@ -1,0 +1,636 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+@font-face { font-family: "JBM"; src: url("file:///Users/binyanli/Library/Fonts/JetBrainsMonoNLNerdFont-Regular.ttf"); }
+@font-face { font-family: "JBM"; font-weight: 700; src: url("file:///Users/binyanli/Library/Fonts/JetBrainsMonoNLNerdFont-Bold.ttf"); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+body { font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; color: #fff; }
+.abs { position: absolute; } .layer { position: absolute; inset: 0; }
+.mono { font-family: "JBM", Menlo, monospace; }
+
+/* desktop */
+#cam { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+#wall { background:
+  radial-gradient(1300px 900px at 12% 105%, #2b6c8c 0%, transparent 60%),
+  radial-gradient(1100px 800px at 96% -8%, #6d3fa6 0%, transparent 62%),
+  radial-gradient(900px 700px at 55% 55%, #1b2750 0%, transparent 72%),
+  linear-gradient(160deg, #141a34, #0c0f1f); }
+#menubar { left: 0; top: 0; width: 1920px; height: 28px; background: rgba(22,24,36,.55); backdrop-filter: blur(24px) saturate(1.4);
+  display: flex; align-items: center; padding: 0 14px; font-size: 13.5px; font-weight: 500; color: #eef0f8; z-index: 50; }
+#menubar .l span { margin-right: 18px; } #menubar .l b { margin-right: 20px; font-weight: 700; }
+#menubar .r { margin-left: auto; display: flex; align-items: center; gap: 18px; }
+#isl { display: flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: 5px; }
+#badge { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mi { width: 15px; height: 15px; border-radius: 4px; background: rgba(238,240,248,.6); }
+
+/* windows */
+.win { position: absolute; border-radius: 12px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 .5px rgba(255,255,255,.14); transform-origin: 50% 40%; }
+.tl { display: flex; gap: 8px; } .tl i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.tl i:nth-child(1){background:#ff5f57}.tl i:nth-child(2){background:#febc2e}.tl i:nth-child(3){background:#28c840}
+.inactive .tl i { background: #4a4a50 !important; }
+
+/* ghostty + tmux */
+#G { background: #13141c; }
+#G .bar { height: 30px; display: flex; align-items: center; padding: 0 12px; background: #1b1c26; color: #9da3bd; font-size: 12.5px; border-bottom: 1px solid #262838; }
+#G .bar .t { flex: 1; text-align: center; margin-right: 52px; }
+#G .panes { position: absolute; top: 30px; left: 0; right: 0; bottom: 24px; display: flex; }
+.pane { position: relative; flex: 1; padding: 14px 18px; font-size: 14.5px; line-height: 1.55; color: #d7dae8; white-space: pre; overflow: hidden; }
+.pane + .pane { border-left: 1.5px solid #333650; }
+.pane.active { box-shadow: inset 0 0 0 1.5px rgba(126,231,135,.0); }
+#G .sep { position: absolute; top: 30px; bottom: 24px; width: 2px; background: #3a3d57; }
+#G .status { position: absolute; left: 0; right: 0; bottom: 0; height: 24px; background: #161826; display: flex; align-items: center; padding: 0 10px; gap: 10px; font-size: 12.5px; color: #8e95b8; }
+.tmw { padding: 1px 8px; border-radius: 3px; } .tmw.cur { background: #7ee787; color: #0b0d14; font-weight: 700; }
+
+.o { color: #d97757; } .dim { color: #7d8299; } .dim2 { color: #5a5f78; } .b { color: #7aa7ff; } .g { color: #7ee787; } .y { color: #f2cc60; }
+.p { color: #b392f0; } .w { color: #fff; font-weight: 700; } .c { color: #79c0ff; } .r { color: #ff7b72; }
+.ubox { background: #242636; color: #e6e8f3; padding: 2px 8px; margin: 0 -8px; border-radius: 3px; }
+.rule { color: #3d4057; }
+.cursor { display: inline-block; width: .6em; height: 1.15em; vertical-align: -3px; background: #cfd3e6; }
+
+/* vscode */
+#V { background: #1f1f1f; }
+#V .bar { height: 34px; background: #181818; display: flex; align-items: center; padding: 0 12px; border-bottom: 1px solid #2b2b2b; }
+#V .cmd { margin: 0 auto; width: 460px; height: 22px; border-radius: 6px; background: #2a2a2a; border: 1px solid #3a3a3a; color: #bbb; font-size: 12.5px; display: flex; align-items: center; justify-content: center; }
+#V .act { position: absolute; left: 0; top: 34px; bottom: 22px; width: 46px; background: #181818; border-right: 1px solid #2b2b2b; }
+#V .act i { display: block; width: 22px; height: 22px; margin: 14px auto 0; border-radius: 4px; border: 2px solid #858585; opacity: .8; }
+#V .act i:first-child { border-color: #fff; opacity: 1; }
+#V .side { position: absolute; left: 46px; top: 34px; bottom: 22px; width: 250px; background: #181818; border-right: 1px solid #2b2b2b; font-size: 13px; color: #ccc; padding-top: 8px; }
+#V .side .h { font-size: 11px; letter-spacing: .6px; color: #bbb; padding: 4px 16px 8px; }
+#V .side div.f { padding: 3px 16px 3px 26px; white-space: nowrap; }
+#V .side div.f.sel { background: #37373d; }
+#V .main { position: absolute; left: 296px; right: 0; top: 34px; bottom: 22px; }
+#V .tabs { height: 36px; background: #181818; display: flex; border-bottom: 1px solid #2b2b2b; font-size: 13px; }
+#V .tab { padding: 9px 16px; color: #999; border-right: 1px solid #2b2b2b; } #V .tab.cur { background: #1f1f1f; color: #fff; border-top: 1.5px solid #0078d4; }
+#V .code { position: absolute; top: 36px; left: 0; right: 0; height: 380px; font-size: 14px; line-height: 1.6; padding: 10px 0; white-space: pre; color: #d4d4d4; }
+#V .ln { display: inline-block; width: 56px; text-align: right; padding-right: 22px; color: #6e7681; }
+.kw { color: #c586c0; } .ty { color: #4ec9b0; } .fn { color: #dcdcaa; } .st { color: #ce9178; } .nu { color: #b5cea8; } .cm { color: #6a9955; } .va { color: #9cdcfe; }
+#V .panel { position: absolute; left: 0; right: 0; bottom: 0; top: 416px; border-top: 1px solid #2b2b2b; background: #181818; }
+#V .ptabs { height: 32px; display: flex; align-items: center; gap: 22px; padding: 0 16px; font-size: 11.5px; letter-spacing: .5px; color: #999; }
+#V .ptabs .cur { color: #e7e7e7; border-bottom: 1px solid #e7e7e7; padding-bottom: 4px; }
+#V .term { position: absolute; top: 32px; left: 0; right: 170px; bottom: 0; padding: 6px 18px; font-size: 14px; line-height: 1.55; white-space: pre; color: #d7dae8; }
+#V .tlist { position: absolute; top: 32px; right: 0; width: 170px; bottom: 0; border-left: 1px solid #2b2b2b; font-size: 12.5px; color: #ccc; padding-top: 6px; }
+#V .tlist div { padding: 4px 12px; } #V .tlist .sel { background: #37373d; }
+#V .sb { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; background: #181818; border-top: 1px solid #2b2b2b; font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 16px; padding-left: 10px; }
+#V .sb .rm { background: #0078d4; color: #fff; height: 22px; padding: 0 10px; display: flex; align-items: center; margin-left: -10px; }
+
+/* codex */
+#C { background: #fff; color: #1f1f1f; }
+#C .side { position: absolute; left: 0; top: 0; bottom: 0; width: 270px; background: #f6f6f7; border-right: 1px solid #ececee; padding: 14px 14px; font-size: 13.5px; color: #2a2a2a; }
+#C .side .tl { margin-bottom: 18px; }
+#C .side .brand { font-weight: 700; font-size: 17px; margin-bottom: 16px; }
+#C .side .it { padding: 5px 8px; border-radius: 7px; display: flex; gap: 10px; align-items: center; }
+#C .side .it.sel { background: #e8e8ea; }
+#C .side .sec { color: #999; font-size: 12.5px; margin: 16px 8px 6px; }
+#C .ic { width: 15px; height: 15px; border: 1.6px solid #555; border-radius: 4px; flex: none; }
+#C .top { position: absolute; left: 270px; right: 0; top: 0; height: 48px; display: flex; align-items: center; padding: 0 22px; font-size: 14px; color: #333; border-bottom: 1px solid #f0f0f0; }
+#C .chat { position: absolute; left: 270px; right: 0; top: 48px; bottom: 120px; display: flex; justify-content: center; }
+#C .col { width: 780px; padding-top: 36px; font-size: 15px; line-height: 1.65; color: #1f1f1f; }
+#C .ubub { margin-left: auto; width: fit-content; max-width: 520px; background: #f1f1f2; border-radius: 18px; padding: 9px 16px; font-size: 15px; }
+#C .worked { color: #8e8e93; font-size: 14px; margin: 22px 0 10px; }
+#C .ans h3 { font-size: 17px; margin: 4px 0 6px; } #C .ans p { margin: 3px 0; } #C .ans b { font-weight: 650; }
+#C .shimmer { color: #9a9aa0; font-size: 14.5px; margin-top: 22px; }
+#C .composer { position: absolute; left: calc(270px + (100% - 270px) / 2 - 390px); width: 780px; bottom: 26px; height: 92px; border: 1px solid #e3e3e6; border-radius: 18px;
+  box-shadow: 0 4px 18px rgba(0,0,0,.06); padding: 14px 18px; font-size: 15px; color: #1f1f1f; }
+#C .composer .ph { color: #a0a0a6; }
+#C .composer .row { position: absolute; left: 18px; right: 14px; bottom: 11px; display: flex; align-items: center; gap: 14px; font-size: 13px; color: #888; }
+#C .send { margin-left: auto; width: 28px; height: 28px; border-radius: 50%; background: #1f1f1f; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+#C .fa { color: #e0691a; }
+#C .empty { text-align: center; margin-top: 190px; font-size: 26px; font-weight: 600; color: #222; }
+
+/* island panel (Midnight), sized like the real one on a 1920pt screen */
+#panel { position: absolute; left: 700px; top: 28px; width: 520px; z-index: 45; transform-origin: top center; }
+#panel .box { background: #050507; border-radius: 0 0 26px 26px; border: 1px solid rgba(255,255,255,.08); border-top: 0; box-shadow: 0 26px 60px rgba(0,0,0,.6); padding: 0 10px 10px; }
+.ph { height: 54px; display: flex; align-items: center; padding: 0 12px; gap: 10px; }
+.ph .dot { width: 8px; height: 8px; border-radius: 50%; background: #9f93ff; }
+.ph .n { font-weight: 700; font-size: 15.5px; color: #f4f4f6; }
+.ph .kc { margin-left: auto; background: #1f1f24; color: #a4a4ad; font-size: 12.5px; font-weight: 600; padding: 4px 9px; border-radius: 7px; }
+.ph .q { flex: 1; font-size: 16.5px; color: #f4f4f6; display: flex; align-items: center; }
+.ph .q .ph2 { color: #6b6b75; }
+.ph .caret { width: 2px; height: 20px; background: #8f9bff; display: inline-block; margin: 0 1px; }
+.ph .pill { background: #2a2750; color: #b8adff; font-size: 12.5px; font-weight: 700; padding: 4px 9px; border-radius: 7px; }
+.rw { height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-radius: 14px; border: 1.5px solid transparent; }
+.rw.sel { background: #16162a; border-color: #45478a; }
+.rw .num { width: 24px; height: 24px; border-radius: 6px; background: #1e1e22; color: #8b8b93; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex: none; }
+.rw .ico { position: relative; width: 28px; height: 28px; flex: none; }
+.rw .ico img { width: 28px; height: 28px; display: block; }
+.rw .ico .rd { position: absolute; right: -3px; top: -3px; width: 9px; height: 9px; border-radius: 50%; background: #ff5b4f; border: 1.5px solid #050507; }
+.rw .tx { flex: 1; min-width: 0; }
+.rw .tt { font-size: 14.5px; font-weight: 650; color: #f2f2f4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rw .st { font-size: 12px; color: #8e8e98; margin-top: 1px; }
+.rw .tm { font-size: 12px; color: #77777f; }
+.hints { text-align: center; font-size: 11.5px; color: #6f6f79; padding: 8px 0 2px; word-spacing: 2px; }
+
+/* overlays */
+#cursor { width: 24px; height: 34px; z-index: 80; }
+#ripple { width: 40px; height: 40px; border-radius: 50%; border: 3px solid rgba(255,255,255,.95); z-index: 79; }
+#keys { left: 0; right: 0; top: 440px; display: flex; justify-content: center; gap: 22px; z-index: 90; }
+.key { min-width: 128px; height: 128px; padding: 0 26px; border-radius: 26px; background: linear-gradient(#2c3042, #1a1d29); border: 1px solid rgba(255,255,255,.2);
+  box-shadow: 0 10px 0 #0c0e15, 0 24px 50px rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; font-size: 62px; font-weight: 500; color: #eef0ff; }
+#switcher { left: 50%; top: 50%; transform: translate(-50%,-50%); background: rgba(40,42,54,.72); backdrop-filter: blur(30px); border-radius: 28px; padding: 22px; display: flex; gap: 18px; z-index: 85; border: 1px solid rgba(255,255,255,.12); }
+#switcher div { width: 140px; height: 140px; border-radius: 22px; display: flex; align-items: center; justify-content: center; }
+#switcher div.sel { background: rgba(255,255,255,.18); }
+#switcher img { width: 112px; height: 112px; }
+#caption { left: 0; right: 0; bottom: 60px; display: flex; justify-content: center; z-index: 95; }
+#caption div { background: rgba(10,12,20,.82); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.14); padding: 16px 34px; border-radius: 18px;
+  font-size: 38px; font-weight: 650; letter-spacing: -.3px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,.45); }
+#caption small { display: block; font-size: 21px; font-weight: 500; color: #b3b8d0; margin-top: 7px; letter-spacing: 0; }
+
+.card { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 100; }
+.bg { background: radial-gradient(1000px 650px at 50% 42%, #202a55, #080a11); }
+.logo { width: 132px; height: 132px; border-radius: 32px; background: linear-gradient(145deg, #8f9bff, #5b64d6); display: flex; align-items: center; justify-content: center; box-shadow: 0 30px 80px rgba(110,120,255,.35); }
+.word { font-size: 124px; font-weight: 750; letter-spacing: -4px; margin-top: 34px; }
+.tag { font-size: 44px; font-weight: 500; color: #c9cdea; margin-top: 12px; letter-spacing: -.5px; }
+.sub { font-size: 25px; color: #8a90ad; margin-top: 30px; }
+.agents { display: flex; gap: 26px; margin-top: 40px; align-items: center; }
+.agents img { width: 64px; height: 64px; }
+.agents .pi { width: 64px; height: 64px; border-radius: 15px; background: #1d1f2b; border: 1px solid #3a3d52; display: flex; align-items: center; justify-content: center; font: 700 26px "JBM", Menlo, monospace; color: #b392f0; }
+#features { z-index: 98; display: flex; align-items: center; padding-left: 130px; }
+#fl { width: 820px; }
+.feat { display: flex; gap: 22px; margin: 30px 0; }
+.feat i { width: 14px; height: 14px; border-radius: 50%; background: #8f9bff; display: block; flex: none; margin-top: 17px; }
+.feat b { font-size: 42px; font-weight: 700; letter-spacing: -.6px; display: block; }
+.feat span { font-size: 24px; color: #9ca2bf; display: block; margin-top: 6px; }
+#themes { position: relative; width: 820px; height: 640px; margin-left: 40px; }
+#themes .tp { position: absolute; width: 470px; }
+.cmd { margin-top: 44px; font-family: "JBM", Menlo, monospace; font-size: 40px; background: #121524; border: 1px solid rgba(255,255,255,.14); border-radius: 16px; padding: 22px 40px; color: #e6e9ff; }
+.cmd .dim { color: #6d7394; }
+.url { font-size: 30px; color: #aab3ff; margin-top: 30px; font-weight: 600; }
+.pills { display: flex; gap: 16px; margin-top: 30px; }
+.pills span { border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 10px 22px; font-size: 22px; color: #c9cdea; }
+</style>
+</head>
+<body>
+
+<div class="layer" id="scene">
+ <div id="cam">
+  <div class="layer" id="wall"></div>
+  <div class="abs" id="menubar">
+    <div class="l"><b id="app">Ghostty</b><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+    <div class="r">
+      <div id="isl"><svg viewBox="0 0 18 18" width="17" height="17"><g fill="#eef0f8"><rect x="3.5" y="6.2" width="11" height="8" rx="2.6"/><rect x="2" y="2.2" width="14" height="2" rx="1"/></g></svg><span id="badge"></span></div>
+      <div class="mi"></div><div class="mi" style="border-radius:50%"></div><div class="mi" style="width:20px"></div>
+      <svg width="18" height="13" viewBox="0 0 20 15"><path d="M10 13.5l2.6-2.9a3.6 3.6 0 00-5.2 0zM4.7 8.1a7.6 7.6 0 0110.6 0l1.5-1.6a9.8 9.8 0 00-13.6 0zM1.8 5A11.8 11.8 0 0118.2 5l1.5-1.6a14 14 0 00-19.4 0z" fill="#eef0f8"/></svg>
+      <svg width="26" height="13" viewBox="0 0 28 14"><rect x=".5" y=".5" width="23" height="13" rx="3.5" fill="none" stroke="#eef0f8" opacity=".6"/><rect x="2.5" y="2.5" width="16" height="9" rx="2" fill="#eef0f8"/><rect x="25" y="4.5" width="2" height="5" rx="1" fill="#eef0f8" opacity=".6"/></svg>
+      <span>Sat Oct 3&nbsp; 9:41 AM</span>
+    </div>
+  </div>
+
+  <div class="win" id="G">
+    <div class="bar"><div class="tl"><i></i><i></i><i></i></div><div class="t">tmux</div></div>
+    <div class="panes"><div class="pane mono" id="gl"></div><div class="pane mono" id="gr"></div></div>
+    <div class="status mono"><span class="tmw">[home]</span><span class="tmw cur">1:agents*</span><span class="tmw">2:notes</span><span style="margin-left:auto">09:41 · 03-Oct</span></div>
+  </div>
+
+  <div class="win" id="C">
+    <div class="side">
+      <div class="tl"><i></i><i></i><i></i></div>
+      <div class="brand">Codex ⌄</div>
+      <div class="it"><span class="ic"></span>New chat</div>
+      <div class="it"><span class="ic" style="border-radius:50%"></span>Pull requests</div>
+      <div class="it"><span class="ic"></span>Scheduled</div>
+      <div class="it"><span class="ic" style="border-radius:50%"></span>Plugins</div>
+      <div class="sec">Pinned</div>
+      <div class="it">📁&nbsp; Daily digest</div>
+      <div class="sec">Recents</div>
+      <div id="crec"></div>
+    </div>
+    <div class="top" id="ctop"></div>
+    <div class="chat"><div class="col" id="ccol"></div></div>
+    <div class="composer"><div id="cin"></div><div class="row"><span style="font-size:18px">+</span><span class="fa">ⓘ Full access</span><span style="margin-left:auto">GPT-5.5 · High</span><span class="send">↑</span></div></div>
+  </div>
+
+  <div class="win" id="V">
+    <div class="bar"><div class="tl"><i></i><i></i><i></i></div><div class="cmd">🔍&nbsp; web-app</div></div>
+    <div class="act"><i></i><i></i><i></i><i></i></div>
+    <div class="side"><div class="h">EXPLORER</div><div class="h" style="padding-top:0">▾ WEB-APP</div>
+      <div class="f">▸ node_modules</div><div class="f">▾ src</div><div class="f" style="padding-left:40px">api.ts</div><div class="f sel" style="padding-left:40px">date.ts</div>
+      <div class="f" style="padding-left:40px">date.test.ts</div><div class="f" style="padding-left:40px">index.ts</div><div class="f">package.json</div><div class="f">README.md</div><div class="f">tsconfig.json</div></div>
+    <div class="main">
+      <div class="tabs"><div class="tab cur">date.ts</div><div class="tab">api.ts</div></div>
+      <div class="code mono" id="vcode"></div>
+      <div class="panel"><div class="ptabs"><span>PROBLEMS</span><span>OUTPUT</span><span class="cur">TERMINAL</span><span>PORTS</span></div>
+        <div class="term mono" id="vterm"></div>
+        <div class="tlist"><div class="sel">▸ claude</div><div>▸ zsh</div></div></div>
+    </div>
+    <div class="sb"><span class="rm">⌥ main</span><span>⊗ 0 ⚠ 0</span><span style="margin-left:auto;margin-right:14px">TypeScript · UTF-8 · Ln 12, Col 3</span></div>
+  </div>
+
+  <div id="panel"></div>
+  <div class="abs" id="ripple"></div>
+ </div>
+</div>
+
+<div class="layer bg" id="features">
+  <div id="fl">
+    <div class="feat" id="ft0"><i></i><div><b>Every agent, one list</b><span>Claude Code · Codex · pi · Claude desktop</span></div></div>
+    <div class="feat" id="ft1"><i></i><div><b>Jumps to the exact place</b><span>tmux · Ghostty · iTerm2 · Terminal · cmux · VS Code · apps</span></div></div>
+    <div class="feat" id="ft2"><i></i><div><b>Quiet when you're watching</b><span>No popup if that tab is already in front of you</span></div></div>
+    <div class="feat" id="ft3"><i></i><div><b>No permissions, no network</b><span>Reads local session files · native Swift · zero dependencies</span></div></div>
+  </div>
+  <div id="themes"></div>
+</div>
+
+<div class="layer card bg" id="title">
+  <div class="logo"><svg viewBox="0 0 18 18" width="84" height="84"><g fill="#fff"><rect x="3.5" y="6.2" width="11" height="8" rx="2.6"/><rect x="2" y="2.2" width="14" height="2" rx="1"/></g></svg></div>
+  <div class="word">island</div>
+  <div class="tag">Know the moment your AI agents finish.</div>
+  <div class="agents"><img src="assets/claude.png"><img src="assets/chatgpt.png"><div class="pi">pi</div><img src="assets/visual-studio-code.png"><img src="assets/ghostty.png"></div>
+  <div class="sub">A tiny macOS menu-bar app · free &amp; open source</div>
+</div>
+
+<div class="layer card bg" id="end">
+  <div class="logo" style="width:100px;height:100px;border-radius:25px"><svg viewBox="0 0 18 18" width="62" height="62"><g fill="#fff"><rect x="3.5" y="6.2" width="11" height="8" rx="2.6"/><rect x="2" y="2.2" width="14" height="2" rx="1"/></g></svg></div>
+  <div class="word" style="font-size:92px;margin-top:22px">island</div>
+  <div class="cmd"><span class="dim">$ </span>brew install lbyxiafei/tap/island</div>
+  <div class="url">github.com/lbyxiafei/island</div>
+  <div class="pills"><span>Free</span><span>Open source · MIT</span><span>macOS 13+</span></div>
+</div>
+
+<div class="abs" id="switcher"><div><img src="assets/ghostty.png"></div><div><img src="assets/chatgpt.png"></div><div id="swv"><img src="assets/visual-studio-code.png"></div></div>
+<div id="keys" class="abs"></div>
+<div class="abs" id="caption"><div id="captext"></div></div>
+<svg class="abs" id="cursor" viewBox="0 0 28 40"><path d="M3 2 L3 31 L10 24.5 L14.5 35 L19 33 L14.6 22.8 L24 22.8 Z" fill="#111" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/></svg>
+
+<script>
+const $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const outBack = x => { x = clamp(x); const c = 1.4; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const ramp = (t, a, b) => ease((t - a) / (b - a));
+const win = (t, a, b, f = .4) => Math.min(ramp(t, a, a + f), 1 - ramp(t, b - f, b));
+const lerp = (a, b, k) => a + (b - a) * k;
+const type = (s, t, a, b) => s.slice(0, Math.round(clamp((t - a) / (b - a)) * s.length));
+const spin = (t, f = '✻✶✳✢·✢✳✶') => f[Math.floor(t * 9) % f.length];
+const braille = t => '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'[Math.floor(t * 12) % 10];
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const secs = s => s < 60 ? `${Math.floor(s)}s` : `${Math.floor(s / 60)}m ${Math.floor(s % 60)}s`;
+
+// ---- story beats (seconds) ----
+const B = {
+  wType: [4.7, 6.1], wSend: 6.25, wDone: 17.0,          // Claude Code in tmux: weather
+  nType: [6.6, 7.9], nSend: 8.05, nDone: 21.5,          // pi in tmux: HN
+  cShow: 8.6, cType: [9.0, 10.3], cSend: 10.45, cDone: 19.5,   // Codex desktop: Tokyo
+  vShow: 11.6, vType: [12.1, 13.3], vSend: 13.45, vDone: 35.4, // Claude Code in VS Code: tests
+  hover: 23.7, click: 24.3,
+  sum1: 28.6, qType: [29.6, 30.2], enter1: 30.9,
+  switcher: [33.7, 34.9],
+  sum2: 38.3, cmd1: 39.5,
+};
+
+// front window over time
+function front(t) {
+  if (t < B.cShow) return 'G';
+  if (t < B.vShow) return 'C';
+  if (t < B.click + .1) return 'V';
+  if (t < B.enter1 + .1) return 'G';
+  if (t < B.switcher[1]) return 'C';
+  if (t < B.cmd1 + .1) return 'V';
+  return 'G';
+}
+const RECT = { G: [60, 48, 1800, 1000], C: [110, 62, 1720, 990], V: [84, 56, 1770, 1000] };
+
+// ---- Claude Code TUI ----
+function ccHeader(cwd) {
+  return `<span class="o"> ▐▛███▜▌</span>   <span class="w">Claude Code</span> <span class="dim">v2.1.283</span>
+<span class="o">▝▜█████▛▘</span>  <span class="dim">Opus 5.5 · Claude Max</span>
+<span class="o">  ▘▘ ▝▝</span>    <span class="dim">${cwd}</span>
+`;
+}
+function ccInput(text, active, t, w = 60) {
+  const cur = active && Math.floor(t * 2) % 2 === 0 ? '<span class="cursor"></span>' : '';
+  return `<span class="rule">${'─'.repeat(w)}</span>
+<span class="dim">❯</span> ${esc(text)}${cur}
+<span class="rule">${'─'.repeat(w)}</span>
+<span class="dim2">  ⏵⏵ accept edits on · ? for shortcuts</span>`;
+}
+function claudeWeather(t, active) {
+  let body = ccHeader('~/home') + '\n';
+  let input = '';
+  if (t < B.wSend) input = type("What's the weather in Seattle this weekend?", t, ...B.wType);
+  else {
+    body += `<span class="ubox">&gt; What's the weather in Seattle this weekend?</span>\n\n`;
+    if (t > B.wSend + .5) body += `<span class="o">⏺</span> Web Search(<span class="b">"Seattle weather forecast this weekend"</span>)\n`;
+    if (t > B.wSend + 1.4) body += `  <span class="dim">⎿  Did 1 search in 2s</span>\n`;
+    if (t < B.wDone) { if (t > B.wSend + 1.6) body += `\n<span class="o">${spin(t)} Checking the forecast…</span> <span class="dim">(${secs(t - B.wSend)} · esc to interrupt)</span>\n`; }
+    else body += `
+<span class="o">⏺</span> This weekend in <span class="w">Seattle</span>:
+
+  <span class="w">Sat</span>  ☀️  Sunny           <span class="y">68°F</span> / 52°F
+  <span class="w">Sun</span>  🌧  Light rain      <span class="y">61°F</span> / 50°F
+
+  Best time to be outside: <span class="w">Saturday afternoon</span>.
+  Bring a light jacket on Sunday.
+`;
+  }
+  return { body, input: ccInput(input, active, t, 52) };
+}
+// ---- pi TUI ----
+function piView(t, active) {
+  let body = `<span class="dim">❯</span> pi
+ <span class="w">pi</span> <span class="dim">v0.87.1</span>
+ <span class="dim">escape interrupt · ctrl+c clear · / commands · ! bash</span>
+
+ <span class="y">[Context]</span> <span class="dim">AGENTS.md</span>
+`;
+  let input = '';
+  if (t < B.nSend) input = type('Summarize the top 5 Hacker News stories today', t, ...B.nType);
+  else {
+    body += `\n<span class="ubox"> Summarize the top 5 Hacker News stories today </span>\n\n`;
+    if (t > B.nSend + .6) body += ` <span class="g">●</span> fetch <span class="c">news.ycombinator.com</span>\n`;
+    if (t < B.nDone) { if (t > B.nSend + 1.2) body += `\n <span class="p">${braille(t)} Working…</span> <span class="dim">(${secs(t - B.nSend)})</span>\n`; }
+    else body += `
+ <span class="w">Top 5 on Hacker News today</span>
+
+ <span class="y">1.</span> Show HN: A tiny menu-bar app for AI agents  <span class="dim">412 pts</span>
+ <span class="y">2.</span> Why SQLite is still everywhere            <span class="dim">388 pts</span>
+ <span class="y">3.</span> The Moon's terminator paradox, explained   <span class="dim">251 pts</span>
+ <span class="y">4.</span> A 1949 computer that booted from ROM       <span class="dim">198 pts</span>
+ <span class="y">5.</span> Pixel-art city nights with generative lofi  <span class="dim">167 pts</span>
+
+ <span class="dim">Theme of the day: old ideas, rediscovered.</span>
+`;
+  }
+  const cur = active && Math.floor(t * 2) % 2 === 0 ? '<span class="cursor"></span>' : '';
+  const inp = `<span class="rule">${'─'.repeat(52)}</span>
+ ${esc(input)}${cur}
+<span class="rule">${'─'.repeat(52)}</span>
+<span class="dim"> ~/news (main)                    deepseek-v4 · high</span>`;
+  return { body, input: inp };
+}
+function paneHTML(v) { return v.body + '\n' + v.input; }
+
+// ---- VS Code ----
+const CODE = [
+  `<span class="kw">export</span> <span class="kw">function</span> <span class="fn">parseDate</span>(<span class="va">input</span>: <span class="ty">string</span>): <span class="ty">Date</span> | <span class="kw">null</span> {`,
+  `  <span class="kw">const</span> <span class="va">iso</span> = <span class="st">/^(\\d{4})-(\\d{2})-(\\d{2})$/</span>.<span class="fn">exec</span>(<span class="va">input</span>.<span class="fn">trim</span>());`,
+  `  <span class="kw">if</span> (!<span class="va">iso</span>) <span class="kw">return</span> <span class="kw">null</span>;`,
+  `  <span class="kw">const</span> [, <span class="va">y</span>, <span class="va">m</span>, <span class="va">d</span>] = <span class="va">iso</span>.<span class="fn">map</span>(<span class="ty">Number</span>);`,
+  `  <span class="kw">const</span> <span class="va">date</span> = <span class="kw">new</span> <span class="ty">Date</span>(<span class="ty">Date</span>.<span class="fn">UTC</span>(<span class="va">y</span>, <span class="va">m</span> - <span class="nu">1</span>, <span class="va">d</span>));`,
+  `  <span class="kw">return</span> <span class="va">date</span>.<span class="fn">getUTCDate</span>() === <span class="va">d</span> ? <span class="va">date</span> : <span class="kw">null</span>;`,
+  `}`,
+  ``,
+  `<span class="cm">// Format a date for the weekly report header</span>`,
+  `<span class="kw">export</span> <span class="kw">function</span> <span class="fn">formatWeek</span>(<span class="va">start</span>: <span class="ty">Date</span>): <span class="ty">string</span> {`,
+];
+function vsCode(t) {
+  const typed = type('  return `Week of ${start.toDateString()}`;', t, 15.2, 17.4);
+  const lines = [...CODE, typed ? esc(typed).replace('return', '<span class="kw">return</span>') : '', '}'];
+  const cur = Math.floor(t * 2) % 2 === 0 && t > 14.8 && t < 23 ? '<span style="display:inline-block;width:2px;height:18px;background:#aeafad;vertical-align:-3px"></span>' : '';
+  return lines.map((l, i) => `<span class="ln">${i + 1}</span>${l}${i === 10 ? cur : ''}`).join('\n');
+}
+function vsTerm(t, active) {
+  let s = ccHeader('~/web-app') + '\n';
+  let input = '';
+  if (t < B.vSend) input = type('add unit tests for parseDate()', t, ...B.vType);
+  else {
+    s += `<span class="ubox">&gt; add unit tests for parseDate()</span>\n`;
+    if (t > B.vSend + .6) s += `<span class="o">⏺</span> Read(<span class="b">src/date.ts</span>)\n`;
+    if (t > B.vSend + 1.5) s += `<span class="o">⏺</span> Write(<span class="b">src/date.test.ts</span>)  <span class="dim">+48 lines</span>\n`;
+    if (t < B.vDone) { if (t > B.vSend + 2.2) s += `<span class="o">${spin(t)} Running the test suite…</span> <span class="dim">(${secs(t - B.vSend)})</span>\n`; }
+    else s += `<span class="o">⏺</span> Bash(<span class="b">npm test</span>)  <span class="g">✓ 12 passed</span>\n<span class="o">⏺</span> Added 12 tests: valid dates, leap years, bad formats, Feb 30.\n`;
+  }
+  const cur = active && Math.floor(t * 2) % 2 === 0 ? '<span class="cursor"></span>' : '';
+  s += `<span class="rule">${'─'.repeat(64)}</span>\n<span class="dim">❯</span> ${esc(input)}${cur}\n<span class="rule">${'─'.repeat(64)}</span>`;
+  return s;
+}
+
+// ---- Codex ----
+function codex(t) {
+  const sent = t >= B.cSend;
+  $('ctop').innerHTML = sent ? '📁&nbsp; Plan a 3-day Tokyo trip &nbsp;<span style="color:#aaa">···</span>' : 'New chat';
+  const rec = ['Plan a 3-day Tokyo trip', 'Summarize my inbox', 'Compare two laptops', 'Explain Rust lifetimes', 'Weekly grocery list', 'Refactor the auth flow'];
+  $('crec').innerHTML = (sent ? rec : rec.slice(1)).map((r, i) => `<div class="it${sent && i === 0 ? ' sel' : ''}">${r}</div>`).join('');
+  let col = '';
+  if (!sent) col = `<div class="empty">What should we do today?</div>`;
+  else {
+    col = `<div class="ubub">Plan a 3-day trip to Tokyo in October</div>`;
+    if (t < B.cDone) col += `<div class="shimmer">Thinking · ${secs(t - B.cSend)}</div>`;
+    else col += `<div class="worked">Worked for 42s ›</div><div class="ans">
+<h3>3 days in Tokyo (October)</h3>
+<p><b>Day 1 — Asakusa &amp; Ueno.</b> Senso-ji at sunrise, lunch in Ameyoko, evening river cruise to Odaiba.</p>
+<p><b>Day 2 — Shibuya &amp; Harajuku.</b> Meiji Shrine, Omotesando cafés, Shibuya Sky at sunset.</p>
+<p><b>Day 3 — Day trip to Nikko or Kamakura.</b> Autumn leaves start late October; book the Limited Express the night before.</p>
+<p style="color:#666;margin-top:10px">October is mild (15–22°C) — pack a light jacket. Get a Suica card at the airport.</p></div>`;
+  }
+  $('ccol').innerHTML = col;
+  const typed = type('Plan a 3-day trip to Tokyo in October', t, ...B.cType);
+  const cur = !sent && t > B.cShow + .2 && Math.floor(t * 2) % 2 === 0 ? '<span style="display:inline-block;width:2px;height:19px;background:#1f1f1f;vertical-align:-4px"></span>' : '';
+  $('cin').innerHTML = !sent ? (typed ? esc(typed) + cur : `<span class="ph">Do anything</span>${cur}`) : '<span class="ph">Do anything</span>';
+}
+
+// ---- island panel ----
+const ICON = {
+  claude: '<img src="assets/claude.png">',
+  codex: '<img src="assets/chatgpt.png">',
+  pi: '<svg viewBox="0 0 28 28" width="28" height="28"><rect x="2.5" y="4.5" width="23" height="19" rx="4" fill="none" stroke="#b9b9c2" stroke-width="1.7"/><path d="M7.5 10.5l3.5 3-3.5 3" fill="none" stroke="#b9b9c2" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 17h6" stroke="#b9b9c2" stroke-width="1.7" stroke-linecap="round"/></svg>',
+};
+const TASK = {
+  w: { title: 'Seattle weather this weekend', sub: 'home • Claude Code', icon: 'claude', done: B.wDone },
+  c: { title: 'Plan a 3-day Tokyo trip', sub: 'travel • Codex', icon: 'codex', done: B.cDone },
+  n: { title: 'Top 5 Hacker News stories today', sub: 'news • pi', icon: 'pi', done: B.nDone },
+  v: { title: 'Add unit tests for parseDate()', sub: 'web-app • Claude Code', icon: 'claude', done: B.vDone },
+};
+function unread(k, t) {
+  if (t < TASK[k].done) return false;
+  if (k === 'v') return false;                 // finished while you were looking at it
+  if (k === 'n' && t >= B.click) return false;
+  if (k === 'c' && t >= B.enter1) return false;
+  if (k === 'w' && t >= B.cmd1) return false;
+  return true;
+}
+function rowsAt(t) {
+  const ks = Object.keys(TASK).filter(k => t >= TASK[k].done);
+  return ks.map(k => ({ k, ...TASK[k], unread: unread(k, t) }))
+    .sort((a, b) => (b.unread - a.unread) || (b.done - a.done));
+}
+const ago = (t, d) => t - d < 50 ? 'now' : `${Math.round((t - d) / 60) || 1}m`;
+function panelHTML(t, mode, query, sel) {
+  let rows = rowsAt(t);
+  if (query) rows = rows.filter(r => r.title.toLowerCase().includes(query));
+  const n = rowsAt(t).filter(r => r.unread).length;
+  const head = mode === 'auto'
+    ? `<div class="ph"><span class="dot"></span><span class="n">${n ? n + ' new' : 'All caught up'}</span><span class="kc">⌃⌘,</span></div>`
+    : `<div class="ph"><svg width="17" height="17" viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="6" fill="none" stroke="#8e8e98" stroke-width="2"/><path d="M13 13l4.5 4.5" stroke="#8e8e98" stroke-width="2" stroke-linecap="round"/></svg>
+       <span class="q">${query ? esc(query) + '<span class="caret"></span>' : '<span class="caret"></span><span class="ph2">Search ' + rowsAt(t).length + ' tasks</span>'}</span><span class="pill">${n} new</span></div>`;
+  const body = rows.map((r, i) => `<div class="rw${i === sel ? ' sel' : ''}"><span class="num">${i + 1}</span><span class="ico">${ICON[r.icon]}${r.unread ? '<span class="rd"></span>' : ''}</span>
+      <div class="tx"><div class="tt">${esc(r.title)}</div><div class="st">${r.sub}</div></div><span class="tm">${ago(t, r.done)}</span></div>`).join('');
+  const hints = mode === 'auto' ? '' : `<div class="hints">↑↓ move &nbsp; ↩ open &nbsp; ⌘1–9 jump &nbsp; ⌘, settings &nbsp; esc close</div>`;
+  return `<div class="box">${head}${body}${hints}</div>`;
+}
+// visibility: auto popups while things finish, then the summoned ones
+function panelState(t) {
+  const pops = [B.wDone, B.cDone, B.nDone];
+  if (t >= B.wDone && t < B.click) {
+    const last = Math.max(...pops.filter(p => p <= t));
+    return { mode: 'auto', show: ramp(t, B.wDone, B.wDone + .45) * (1 - ramp(t, B.click, B.click + .35)), bump: t - last < .35 && last !== B.wDone ? 1 : 0, sel: t >= B.hover ? 0 : 0, hover: t >= B.hover };
+  }
+  if (t >= B.click && t < B.click + .4) return { mode: 'auto', show: 1 - ramp(t, B.click, B.click + .35), sel: 0 };
+  if (t >= B.sum1 && t < B.enter1 + .4) {
+    const q = type('tok', t, ...B.qType);
+    return { mode: 'sum', show: ramp(t, B.sum1, B.sum1 + .4) * (1 - ramp(t, B.enter1, B.enter1 + .35)), query: q, sel: 0 };
+  }
+  if (t >= B.sum2 && t < B.cmd1 + .4) return { mode: 'sum', show: ramp(t, B.sum2, B.sum2 + .4) * (1 - ramp(t, B.cmd1, B.cmd1 + .35)), sel: 0 };
+  return { show: 0 };
+}
+
+// ---- camera: [t, zoom, focusX, focusY] ----
+const CAM = [
+  [4.0, 1.0, 960, 540], [4.7, 1.6, 520, 330], [6.3, 1.6, 520, 330], [6.7, 1.6, 1410, 330], [8.3, 1.6, 1410, 330],
+  [8.9, 1.35, 1080, 780], [10.9, 1.35, 1080, 780], [11.8, 1.12, 1000, 560], [16.6, 1.14, 1000, 560],
+  [17.2, 1.95, 960, 200], [24.2, 1.95, 960, 200], [25.0, 1.7, 1410, 390], [28.2, 1.74, 1410, 390],
+  [28.8, 1.95, 960, 200], [30.95, 1.95, 960, 200], [31.7, 1.55, 1080, 330], [33.6, 1.58, 1080, 330],
+  [35.0, 1.6, 860, 700], [38.0, 1.62, 860, 700], [38.5, 1.95, 960, 200], [39.5, 1.95, 960, 200], [40.3, 1.7, 520, 390], [42.3, 1.74, 520, 390],
+];
+function camAt(t) {
+  let z = 1, x = 960, y = 540;
+  for (let i = 0; i < CAM.length; i++) {
+    const [t1, z1, x1, y1] = CAM[i];
+    if (t >= t1) { z = z1; x = x1; y = y1; continue; }
+    if (i === 0) break;
+    const [t0, z0, x0, y0] = CAM[i - 1]; const k = ease((t - t0) / (t1 - t0));
+    z = lerp(z0, z1, k); x = lerp(x0, x1, k); y = lerp(y0, y1, k); break;
+  }
+  const hw = 960 / z, hh = 540 / z;
+  return [z, clamp(x, hw, 1920 - hw), clamp(y, hh, 1080 - hh)];
+}
+
+// ---- cursor (scene coordinates) ----
+const ROW0 = [900, 28 + 54 + 26];
+const CUR = [[4, 1500, 1000], [16.8, 1500, 900], [22.6, 1500, 900], [23.8, ROW0[0], ROW0[1]], [24.5, ROW0[0], ROW0[1]], [26.0, 1650, 950], [60, 1650, 950]];
+function cursorAt(t) {
+  for (let i = 1; i < CUR.length; i++) {
+    const [t1, x1, y1] = CUR[i], [t0, x0, y0] = CUR[i - 1];
+    if (t <= t1) { const k = ease((t - t0) / (t1 - t0)); return [lerp(x0, x1, k), lerp(y0, y1, k)]; }
+  }
+  return CUR[CUR.length - 1].slice(1);
+}
+
+const CAPS = [
+  [4.9, 8.5, 'Ask Claude Code and pi something in tmux…'],
+  [8.8, 11.4, '…ask Codex something else…', '', 'top'],
+  [11.8, 16.7, '…then get back to your own work.', 'Claude Code keeps going in the VS Code terminal'],
+  [17.3, 21.2, 'island drops down the moment one finishes.'],
+  [21.6, 24.2, 'Claude Code · Codex · pi — one list.', 'Unread first, newest on top'],
+  [24.6, 28.3, 'Click it — you land in that exact tmux pane.'],
+  [28.8, 33.5, '⌃⌘, from anywhere. Type. ↩.', 'Straight into the Codex conversation'],
+  [34.2, 38.1, 'Already looking at it? island stays quiet.', 'No popup, no badge — the VS Code task finished in front of you'],
+  [38.5, 42.4, '⌘1–9: one keystroke per task.'],
+];
+const KEYS = [[B.sum1 - .35, B.sum1 + .7, ['⌃', '⌘', ',']], [B.switcher[0] - .1, B.switcher[1], ['⌘', '⇥']], [B.sum2 - .35, B.sum2 + .7, ['⌃', '⌘', ',']], [B.cmd1 - .3, B.cmd1 + .6, ['⌘', '1']]];
+
+function render(t) {
+  // cards
+  $('title').style.opacity = 1 - ramp(t, 3.6, 4.4);
+  $('title').style.transform = `scale(${lerp(1, 1.05, ramp(t, 0, 4.4))})`;
+  $('features').style.opacity = ramp(t, 42.4, 43.2) * (1 - ramp(t, 51.2, 51.9));
+  $('end').style.opacity = ramp(t, 51.2, 51.9);
+
+  // windows
+  const f = front(t);
+  const order = { G: ['C', 'V', 'G'], C: ['G', 'V', 'C'], V: ['G', 'C', 'V'] }[f];
+  for (const id of ['G', 'C', 'V']) {
+    const el = $(id), [x, y, w, h] = RECT[id];
+    el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.width = w + 'px'; el.style.height = h + 'px';
+    el.style.zIndex = 10 + order.indexOf(id);
+    el.classList.toggle('inactive', id !== f);
+  }
+  // pop when a window comes forward
+  const pops = [B.cShow, B.vShow, B.click + .1, B.enter1 + .1, B.switcher[1], B.cmd1 + .1];
+  const lastPop = Math.max(0, ...pops.filter(p => p <= t));
+  $(f).style.transform = `scale(${lerp(.985, 1, ramp(t, lastPop, lastPop + .3))})`;
+  for (const id of ['G', 'C', 'V']) if (id !== f) $(id).style.transform = 'none';
+  $('app').textContent = { G: 'Ghostty', C: 'Codex', V: 'Code' }[f];
+
+  // tmux panes (active pane: left while typing weather, right for HN, left after ⌘1)
+  const rightActive = (t >= B.nType[0] - .2 && t < B.cShow) || (t >= B.click && t < B.cmd1);
+  const gl = claudeWeather(t, f === 'G' && !rightActive), gr = piView(t, f === 'G' && rightActive);
+  $('gl').innerHTML = paneHTML(gl); $('gr').innerHTML = paneHTML(gr);
+  $('gl').style.opacity = rightActive ? .62 : 1; $('gr').style.opacity = rightActive ? 1 : .62;
+  $('vcode').innerHTML = vsCode(t);
+  $('vterm').innerHTML = vsTerm(t, f === 'V' && t < B.vSend + .1);
+  codex(t);
+
+  // island
+  const ps = panelState(t);
+  // while the panel retracts, keep showing what was on it when the task was picked
+  const pick = [B.click, B.enter1, B.cmd1].find(p => t >= p && t < p + .4);
+  const pt = pick !== undefined ? pick - .01 : t;
+  if (ps.show > 0) {
+    const pq = pick !== undefined ? (panelState(pt).query || '') : (ps.query || '');
+    $('panel').innerHTML = panelHTML(pt, ps.mode === 'sum' ? 'sum' : 'auto', pq, ps.mode === 'sum' ? 0 : (ps.hover || pick === B.click ? 0 : -1));
+    $('panel').style.opacity = 1;
+    $('panel').style.transform = `translateY(${lerp(-105, 0, outBack(ps.show))}%) scale(${1 + (ps.bump ? .012 : 0)})`;
+  } else $('panel').style.opacity = 0;
+
+  // menu bar badge
+  const n = rowsAt(t).filter(r => r.unread).length;
+  $('badge').textContent = n ? n : '';
+  $('isl').style.background = [B.wDone, B.cDone, B.nDone].some(e => t >= e && t < e + .6) ? 'rgba(143,155,255,.5)' : 'transparent';
+
+  // camera
+  const [z, fx, fy] = camAt(t);
+  $('cam').style.transform = `translate(${960 - fx * z}px, ${540 - fy * z}px) scale(${z})`;
+
+  // cursor + click ripple (scene -> screen)
+  const [cx, cy] = cursorAt(t), sx = 960 + (cx - fx) * z, sy = 540 + (cy - fy) * z;
+  $('cursor').style.left = sx + 'px'; $('cursor').style.top = sy + 'px';
+  $('cursor').style.opacity = t > 16.8 && t < 27 ? 1 : 0;
+  const rp = t >= B.click && t < B.click + .5 ? (t - B.click) / .5 : 0;
+  $('ripple').style.opacity = rp ? 1 - rp : 0;
+  $('ripple').style.left = (ROW0[0] - 20) + 'px'; $('ripple').style.top = (ROW0[1] - 20) + 'px';
+  $('ripple').style.transform = `scale(${.4 + rp})`;
+
+  // app switcher
+  const sw = win(t, B.switcher[0], B.switcher[1], .2);
+  $('switcher').style.opacity = sw;
+  [...$('switcher').children].forEach((d, i) => d.classList.toggle('sel', i === (t < B.switcher[0] + .5 ? 1 : 2)));
+
+  // keycaps
+  let kc = null, ko = 0, kt0 = 0;
+  for (const [a, b, ks] of KEYS) if (t >= a && t < b) { kc = ks; ko = win(t, a, b, .2); kt0 = a; }
+  $('keys').style.opacity = ko;
+  if (kc) {
+    $('keys').innerHTML = kc.map(k => `<div class="key">${k}</div>`).join('');
+    [...$('keys').children].forEach((el, i) => {
+      const down = t > kt0 + .2 + i * .07 && t < kt0 + .6;
+      el.style.transform = down ? 'translateY(8px)' : 'none';
+      el.style.boxShadow = down ? '0 2px 0 #0c0e15, 0 8px 20px rgba(0,0,0,.5)' : '';
+    });
+    $('keys').style.top = kc[1] === '⇥' ? '760px' : '690px';
+  }
+
+  // features + themes
+  for (let i = 0; i < 4; i++) {
+    const k = ramp(t, 43.0 + i * .7, 43.6 + i * .7);
+    $('ft' + i).style.opacity = k; $('ft' + i).style.transform = `translateX(${-40 * (1 - k)}px)`;
+  }
+  if (!$('themes').innerHTML) {
+    const themes = [['#f3efe6', '#1f1d1a', '#6b675f'], ['#152a35', '#e9f3f7', '#8fb3c2'], ['#050507', '#f2f2f4', '#8e8e98']];
+    $('themes').innerHTML = themes.map(([bg, fg, sub], i) => `<div class="tp" id="th${i}"><div style="background:${bg};border-radius:0 0 24px 24px;padding:0 10px 10px;box-shadow:0 30px 70px rgba(0,0,0,.5)">
+      <div class="ph"><span class="dot" style="background:${i === 1 ? '#5fd1c1' : '#9f93ff'}"></span><span class="n" style="color:${fg}">3 new</span></div>
+      ${['Seattle weather this weekend|home • Claude Code|claude', 'Plan a 3-day Tokyo trip|travel • Codex|codex', 'Top 5 Hacker News stories today|news • pi|pi'].map((r, j) => { const [a, b, ic] = r.split('|');
+        return `<div class="rw${j === 0 ? ' sel' : ''}" style="${j === 0 ? `background:${i === 0 ? '#e6e1d6' : i === 1 ? '#1d3b48' : '#16162a'};border-color:${i === 0 ? '#c9c1b1' : i === 1 ? '#3d7383' : '#45478a'}` : ''}"><span class="num" style="background:${i === 0 ? '#e3ded3' : i === 1 ? '#1e3a47' : '#1e1e22'}">${j + 1}</span><span class="ico">${ICON[ic]}<span class="rd" style="border-color:${bg}"></span></span><div class="tx"><div class="tt" style="color:${fg}">${a}</div><div class="st" style="color:${sub}">${b}</div></div></div>`; }).join('')}
+      </div></div>`).join('');
+  }
+  [[-6, 0, 170], [0, 170, 90], [6, 340, 10]].forEach(([r, x, y], i) => {
+    const k = ramp(t, 42.8 + i * .3, 43.6 + i * .3), el = $('th' + i);
+    el.style.left = x + 'px'; el.style.top = (y + 60 * (1 - k)) + 'px'; el.style.opacity = k; el.style.transform = `rotate(${r * k}deg)`;
+  });
+
+  // caption
+  let cap = null, co = 0;
+  let top = false;
+  for (const [a, b, text, sub, pos] of CAPS) if (t >= a && t < b) { cap = [text, sub]; co = win(t, a, b, .35); top = pos === 'top'; }
+  $('caption').style.opacity = co;
+  $('caption').style.bottom = top ? 'auto' : '60px'; $('caption').style.top = top ? '70px' : 'auto';
+  $('caption').style.transform = `translateY(${14 * (1 - co)}px)`;
+  if (cap) $('captext').innerHTML = cap[0] + (cap[1] ? `<small>${cap[1]}</small>` : '');
+}
+window.render = render;
+render(0);
+</script>
+</body>
+</html>

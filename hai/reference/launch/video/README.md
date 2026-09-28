@@ -1,5 +1,7 @@
 # 介绍视频与 GIF 的制作工具
 
+> **当前采用的是 `simulated/`（v3，4K 全模拟）**。本页记录的是 v2 实录方案，保留下来供参考。
+
 2026-09-27 做 60 秒 YouTube 介绍视频（`~/Movies/island/island-intro.mp4`）和 `docs/demo.gif` 用的全套工具。**仅作参考，不参与构建**；脚本里的路径指向当时会话的 scratchpad，重录前先改路径。
 
 ## 思路

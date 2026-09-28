@@ -36,10 +36,10 @@
 ## 安装
 
 ```bash
-brew install --cask lbyxiafei/tap/island
+brew install lbyxiafei/tap/island
 ```
 
-升级 `brew upgrade --cask island`，卸载 `brew uninstall --cask island`（加 `--zap` 连设置一起清掉）。app 已签名并公证，装完直接从「应用程序」启动即可。
+升级 `brew upgrade island`，卸载 `brew uninstall island`（`brew uninstall --zap island` 连设置一起清掉）。app 已签名并公证，装完直接从「应用程序」启动即可。
 
 ## 从源码构建
 

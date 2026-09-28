@@ -15,10 +15,10 @@ Stop checking five terminals to see who's done.
 ## Install
 
 ```bash
-brew install --cask lbyxiafei/tap/island
+brew install lbyxiafei/tap/island
 ```
 
-Upgrade with `brew upgrade --cask island`, uninstall with `brew uninstall --cask island` (add `--zap` to also remove settings). The app is signed and notarized — just launch it from Applications.
+Upgrade with `brew upgrade island`, uninstall with `brew uninstall island` (`brew uninstall --zap island` also removes settings). The app is signed and notarized — just launch it from Applications.
 
 Requires macOS 13+.
 

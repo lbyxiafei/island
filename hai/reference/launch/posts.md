@@ -4,13 +4,15 @@
 
 赞助页：https://github.com/sponsors/lbyxiafei （仓库已有 Sponsor 按钮，文案里不必强调）。
 
+关于 `brew install island`（不带 tap 前缀）：官方 homebrew/cask 里 `island` 这个名字目前没人占用（2026-09-28 查过），但作者自己提交的 cask 要满足知名度门槛：GitHub **≥ 75 star**，或 ≥ 30 fork / ≥ 30 watcher，否则 PR 会被拒。star 到了之后按官方 cask 模板把 `Casks/island.rb` 提交到 homebrew/cask，合并后就能 `brew install island`。在那之前，`brew install lbyxiafei/tap/island` 是最短的写法（不需要 `--cask`）。
+
 发布节奏建议：先 V2EX / X 中文圈小范围试水、收一轮反馈修掉明显问题，再发 Show HN 和 Reddit。Show HN 在美西工作日早上 8–10 点发效果最好，发完前两小时守着回复评论。
 
 ---
 
 ## YouTube
 
-视频文件：`~/Movies/island/island-intro.mp4`（1920×1080，60 秒，无音轨，可以在 YouTube Studio 编辑器里从 Audio Library 加一段免费配乐）。封面候选：`~/Movies/island/thumbnail-title.jpg` / `thumbnail-panel.jpg`。最后 11 秒是静态片尾，正好放 End screen（订阅 + 链接到 repo）。
+视频文件：`~/Movies/island/island-intro.mp4`（4K 3840×2160，60 秒，无音轨，可以在 YouTube Studio 编辑器里从 Audio Library 加一段免费配乐）。封面候选：`~/Movies/island/thumbnail-title.jpg` / `thumbnail-panel.jpg`。最后约 9 秒是静态片尾，正好放 End screen（订阅 + 链接到 repo）。
 
 **标题**：
 
@@ -26,12 +28,12 @@
 > • Quiet when you're already looking at that tab
 > • No permission prompts, no network: reads local session files only
 >
-> Install: brew install --cask lbyxiafei/tap/island
+> Install: brew install lbyxiafei/tap/island
 > Source (MIT): https://github.com/lbyxiafei/island
 >
-> 0:00 Agents finishing in parallel
-> 0:19 Jump back: click, or ⌃⌘, and type
-> 0:37 Features & install
+> 0:00 Ask Claude Code, pi and Codex anything
+> 0:17 island pops up — click or ⌃⌘, to jump back
+> 0:42 Features & install
 
 **标签**：claude code, codex, ai agents, macos, menu bar app, tmux, developer tools, open source
 
@@ -57,7 +59,7 @@
 >
 > Detecting "done" turned out to be the fun part: every agent stores state differently (JSONL transcripts, SQLite, and for the Claude desktop app, a Snappy-compressed V8-serialized IndexedDB blob, decoded by hand). Notes on each format are in the repo.
 >
-> `brew install --cask lbyxiafei/tap/island` — MIT licensed, macOS 13+. Feedback and PRs for other agents welcome.
+> `brew install lbyxiafei/tap/island` — MIT licensed, macOS 13+. Feedback and PRs for other agents welcome.
 >
 > https://github.com/lbyxiafei/island
 
@@ -81,7 +83,7 @@
 > - Won't interrupt you if you're already looking at that task
 > - No network access, reads local files only, MIT licensed
 >
-> Install: `brew install --cask lbyxiafei/tap/island`
+> Install: `brew install lbyxiafei/tap/island`
 > Repo: https://github.com/lbyxiafei/island
 >
 > What agents / terminals should it support next?
@@ -137,7 +139,7 @@ r/macapps 规定自己的 app 要带 `[Self-promotion]` 或在周贴里发，发
 > - 纯本地：只读各 agent 的本地 session 文件，代码里没有任何网络请求
 > - 原生 Swift，零依赖，已签名公证
 >
-> 安装：`brew install --cask lbyxiafei/tap/island`
+> 安装：`brew install lbyxiafei/tap/island`
 >
 > 仓库（MIT）：https://github.com/lbyxiafei/island
 >
