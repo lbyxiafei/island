@@ -11,7 +11,12 @@ ffmpeg -i silent-4k.mp4 -i music.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 3
 
 ## 配乐
 
-`music.py` 从零合成，原创、无版权问题：120 BPM，D 大调，和声走 Gmaj7 → F#m7 → Em9 → A7sus4，结尾落在 Dmaj9。配器有 detune 锯齿波 Pad、带乒乓延迟的拨弦琶音、正弦贝斯、合成鼓组，外加一个短混响。小节线从 1 秒开始，每 2 秒一小节，这样 17.0 秒（第一个任务完成、浮窗弹出）正好落在强拍上，鼓在这里进来；55 秒片尾时鼓退出。UI 音效（浮窗弹出的「叮」、鼠标点击、按键帽、打字声）按 index.html 里 `B` / `S` 的时间点放置，改时间线时两边要一起改。成品响度约 -14 LUFS，对齐 YouTube 的标准。
+`music.py` 从零合成，原创、无版权问题。2026-09-28 按用户要求改成轻快版：128 BPM，D 大调，和声走 I–V–vi–IV（D → A → Bm → G），结尾落在 Dmaj9。配器有反拍短和弦（弹跳感）、马林巴风格的 16 分音符琶音、8 分音符八度跳动的贝斯，前奏就有响指和沙锤，鼓进来后是轻的四拍底鼓、拍手和反拍开镲。网格对齐方式：`T0 = 17.0 - 9 * BAR`，让 17.0 秒（第一个任务完成、浮窗弹出）正好落在小节强拍上，鼓在这里进来，约 54.5 秒片尾时鼓退出。UI 音效（浮窗弹出、鼠标点击、按键帽、打字声）按 index.html 里 `B` / `S` 的时间点放置，改时间线时两边要一起改。输出 `music-raw.wav` 后，先用 ebur128 测响度，再调增益到 -14 LUFS：
+
+```bash
+I=$(ffmpeg -hide_banner -i music-raw.wav -af ebur128 -f null - 2>&1 | grep -E '^\s+I:' | tail -1 | awk '{print $2}')
+ffmpeg -i music-raw.wav -af "volume=$(python3 -c "print(-14 - ($I))")dB,alimiter=limit=0.89:level=false" music.wav
+```
 
 ## 为什么全模拟，不用实录
 
