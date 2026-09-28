@@ -81,4 +81,6 @@
 
 # 开发指南
 
-每次开发完成，可以运行：`pkill -x Island; ./scripts/build-app.sh && open build/Island.app` 进行重启。
+~~每次开发完成，可以运行：`pkill -x Island; ./scripts/build-app.sh && open build/Island.app` 进行重启。~~
+
+> 因为现在 homebrew 版本有了 upgrade 功能，因此，每次开发完成，都将新的版本发布到 homebrew `lbyxiafei/tap/island` 上，然后由本地开发者，手动从 settings upgrade。顺道验证 upgrade 功能。
