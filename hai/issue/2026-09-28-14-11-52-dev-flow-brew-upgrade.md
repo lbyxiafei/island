@@ -2,9 +2,9 @@
 type: chore
 name: dev-flow-brew-upgrade
 title: "开发完成即发布到 brew，本地从 settings 升级验收"
-status: in-progress
+status: solved
 created_ts: 2026-09-28T14:11:52-07:00
-updated_ts: 2026-09-28T14:14:33-07:00
+updated_ts: 2026-09-28T14:16:30-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -33,3 +33,7 @@ updated_ts: 2026-09-28T14:14:33-07:00
 ## 2026-09-28T14:12:01-07:00: new -> in-progress
 
 用户在会话中要求按 PLAN § 开发指南实践；授权见 Decision。
+
+## 2026-09-28T14:16:30-07:00: in-progress -> solved
+
+按 PLAN § 开发指南走通：发布 0.2.0（含 in-app upgrade/feedback）；本机 /Applications/Island.app（手动装的 0.1.0）进废纸篓，改为 brew install 的 0.2.0（spctl: Notarized Developer ID），登录项重新启用；reference/workflow 与 CONTEXT 改成「ship → publish → 从 Settings → Updates 升级验收」；发布 0.2.1（与 0.2.0 代码相同，仅用于这次验证升级链路，是「只动 hai/ 不发版」规则的一次性例外）。待开发者在本机从 Settings → Updates 升级 0.2.0 → 0.2.1，确认重开后显示 up to date，即可 close（同时验收 upgrade-n-feedback 的一键升级）。
