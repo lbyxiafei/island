@@ -4,8 +4,10 @@ import IslandCore
 /// The settings window behind the menu's `Settings…` item, one tab per topic:
 /// General (record the summon hotkey by pressing it, switch it on or off, or
 /// clear it — PLAN § Scope #3, #5), Appearance (overlay theme, keyboard
-/// hints), Notifications (the pop-up shown when a run finishes) and Agents
-/// (which agent scenarios island watches, see `AgentSettingsView`).
+/// hints), Notifications (the pop-up shown when a run finishes), Agents
+/// (which agent scenarios island watches, see `AgentSettingsView`), Updates
+/// (`UpdateSettingsView`, its label dotted while an upgrade waits) and
+/// Feedback (`FeedbackSettingsView`).
 ///
 /// It is a regular, key-capable window — unlike the overlay — because the user
 /// has to be able to press keys into it.
@@ -24,6 +26,11 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         checkboxWithTitle: "Pop up when an agent run finishes", target: nil, action: nil)
     private let popupSeconds = NSTextField(string: "")
     private let agentsView: AgentSettingsView
+    private let updates: UpdateController
+    private let updatesView: UpdateSettingsView
+    private let feedbackView: FeedbackSettingsView
+    private let tabs = NSTabView()
+    private let updatesTab = NSTabViewItem(identifier: "Updates")
     private let window: SettingsWindow
     private let recorder: HotkeyRecorderView
     private let enabledToggle: NSButton
@@ -35,6 +42,8 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         showsHints: Bool,
         popup: PopupSettings,
         scenarios: AgentScenarioSettings,
+        updates: UpdateController,
+        feedbackEnvironment: FeedbackEnvironment,
         onHotkeyChanged: @escaping (HotkeySpec, Bool) -> Void,
         onThemeChanged: @escaping (OverlayTheme) -> Void,
         onHintsChanged: @escaping (Bool) -> Void,
@@ -51,6 +60,9 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         enabledToggle = NSButton(checkboxWithTitle: "Enabled", target: nil, action: nil)
         feedback = NSTextField(labelWithString: "")
         agentsView = AgentSettingsView(settings: scenarios, onChange: onScenariosChanged)
+        self.updates = updates
+        updatesView = UpdateSettingsView(updates: updates)
+        feedbackView = FeedbackSettingsView(environment: feedbackEnvironment)
         window = SettingsWindow(
             contentRect: NSRect(x: 0, y: 0, width: 520, height: 500),
             styleMask: [.titled, .closable],
@@ -88,8 +100,12 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         refreshFromCoordinator()
     }
 
-    func show() {
+    /// `tab` is a tab identifier (its untitled label, e.g. "Updates").
+    func show(tab: String? = nil) {
         refreshFromCoordinator()
+        if let tab { tabs.selectTabViewItem(withIdentifier: tab) }
+        // Opening settings is a natural moment to look for a release.
+        updates.check()
         NSApp.activate(ignoringOtherApps: true)
         window.center()
         window.makeKeyAndOrderFront(nil)
@@ -100,7 +116,6 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
     // MARK: - Layout
 
     private func makeContentView() -> NSView {
-        let tabs = NSTabView()
         tabs.translatesAutoresizingMaskIntoConstraints = false
         for (title, view) in [
             ("General", pane(generalSection())),
@@ -113,6 +128,13 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
             item.view = view
             tabs.addTabViewItem(item)
         }
+        updatesTab.view = updatesView
+        tabs.addTabViewItem(updatesTab)
+        let feedbackTab = NSTabViewItem(identifier: "Feedback")
+        feedbackTab.label = "Feedback"
+        feedbackTab.view = feedbackView
+        tabs.addTabViewItem(feedbackTab)
+        updateStatusChanged()
 
         let content = NSView()
         content.addSubview(tabs)
@@ -208,6 +230,12 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
     }
 
     // MARK: - State
+
+    /// Mirrors `UpdateController.status` into the Updates tab and its label.
+    func updateStatusChanged() {
+        updatesTab.label = updates.status.tabLabel
+        updatesView.refresh()
+    }
 
     /// Pushes the coordinator's state into the controls; never notifies back.
     private func refreshFromCoordinator() {

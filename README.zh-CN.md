@@ -23,7 +23,8 @@
 - **你正看着的任务不打扰**：任务完成时如果它所在的 tab / 窗口就在最前面（tmux 当前 pane、cmux / Ghostty / Terminal / iTerm2 当前 tab、VS Code 当前终端、桌面 app 在前台），不弹出、不计数，列表里照样有它但没有红点；你自己切回一个未读任务的窗口后，几秒内红点和计数也会自动消掉
 - 「岛」式外观：面板贴着菜单栏下沿垂下，底部大圆角；标题行：自动弹出时是 `● N new`（没有未读是 `All caught up`）+ 快捷键；召唤时整行就是搜索框，右侧是 `N new` 小胶囊；每行是数字键帽 + agent 图标（未读在图标角上带红点）+ 标题 + `目录 • agent` + 右侧短时间（now / 3m / 2h）；选中行是半透明描边胶囊
 - 用快捷键 / 菜单召唤时可以直接打字过滤任务，`↑↓` 选择、`↩` 打开、`⌘1–9` 直达、`⌘,` 打开设置、`esc` 或点别处关闭；任务完成自动弹出时不抢焦点，只能鼠标点
-- `Settings…` 分 `General`（快捷键）/ `Appearance`（主题、键盘提示）/ `Notifications`（弹出）/ `Agents` 四个 tab
+- `Settings…` 分 `General`（快捷键）/ `Appearance`（主题、键盘提示）/ `Notifications`（弹出）/ `Agents` / `Updates` / `Feedback` 六个 tab
+- `Settings…` → `Feedback`：写几句话，用邮件发出、打开预填好的 GitHub issue，或者复制下来；会自动附上 island 与 macOS 版本
 - `Settings…` → `Agents` 列出 island 支持的每个 agent 及其场景（如 Claude Code 的终端 CLI / 编辑器扩展 / Claude app 内 / SDK，Codex 的桌面 app / 终端 CLI / `codex exec`），写明怎么检测、点击后会怎样；每个场景、每个 agent 都可以单独关掉，关掉的场景不计数、不弹出、不进列表
 - `Settings…` → `Appearance` 里可以关掉底部的键盘提示（`Show keyboard hints`）；可选主题：System（浅色 Sand / 深色 Lagoon）/ Lagoon / Coral / Sand / Midnight，立即生效
 - 悬浮窗不会出现在窗口切换器里
@@ -39,7 +40,7 @@
 brew install lbyxiafei/tap/island
 ```
 
-升级 `brew upgrade island`，卸载 `brew uninstall island`（`brew uninstall --zap island` 连设置一起清掉）。app 已签名并公证，装完直接从「应用程序」启动即可。
+升级 `brew upgrade island`，也可以在 app 里升级：有新版本时 `Settings…` → `Updates` 会带红点，点一下就升级并重启。卸载 `brew uninstall island`（`brew uninstall --zap island` 连设置一起清掉）。app 已签名并公证，装完直接从「应用程序」启动即可。
 
 ## 从源码构建
 
@@ -123,7 +124,7 @@ defaults delete com.commallama.island IslandHotkeyEnabled
 | `Summon overlay (⌃⌘,)` | 手动召唤一次（快捷键之外的备用入口） |
 | `Summon hotkey` | 召唤快捷键的 on / off 开关，勾选状态即真实状态 |
 | `hotkey ⌃⌘, · default` | 当前快捷键及其来源（应用内设置 / 环境变量 / 默认），关掉时显示 `hotkey off` |
-| `Settings…` | 分 tab：录制快捷键、开关、清空；选择悬浮窗主题；任务完成时是否弹出、停留几秒；按 agent / 场景开关检测 |
+| `Settings…` | 分 tab：录制快捷键、开关、清空；选择悬浮窗主题；任务完成时是否弹出、停留几秒；按 agent / 场景开关检测；升级；反馈 |
 | `Launch at login` | 开机自启开关，勾选状态即系统真实状态 |
 | `Quit island` | 退出 |
 

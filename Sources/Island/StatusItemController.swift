@@ -13,6 +13,7 @@ final class StatusItemController {
     private let onToggleHotkey: (Bool) -> Void
     private let onSelectTask: (String) -> Void
     private let onOpenSettings: () -> Void
+    private let onOpenUpdates: () -> Void
     private let onQuit: () -> Void
 
     private var hotkeyDisplay: String
@@ -28,6 +29,9 @@ final class StatusItemController {
     /// Set when a terminal refused automation; the item opens the settings pane.
     private var automationHint: String?
 
+    /// A newer release; the item opens Settings → Updates.
+    private var availableUpdate: AppVersion?
+
     init(
         hotkey: HotkeySpec,
         hotkeySource: HotkeySource,
@@ -38,6 +42,7 @@ final class StatusItemController {
         onToggleHotkey: @escaping (Bool) -> Void,
         onSelectTask: @escaping (String) -> Void,
         onOpenSettings: @escaping () -> Void,
+        onOpenUpdates: @escaping () -> Void,
         onQuit: @escaping () -> Void
     ) {
         self.popup = popup
@@ -46,6 +51,7 @@ final class StatusItemController {
         self.onToggleHotkey = onToggleHotkey
         self.onSelectTask = onSelectTask
         self.onOpenSettings = onOpenSettings
+        self.onOpenUpdates = onOpenUpdates
         self.onQuit = onQuit
         hotkeyDisplay = hotkey.displayString
         hotkeySourceNote = Self.note(for: hotkeySource)
@@ -79,6 +85,12 @@ final class StatusItemController {
     /// Called when the agent monitor sees a new finished run.
     func setAutomationHint(_ hint: String?) {
         automationHint = hint
+        rebuildMenu()
+    }
+
+    func setAvailableUpdate(_ version: AppVersion?) {
+        guard version != availableUpdate else { return }
+        availableUpdate = version
         rebuildMenu()
     }
 
@@ -156,6 +168,13 @@ final class StatusItemController {
             menu.addItem(.separator())
         }
 
+        if let availableUpdate {
+            let item = action(
+                "Update to \(availableUpdate) available…", #selector(openUpdates), keyEquivalent: ""
+            )
+            item.image = Self.unreadDot()
+            menu.addItem(item)
+        }
         menu.addItem(action("Settings…", #selector(openSettings), keyEquivalent: ","))
         menu.addItem(.separator())
 
@@ -244,6 +263,10 @@ final class StatusItemController {
 
     @objc private func openSettings() {
         onOpenSettings()
+    }
+
+    @objc private func openUpdates() {
+        onOpenUpdates()
     }
 
     @objc private func quit() {

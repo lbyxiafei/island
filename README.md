@@ -18,7 +18,7 @@ Stop checking five terminals to see who's done.
 brew install lbyxiafei/tap/island
 ```
 
-Upgrade with `brew upgrade island`, uninstall with `brew uninstall island` (`brew uninstall --zap island` also removes settings). The app is signed and notarized — just launch it from Applications.
+Upgrade with `brew upgrade island` — or in-app: when a new release is out, `Settings…` → `Updates` gets a red dot and one click upgrades and relaunches. Uninstall with `brew uninstall island` (`brew uninstall --zap island` also removes settings). The app is signed and notarized — just launch it from Applications.
 
 Requires macOS 13+.
 
@@ -35,7 +35,8 @@ Requires macOS 13+.
 - **Doesn't interrupt what you're looking at**: if the finished task's tab / window is already frontmost (current tmux pane, current cmux / Ghostty / Terminal / iTerm2 tab, current VS Code terminal, desktop app in front), there's no popup and no count — it's listed without a red dot. Switch to an unread task's window yourself and its red dot and count clear within seconds
 - **Island look**: the panel hangs from the menu bar with large rounded bottom corners. Header: `● N new` on auto-popup (`All caught up` when nothing is unread); when summoned, the whole header is a search field with an `N new` pill. Each row: number keycap + agent icon (red dot on the icon when unread) + title + `directory • agent` + short time (now / 3m / 2h)
 - **Keyboard-driven when summoned**: type to filter, `↑↓` to select, `↩` to open, `⌘1–9` to jump directly, `⌘,` for settings, `esc` or click elsewhere to close. Auto-popups never steal focus — mouse only
-- `Settings…` has four tabs: `General` (hotkey) / `Appearance` (theme, keyboard hints) / `Notifications` (popups) / `Agents`
+- `Settings…` has six tabs: `General` (hotkey) / `Appearance` (theme, keyboard hints) / `Notifications` (popups) / `Agents` / `Updates` / `Feedback`
+- `Settings…` → `Feedback`: write a note and send it by email, as a prefilled GitHub issue, or copy it — your island and macOS versions are attached
 - `Settings…` → `Agents` lists every supported agent and scenario (e.g. Claude Code's terminal CLI / editor extension / inside the Claude app / SDK; Codex's desktop app / terminal CLI / `codex exec`), how each is detected, and what a click does. Every scenario and every agent can be turned off individually — disabled ones aren't counted, don't pop up, and don't appear in the list
 - Themes: System (light Sand / dark Lagoon) / Lagoon / Coral / Sand / Midnight, applied instantly; keyboard hints can be hidden
 - The panel never shows up in the window switcher
@@ -140,7 +141,7 @@ Click the island icon in the menu bar:
 | `Summon overlay (⌃⌘,)` | Summon once manually (a fallback to the hotkey) |
 | `Summon hotkey` | Turns the summon hotkey on / off; the checkmark reflects the real state |
 | `hotkey ⌃⌘, · default` | The current hotkey and where it comes from (in-app setting / environment variable / default); shows `hotkey off` when disabled |
-| `Settings…` | Tabs for recording, toggling and clearing the hotkey; panel theme; whether to pop up on completion and for how long; per-agent / per-scenario detection toggles |
+| `Settings…` | Tabs for recording, toggling and clearing the hotkey; panel theme; whether to pop up on completion and for how long; per-agent / per-scenario detection toggles; updates; feedback |
 | `Launch at login` | Launch-at-login toggle; the checkmark reflects the real system state |
 | `Quit island` | Quit |
 

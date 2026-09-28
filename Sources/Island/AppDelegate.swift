@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// stall the monitor.
     private let visibilityQueue = DispatchQueue(label: "island.visibility", qos: .utility)
     private var hideTask: Task<Void, Never>?
+    private let updates = UpdateController()
 
     init(configuration: ResolvedConfiguration) {
         self.configuration = configuration
@@ -112,6 +113,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showsHints: content.showsHints,
             popup: popup,
             scenarios: scenarios,
+            updates: updates,
+            feedbackEnvironment: FeedbackEnvironment(
+                appVersion: updates.current.description,
+                osVersion: Self.osVersion),
             onHotkeyChanged: { [weak self] spec, enabled in
                 self?.log("hotkey changed to \(spec.displayString) (enabled: \(enabled))")
                 self?.statusItem?.setHotkey(spec, source: .menu)
@@ -134,11 +139,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onToggleHotkey: { [weak self] enabled in self?.setHotkeyEnabled(enabled) },
             onSelectTask: { [weak self] id in self?.selectTask(id: id) },
             onOpenSettings: { [weak self] in self?.settingsWindow?.show() },
+            onOpenUpdates: { [weak self] in self?.settingsWindow?.show(tab: "Updates") },
             onQuit: { NSApp.terminate(nil) }
         )
         log("menu bar item installed; launch at login: \(LoginItemController().status.rawValue)")
 
         startAgentMonitor()
+
+        updates.onChange = { [weak self] status in
+            self?.settingsWindow?.updateStatusChanged()
+            if case .available(let latest) = status {
+                self?.statusItem?.setAvailableUpdate(latest)
+            } else {
+                self?.statusItem?.setAvailableUpdate(nil)
+            }
+        }
+        updates.start()
 
         // Show once at launch so the POC is visible without hunting for the hotkey.
         if popup.isEnabled { showOverlay() }
@@ -368,6 +384,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for line in configuration.summary.split(separator: "\n") {
             log(String(line))
         }
+    }
+
+    /// `26.6.2`, not the `Version 26.6.2 (Build …)` of `operatingSystemVersionString`.
+    private static var osVersion: String {
+        let version = ProcessInfo.processInfo.operatingSystemVersion
+        return "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
     }
 
     /// Written to stderr, which is only visible when launch happens from a
