@@ -4,7 +4,7 @@ name: dev-flow-brew-upgrade
 title: "开发完成即发布到 brew，本地从 settings 升级验收"
 status: in-progress
 created_ts: 2026-09-28T14:11:52-07:00
-updated_ts: 2026-09-28T14:12:01-07:00
+updated_ts: 2026-09-28T14:14:33-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)

@@ -29,7 +29,7 @@ swift build                        # 编译
 ./scripts/publish.sh 0.2.0         # 发布到 brew：release.sh + tap 仓库 Release + Casks/island.rb + tag v0.2.0
 ./scripts/demo.sh                  # ISLAND_AGENT_HOME 指向临时目录里的假 session，逐个完成触发弹出，录演示用；--check 不开窗只打印检测结果
 
-# 运行
+# 运行（开发机日常跑的是 brew 装的 /Applications/Island.app，见下方 Gotchas「开发流程」）
 ./build/Island.app/Contents/MacOS/Island    # 前台运行，配置与事件日志走 stderr
 open build/Island.app                       # 后台运行（无日志输出）
 
@@ -247,3 +247,5 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - **轮询路径上的大文件一律要缓存**：Claude Code 转录（`ClaudeTranscriptCache`，只读追加部分）、Claude 桌面版 blob（`ClaudeDesktopCacheReader`）、pi session（`PiScanCache`，按 mtime + size 判断变没变）。改文件属性要用 `FileManager.attributesOfItem`，不要用 `URL.resourceValues`，后者在同一个 URL 实例上会缓存旧值（issue `cache-pi-session-scans`：没缓存时 pi 每 3 秒全量解析约 6.7 MB，约 0.3s CPU）
 - **应用内升级**（issue `upgrade-n-feedback`）：版本真源是公开 tap 的 `Casks/island.rb`（raw.githubusercontent，`UpdateSource.caskURL`），不是 GitHub API（无限流问题）。app 版本读 `CFBundleShortVersionString`，本地构建 `0.0.0` 视为开发版、永不提示。本地测提示用 `ISLAND_VERSION=0.0.9 ./scripts/build-app.sh`。有新版本时 Updates tab 名带 `🔴`（NSTabView 标签没法上色，emoji 是唯一不用自绘的办法）、菜单出现 `Update to x available…`。自动检查开关存 `IslandAutoCheckUpdates`（缺省开）。**升级只对 brew 装的有效**（`<prefix>/bin/brew` 与 `<prefix>/Caskroom/island` 都在）：spawn 脱离的 `sh` 后 island 立刻 `terminate`，shell 等 pid 退出再 `brew update && brew upgrade --cask lbyxiafei/tap/island`，输出与 `island-upgrade: exit N` 追加到 `~/Library/Logs/island-upgrade.log`，最后无论成败都 `open -b com.commallama.island`；下次打开 Updates tab 若日志最后一次非 0 会提示。先退出再升级，是为了让 cask 的 `uninstall quit:` 不去 quit 一个正在跑 brew 的父进程。不是 brew 装的就打开 tap 的 Release 页
 - **反馈没有服务端**（issue `upgrade-n-feedback` § Decision）：`Send Email` 是 `mailto:`（用户自己的邮件客户端）、`Open GitHub Issue` 是预填的 `lbyxiafei/island/issues/new`、`Copy` 兜底。URL 编码只放行 RFC 3986 unreserved 字符——`URLComponents` 不转义 `+` / `&`，邮件客户端会把 `+` 当空格
+- **开发流程**（PLAN § 开发指南，issue `dev-flow-brew-upgrade`，完整步骤见 `hai/reference/workflow/README.md`）：开发机只装 brew 那份。每次开发完成 = ship 到 master + `./scripts/publish.sh <下一个版本>`，开发者在 Settings → Updates 一键升级来验收，顺带验证 upgrade。只动 `hai/` 的提交不发版。agent 中途要跑构建产物，先 `pkill -x Island`，测完 `pkill -x Island; open /Applications/Island.app` 换回来
+
