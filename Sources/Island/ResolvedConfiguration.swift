@@ -12,6 +12,7 @@ struct ResolvedConfiguration {
     let hotkeyEnabled: Bool
     let duration: OverlayDuration
     let taskLimit: Int
+    let agentHome: URL
 
     init(environment: [String: String], store: HotkeyStoring = UserDefaultsHotkeyStore()) {
         hotkey = HotkeyConfiguration.resolve(
@@ -21,6 +22,7 @@ struct ResolvedConfiguration {
         hotkeyEnabled = HotkeySettingsCoordinator.initialEnabled(stored: store.loadHotkeyEnabled())
         duration = OverlayDuration.resolve(environment[Self.durationEnvironmentKey])
         taskLimit = TaskLimit.resolve(environment[Self.taskLimitEnvironmentKey])
+        agentHome = AgentHome.resolve(environment[AgentHome.environmentKey])
     }
 
     var summary: String {
@@ -28,6 +30,7 @@ struct ResolvedConfiguration {
             "hotkey            \(hotkey.spec.displayString)  (\(sourceNote)\(hotkeyEnabled ? "" : ", disabled"))",
             "overlay duration  \(Self.secondsText(duration.seconds))s",
             "task limit        \(taskLimit)",
+            "agent home        \(agentHome.path)",
         ]
         if hotkey.usedFallback {
             lines.append(

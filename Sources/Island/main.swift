@@ -26,6 +26,7 @@ if arguments.contains("--help") || arguments.contains("-h") {
         environment:
           ISLAND_HOTKEY=cmd+ctrl+,        hotkey that summons the overlay
           ISLAND_OVERLAY_SECONDS=5        how long the pop-up stays on screen (settings override it)
+          ISLAND_AGENT_HOME=~             where agent session stores are read from (e.g. demo data)
 
         flags (login-item flags must run from inside the app bundle):
           --print-config                  resolve the environment and exit
@@ -66,7 +67,9 @@ if arguments.contains("--login-item-enable") || arguments.contains("--login-item
 
 if arguments.contains("--scan-agents") {
     // Deliberately unfiltered: lists switched-off scenarios too, marked `off`.
-    let tasks = AgentActivityScanner.standard(sqlite: ProcessSQLiteQuerying()).completedTasks()
+    let tasks = AgentActivityScanner.standard(
+        home: configuration.agentHome, sqlite: ProcessSQLiteQuerying()
+    ).completedTasks()
     let scenarios = UserDefaultsAgentScenarioStore().load()
     if tasks.isEmpty {
         print("no completed agent tasks found")
@@ -85,8 +88,10 @@ if arguments.contains("--scan-agents") {
 if arguments.contains("--live-sessions") {
     // What the monitor prunes against: rows whose session is not listed here
     // leave the overlay; "cannot tell" agents keep all of theirs.
-    let presence = AgentActivityScanner.standard(sqlite: ProcessSQLiteQuerying())
-        .presence(of: Set(AgentKind.allCases), processes: ProcessInspector())
+    let presence = AgentActivityScanner.standard(
+        home: configuration.agentHome, sqlite: ProcessSQLiteQuerying()
+    )
+    .presence(of: Set(AgentKind.allCases), processes: ProcessInspector())
     for agent in AgentKind.allCases {
         guard let live = presence.live[agent] else {
             print("\(agent.rawValue): cannot tell")

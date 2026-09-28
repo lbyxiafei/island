@@ -151,7 +151,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let inbox = AgentInbox(limit: configuration.taskLimit)
         self.inbox = inbox
         let monitor = AgentMonitor(
-            scanner: .standard(sqlite: ProcessSQLiteQuerying()),
+            scanner: .standard(home: configuration.agentHome, sqlite: ProcessSQLiteQuerying()),
             inbox: inbox,
             scenarios: scenarios,
             inView: { [weak self] tasks in await self?.tasksInView(tasks) ?? [] },

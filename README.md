@@ -1,128 +1,148 @@
 # island
 
-监视本机 AI Agent 的运行活动，在 session / task 完成时于屏幕中央上方弹出一个悬浮窗。
+**English** | [简体中文](README.zh-CN.md)
 
-> **当前处于 MVP 阶段**：POC（app 流程、global hotkey、菜单栏、开机自启、快捷键配置）已完成；MVP 正在做 agent 检测与展示 UX，详见 `hai/PLAN.md`。
+A macOS menu-bar app that watches the AI agents running on your machine — Claude Code, Codex, pi, and the Claude desktop app — and drops a Dynamic-Island-style panel from the top of the screen the moment one of them finishes a task. Click a task and you land right back in the terminal tab, tmux pane, VS Code terminal, or desktop conversation it came from.
 
-## 现在能做什么
+Stop checking five terminals to see who's done.
 
-- **检测本机已完成的 agent run**：支持 Claude Code（terminal）、Claude 桌面版（聊天）、pi（terminal）、Codex（CLI + 桌面）；完成信号、任务身份、标题、宿主进程的调研见 `hai/reference/agents/README.md`
-- 任务完成时自动弹出悬浮窗，里面是任务列表（未读优先，未读左侧有红点）；hover 会暂停自动隐藏
-- 任务标题优先用 agent 自己的 title，没有就显示**最后一条消息**，再没有才回退到目录名
-- 点击任务后**悬浮窗随即收起**，并直接跳到那个任务所在的 tab：tmux 切到对应 session/window/pane，cmux / Ghostty / Terminal / iTerm2 切到对应 tab，VS Code 切到对应终端 tab（island 启动时自动安装配套扩展，无需配置），桌面 app 打开对应对话；无法定位时把 resume 命令（如 `claude --resume <id>`）贴到剪贴板。首次跳到某个终端 app 时 macOS 会询问一次是否允许 island 控制它。点过后红点消失但条目保留
-- 菜单栏图标右侧显示**未读任务数**，菜单里也有一份同样的任务列表（点击即跳回）
-- 只统计 island 启动之后完成的 run，不看历史
-- 按 `⌃⌘,` 全局召唤屏幕顶部中央的悬浮窗，**不需要任何系统权限授权**（不弹输入监控 / 辅助功能对话框）；悬浮窗显示期间再按一次即可立即收起（toggle）
-- 自动弹出的悬浮窗 5 秒后消失（`Settings…` → `Notifications` 里可改秒数，也可以整个关掉弹出；hover 暂停）；用快捷键召唤的则一直停留到你关闭
-- **你正看着的任务不打扰**：任务完成时如果它所在的 tab / 窗口就在最前面（tmux 当前 pane、cmux / Ghostty / Terminal / iTerm2 当前 tab、VS Code 当前终端、桌面 app 在前台），不弹出、不计数，列表里照样有它但没有红点；你自己切回一个未读任务的窗口后，几秒内红点和计数也会自动消掉
-- 「岛」式外观：面板贴着菜单栏下沿垂下，底部大圆角；标题行：自动弹出时是 `● N new`（没有未读是 `All caught up`）+ 快捷键；召唤时整行就是搜索框，右侧是 `N new` 小胶囊；每行是数字键帽 + agent 图标（未读在图标角上带红点）+ 标题 + `目录 • agent` + 右侧短时间（now / 3m / 2h）；选中行是半透明描边胶囊
-- 用快捷键 / 菜单召唤时可以直接打字过滤任务，`↑↓` 选择、`↩` 打开、`⌘1–9` 直达、`⌘,` 打开设置、`esc` 或点别处关闭；任务完成自动弹出时不抢焦点，只能鼠标点
-- `Settings…` 分 `General`（快捷键）/ `Appearance`（主题、键盘提示）/ `Notifications`（弹出）/ `Agents` 四个 tab
-- `Settings…` → `Agents` 列出 island 支持的每个 agent 及其场景（如 Claude Code 的终端 CLI / 编辑器扩展 / Claude app 内 / SDK，Codex 的桌面 app / 终端 CLI / `codex exec`），写明怎么检测、点击后会怎样；每个场景、每个 agent 都可以单独关掉，关掉的场景不计数、不弹出、不进列表
-- `Settings…` → `Appearance` 里可以关掉底部的键盘提示（`Show keyboard hints`）；可选主题：System（浅色 Sand / 深色 Lagoon）/ Lagoon / Coral / Sand / Midnight，立即生效
-- 悬浮窗不会出现在窗口切换器里
-- 菜单栏常驻一个 island 图标：一眼看出它在跑，可手动召唤、开关召唤快捷键、改快捷键、切换开机自启、退出
-- 快捷键可以随时 on / off：关掉后键位还给系统，配置仍然保留，随时可以再打开
-- 改快捷键时直接**按组合键录制**（不用记语法），并有一键 `Clear` 清空
-- 支持开机 / 登录自启（`SMAppService`，可在系统设置的登录项里关掉）
-- 构建与运行只需要本机 Xcode，**不需要 Apple Developer 账号**（没有证书时 ad-hoc 签名，只能本机用）；有 Developer ID 证书时 `scripts/release.sh` 产出**已签名 + 已公证**的 dmg，别人下载后可直接打开，不会被 Gatekeeper 拦
+> **Status: MVP.** The app shell (overlay, global hotkey, menu bar, launch at login, hotkey settings) is done; agent detection and the overlay UX are under active development. See `hai/PLAN.md`.
 
-## 安装
+## Install
 
 ```bash
 brew install --cask lbyxiafei/tap/island
 ```
 
-升级 `brew upgrade --cask island`，卸载 `brew uninstall --cask island`（加 `--zap` 连设置一起清掉）。app 已签名并公证，装完直接从「应用程序」启动即可。
+Upgrade with `brew upgrade --cask island`, uninstall with `brew uninstall --cask island` (add `--zap` to also remove settings). The app is signed and notarized — just launch it from Applications.
 
-## 从源码构建
+Requires macOS 13+.
 
-要求 macOS 13+ 与 Xcode（本机在 macOS 26.6.2 / Xcode 26.6 / Swift 6.3.3 上验证过）。零第三方依赖。
+## Features
+
+- **Detects finished agent runs**: Claude Code (terminal), Claude desktop app (chat), pi (terminal), Codex (CLI + desktop). How each agent's completion signal, task identity, title, and host process are read is documented in `hai/reference/agents/README.md`
+- **Pops up when a task finishes**, listing tasks (unread first, with a red dot); hovering pauses auto-hide
+- **Meaningful titles**: the agent's own title when it has one, otherwise the **last message**, otherwise the directory name
+- **Click to jump back** to the exact tab — the panel closes and you're taken to the task: tmux switches to the right session/window/pane; cmux / Ghostty / Terminal / iTerm2 switch to the right tab; VS Code switches to the right terminal tab (island installs a companion extension automatically, no setup); desktop apps open the conversation. When the task can't be located, the resume command (e.g. `claude --resume <id>`) is copied to the clipboard. macOS asks once for permission the first time island controls a given terminal app. Clicked tasks lose their red dot but stay in the list
+- **Unread count in the menu bar**, plus the same task list in the menu (click to jump back)
+- **Only runs that finish after island starts** are counted — history is ignored
+- **Global hotkey `⌃⌘,`** summons the panel at the top center of the screen, **with no system permissions required** (no Input Monitoring / Accessibility prompts); press it again to dismiss
+- Auto-popups hide after 5 seconds (configurable in `Settings…` → `Notifications`, or turn popups off entirely; hover pauses); a hotkey-summoned panel stays until you close it
+- **Doesn't interrupt what you're looking at**: if the finished task's tab / window is already frontmost (current tmux pane, current cmux / Ghostty / Terminal / iTerm2 tab, current VS Code terminal, desktop app in front), there's no popup and no count — it's listed without a red dot. Switch to an unread task's window yourself and its red dot and count clear within seconds
+- **Island look**: the panel hangs from the menu bar with large rounded bottom corners. Header: `● N new` on auto-popup (`All caught up` when nothing is unread); when summoned, the whole header is a search field with an `N new` pill. Each row: number keycap + agent icon (red dot on the icon when unread) + title + `directory • agent` + short time (now / 3m / 2h)
+- **Keyboard-driven when summoned**: type to filter, `↑↓` to select, `↩` to open, `⌘1–9` to jump directly, `⌘,` for settings, `esc` or click elsewhere to close. Auto-popups never steal focus — mouse only
+- `Settings…` has four tabs: `General` (hotkey) / `Appearance` (theme, keyboard hints) / `Notifications` (popups) / `Agents`
+- `Settings…` → `Agents` lists every supported agent and scenario (e.g. Claude Code's terminal CLI / editor extension / inside the Claude app / SDK; Codex's desktop app / terminal CLI / `codex exec`), how each is detected, and what a click does. Every scenario and every agent can be turned off individually — disabled ones aren't counted, don't pop up, and don't appear in the list
+- Themes: System (light Sand / dark Lagoon) / Lagoon / Coral / Sand / Midnight, applied instantly; keyboard hints can be hidden
+- The panel never shows up in the window switcher
+- Menu bar icon: see at a glance that it's running, summon manually, toggle or change the hotkey, toggle launch at login, quit
+- The hotkey can be turned on / off at any time; turning it off releases the key combo to the system while keeping your setting
+- Change the hotkey by **pressing the combo to record it** (no syntax to remember), with a one-click `Clear`
+- Launch at login (`SMAppService`; can be turned off in System Settings → Login Items)
+
+## Privacy
+
+island only reads each agent's session / transcript files on your machine to tell whether a task has finished. It contains no network code at all — nothing is uploaded or collected.
+
+## Build from source
+
+Requires macOS 13+ and Xcode (verified on macOS 26.6.2 / Xcode 26.6 / Swift 6.3.3). Zero third-party dependencies. No Apple Developer account needed: without a certificate the app is ad-hoc signed (runs on your machine only).
 
 ```bash
 git clone https://github.com/lbyxiafei/island.git
 cd island
 
-./scripts/build-app.sh      # 编译并打包成 build/Island.app（有 Developer ID 证书就用它签，否则 ad-hoc）
-open build/Island.app       # 启动，无日志输出
+./scripts/build-app.sh      # build and bundle build/Island.app (signed with Developer ID if available, ad-hoc otherwise)
+open build/Island.app       # launch, no log output
 
-# 或者前台运行，配置与事件日志直接打在终端：
+# or run in the foreground, with config and event logs in the terminal:
 ./build/Island.app/Contents/MacOS/Island
 ```
 
-启动时会先自动弹一次悬浮窗，之后按快捷键即可再次召唤。退出：点菜单栏 island 图标 → `Quit island`，或 `pkill -x Island`。
+The panel pops up once on launch; use the hotkey to summon it again. To quit: menu bar island icon → `Quit island`, or `pkill -x Island`.
 
-> 想长期使用，建议把 `Island.app` 拷到 `/Applications` 再从那里启动——登录项记的是 app 的路径，放在构建目录里容易被后续构建或清理打扰。
+> For long-term use, copy `Island.app` into `/Applications` and launch it from there — the login item remembers the app's path, and the build directory gets disturbed by later builds or cleanups.
 
-## 打包发布（给别人用）
+## Packaging a release
 
 ```bash
-./scripts/release.sh 0.2.0  # -> build/dist/island-0.2.0.dmg，已签名、已公证、已 staple
-./scripts/publish.sh 0.2.0  # release.sh + 上传到 homebrew tap + 更新 cask + 打 tag v0.2.0
+./scripts/release.sh 0.2.0  # -> build/dist/island-0.2.0.dmg, signed, notarized, stapled
+./scripts/publish.sh 0.2.0  # release.sh + upload to the homebrew tap + update the cask + tag v0.2.0
 ```
 
-源码仓库是私有的，dmg 和 cask 都放在公开的 [`lbyxiafei/homebrew-tap`](https://github.com/lbyxiafei/homebrew-tap)：dmg 是它的 Release `island-v<version>`，cask 是 `Casks/island.rb`。`publish.sh` 要在已 push 的干净 master 上跑。
+The dmg and cask live in [`lbyxiafei/homebrew-tap`](https://github.com/lbyxiafei/homebrew-tap): the dmg is its Release `island-v<version>`, the cask is `Casks/island.rb`. Run `publish.sh` on a clean, pushed master.
 
-需要钥匙串里有 `Developer ID Application` 证书，以及 notarytool 的钥匙串 profile（默认名 `notary`，可用 `ISLAND_NOTARY_PROFILE` 改）。脚本最后用 `spctl` 按 Gatekeeper 的标准检查 app 和 dmg，两者都应是 `accepted, source=Notarized Developer ID`。别人拿到 dmg：打开 → 把 Island 拖进 Applications → 启动即可。
+This needs a `Developer ID Application` certificate in the keychain and a notarytool keychain profile (named `notary` by default; override with `ISLAND_NOTARY_PROFILE`). The script finishes by checking both app and dmg with `spctl` against Gatekeeper's rules; both should report `accepted, source=Notarized Developer ID`. Users then just open the dmg, drag Island into Applications, and launch it.
 
-## 配置快捷键
+## Hotkey
 
-菜单栏图标 → `Settings…` → `General`：点一下录制框，直接按下想要的组合键即可录入（至少含一个 `⌘⌃⌥⇧` 修饰键）。`Apply` 立即生效并记住；`Clear` 清空并关掉快捷键；`Reset to default` 回到内置默认。失败的换绑会自动保留旧快捷键。
+Menu bar icon → `Settings…` → `General`: click the recorder and press the combo you want (it must include at least one of `⌘⌃⌥⇧`). `Apply` takes effect immediately and is remembered; `Clear` empties it and turns the hotkey off; `Reset to default` restores the built-in default. A failed rebind keeps the old hotkey.
 
-快捷键也可以随时停用：录制框上方的 `Enabled` 勾选框、菜单里的 `Summon hotkey` 勾选项，效果一致（关掉后配置保留，随时可再打开）。
+The hotkey can also be disabled at any time, via the `Enabled` checkbox above the recorder or the `Summon hotkey` menu item (same effect; your setting is kept).
 
-快捷键本身是 toggle：悬浮窗已经显示时再按一次会立刻收起，而不是把 5 秒计时重新开始（菜单里的 `Summon overlay` 则始终是“显示”）。
+The hotkey is a toggle: pressing it while the panel is showing closes it immediately rather than restarting the 5-second timer (the menu's `Summon overlay` always shows).
 
-另外两种方式，**应用内设置优先**：
+Two other ways to set it — **in-app settings win**:
 
-| 方式 | 说明 |
+| Method | Notes |
 |---|---|
-| 菜单栏图标 → `Settings…` | 立即生效并记住；非法组合会当场提示，改坏了会自动保留旧快捷键 |
-| 环境变量 `ISLAND_HOTKEY` | 启动时读取，适合一次性试用；被应用内设置覆盖 |
+| Menu bar icon → `Settings…` | Takes effect immediately and is remembered; invalid combos are rejected on the spot, and a broken rebind keeps the old hotkey |
+| `ISLAND_HOTKEY` environment variable | Read at launch, handy for one-off trials; overridden by in-app settings |
 
-内置默认是 `cmd+ctrl+,`。清掉应用内设置即回到环境变量或默认：
+The built-in default is `cmd+ctrl+,`. Clear the in-app setting to fall back to the environment variable or the default:
 
 ```bash
-# 恢复默认快捷键，并重新打开
+# restore the default hotkey and re-enable it
 defaults delete com.commallama.island IslandHotkeyText
 defaults delete com.commallama.island IslandHotkeyEnabled
 ```
 
-## 配置
+Modifiers can be written as `cmd`/`command`/`⌘`, `ctrl`/`control`/`⌃`, `opt`/`option`/`alt`/`⌥`, `shift`/`⇧`; the key is a single US-layout character, or `space` / `tab` / `return` / `escape` (this syntax only matters for the environment variable / `defaults`; in-app recording doesn't need it).
 
-时长通过环境变量，改完即生效，无需重新构建。
+## Configuration
 
-| 环境变量 | 默认值 | 说明 |
+Set via environment variables; no rebuild needed.
+
+| Variable | Default | Description |
 |---|---|---|
-| `ISLAND_HOTKEY` | `cmd+ctrl+,` | 召唤快捷键 |
-| `ISLAND_OVERLAY_SECONDS` | `5` | 自动弹出的停留秒数（`Settings…` 里改过则以设置为准） |
-| `ISLAND_TASK_LIMIT` | `10` | 悬浮窗展示的任务条数 |
-
-看一下本机现在检测到哪些已完成 run（不会开窗，纯调试）：
+| `ISLAND_HOTKEY` | `cmd+ctrl+,` | Summon hotkey |
+| `ISLAND_OVERLAY_SECONDS` | `5` | How long an auto-popup stays (a value set in `Settings…` wins) |
+| `ISLAND_TASK_LIMIT` | `10` | Number of tasks shown in the panel |
+| `ISLAND_AGENT_HOME` | `~` | Where agent session stores (`~/.claude`, `~/.pi`, `~/.codex`, …) are read from |
 
 ```bash
-./build/Island.app/Contents/MacOS/Island --scan-agents        # 每行带场景 id（如 claude-code.terminal），被关掉的标 (off)
-./build/Island.app/Contents/MacOS/Island --reopen-plan <pid>   # 某个 agent 进程会被怎么跳回
+ISLAND_HOTKEY=cmd+shift+k ISLAND_OVERLAY_SECONDS=2 ./build/Island.app/Contents/MacOS/Island
 ```
 
-任务条数用 `ISLAND_TASK_LIMIT` 调，默认 10。
+Bad values don't crash: island falls back to the default and prints a `warning` to stderr. To check only how the config resolves:
 
-## 菜单栏
+```bash
+./build/Island.app/Contents/MacOS/Island --print-config
+```
 
-点开菜单栏的 island 图标：
+See which finished runs island currently detects (no window, debugging only):
 
-| 菜单项 | 作用 |
+```bash
+./build/Island.app/Contents/MacOS/Island --scan-agents        # each line carries a scenario id (e.g. claude-code.terminal); disabled ones are marked (off)
+./build/Island.app/Contents/MacOS/Island --reopen-plan <pid>   # how island would jump back to a given agent process
+```
+
+## Menu bar
+
+Click the island icon in the menu bar:
+
+| Item | Action |
 |---|---|
-| `Summon overlay (⌃⌘,)` | 手动召唤一次（快捷键之外的备用入口） |
-| `Summon hotkey` | 召唤快捷键的 on / off 开关，勾选状态即真实状态 |
-| `hotkey ⌃⌘, · default` | 当前快捷键及其来源（应用内设置 / 环境变量 / 默认），关掉时显示 `hotkey off` |
-| `Settings…` | 分 tab：录制快捷键、开关、清空；选择悬浮窗主题；任务完成时是否弹出、停留几秒；按 agent / 场景开关检测 |
-| `Launch at login` | 开机自启开关，勾选状态即系统真实状态 |
-| `Quit island` | 退出 |
+| `Summon overlay (⌃⌘,)` | Summon once manually (a fallback to the hotkey) |
+| `Summon hotkey` | Turns the summon hotkey on / off; the checkmark reflects the real state |
+| `hotkey ⌃⌘, · default` | The current hotkey and where it comes from (in-app setting / environment variable / default); shows `hotkey off` when disabled |
+| `Settings…` | Tabs for recording, toggling and clearing the hotkey; panel theme; whether to pop up on completion and for how long; per-agent / per-scenario detection toggles |
+| `Launch at login` | Launch-at-login toggle; the checkmark reflects the real system state |
+| `Quit island` | Quit |
 
-图标右侧的数字是未读 agent 任务数（同微信那种角标）。
+The number next to the icon is the count of unread agent tasks.
 
-登录项也可以用命令行检查与开关（必须调用 `.app` 包内的可执行文件）：
+Login items can also be checked and toggled from the command line (you must call the executable inside the `.app` bundle):
 
 ```bash
 ./build/Island.app/Contents/MacOS/Island --login-item-status
@@ -130,39 +150,26 @@ defaults delete com.commallama.island IslandHotkeyEnabled
 ./build/Island.app/Contents/MacOS/Island --login-item-disable
 ```
 
-关闭自启后，也可以在「系统设置 → 通用 → 登录项」里确认。
+After disabling, you can confirm in System Settings → General → Login Items.
 
-modifier 可写 `cmd`/`command`/`⌘`、`ctrl`/`control`/`⌃`、`opt`/`option`/`alt`/`⌥`、`shift`/`⇧`；key 是 US 布局的单字符，或 `space` / `tab` / `return` / `escape`（这条语法只有写环境变量 / `defaults` 时才需要，应用内录制不涉及）。
-
-```bash
-ISLAND_HOTKEY=cmd+shift+k ISLAND_OVERLAY_SECONDS=2 ./build/Island.app/Contents/MacOS/Island
-```
-
-配置值写错时不会崩：回落到默认值，并在 stderr 打一行 `warning`。想只检查配置解析结果：
+## Development
 
 ```bash
-./build/Island.app/Contents/MacOS/Island --print-config
+make verify        # all gates: build / fmt / lint / test / coverage / cycles / issue-check
+make help          # all available targets
+swift test         # tests only
+./scripts/demo.sh  # run island on fake agent sessions (for recording demos); --check prints what it detects
 ```
 
-## 开发
-
-```bash
-make verify        # 全部 gate：build / fmt / lint / test / coverage / cycles / issue-check
-make help          # 所有可用 target
-swift test         # 只跑测试
-```
-
-| 文件 | 内容 | 维护者 |
+| File | Contents | Maintained by |
 |---|---|---|
-| `hai/PLAN.md` | goal / non-goal / scope / design / key decisions | 人 |
-| `hai/CONTEXT.md` | setup / test / layout / conventions / gotchas，面向 AI Agent | Agent |
-| `hai/ISSUES.md` | issue 索引，由 `make issue-sync` 生成 | 工具 |
+| `hai/PLAN.md` | goal / non-goal / scope / design / key decisions | human |
+| `hai/CONTEXT.md` | setup / test / layout / conventions / gotchas, for AI agents | agent |
+| `hai/ISSUES.md` | issue index, generated by `make issue-sync` | tooling |
 
-代码分两层：`Sources/IslandCore`（纯逻辑，不与 UI 框架耦合，测试完整覆盖）与 `Sources/Island`（AppKit / Carbon 装配）。
+The code has two layers: `Sources/IslandCore` (pure logic, no UI framework coupling, fully tested) and `Sources/Island` (AppKit / Carbon wiring).
 
-## 隐私
-
-island 只在本机读取各 agent 的 session / transcript 文件来判断任务是否完成，代码里没有任何网络请求，不上传、不收集数据。
+Project docs under `hai/` are mostly written in Chinese.
 
 ## License
 

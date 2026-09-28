@@ -27,6 +27,7 @@ swift build                        # 编译
 ./scripts/build-app.sh --debug     # 同上，debug 构建
 ./scripts/release.sh 0.2.0         # 签名 + 公证 + staple，产出 build/dist/island-0.2.0.dmg
 ./scripts/publish.sh 0.2.0         # 发布到 brew：release.sh + tap 仓库 Release + Casks/island.rb + tag v0.2.0
+./scripts/demo.sh                  # ISLAND_AGENT_HOME 指向临时目录里的假 session，逐个完成触发弹出，录演示用；--check 不开窗只打印检测结果
 
 # 运行
 ./build/Island.app/Contents/MacOS/Island    # 前台运行，配置与事件日志走 stderr
@@ -57,6 +58,7 @@ defaults delete com.commallama.island IslandHotkeyEnabled   # 回到默认开启
 | `ISLAND_HOTKEY` | `cmd+ctrl+,` | 召唤快捷键。见下方语法；被应用内设置覆盖 |
 | `ISLAND_OVERLAY_SECONDS` | `5` | 自动弹出的停留秒数，正数；被应用内设置（`IslandPopupSeconds`）覆盖 |
 | `ISLAND_TASK_LIMIT` | `10` | 悬浮窗展示的任务条数（PLAN § Design 里的 N），正数 |
+| `ISLAND_AGENT_HOME` | `~` | agent 数据根目录（`AgentHome`）。macOS 上改 `HOME` 无效（`homeDirectoryForCurrentUser` 不读环境变量），所以单独开这个口子 |
 
 ```bash
 ./build/Island.app/Contents/MacOS/Island --print-config   # 只解析并打印配置后退出，不开窗
@@ -153,6 +155,7 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
 Tests/IslandCoreTests/         # IslandCore 的行为测试（XCTest）
 scripts/build-app.sh           # 打包 .app + 签名（Developer ID 优先，否则 ad-hoc）
 scripts/release.sh             # 签名 + 公证 + dmg
+scripts/demo.sh                # 假数据演示；替身进程是 ad-hoc 重签的 /bin/sleep 拷贝（不重签会被 SIGKILL），目录要 pwd -P（lsof 报 /private/tmp）
 scripts/publish.sh             # dmg -> lbyxiafei/homebrew-tap（Release + cask）+ tag
 scripts/Island.entitlements    # hardened runtime 下允许 Apple events（控制终端）
 scripts/coverage.sh            # 刷新 coverage.txt
