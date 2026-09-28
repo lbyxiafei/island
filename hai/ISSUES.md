@@ -4,7 +4,7 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
-| chore | [open-source-release](./issue/2026-09-27-22-40-10-open-source-release.md) | 以 MIT 协议开源并把仓库转为 public | in-progress | 2026-09-27T22:40:10-07:00 | 2026-09-27T22:40:38-07:00 |
+| chore | [open-source-release](./issue/2026-09-27-22-40-10-open-source-release.md) | 以 MIT 协议开源并把仓库转为 public | solved | 2026-09-27T22:40:10-07:00 | 2026-09-27T22:41:59-07:00 |
 | bug | [cmd-comma-under-pinyin](./issue/2026-09-27-14-56-40-cmd-comma-under-pinyin.md) | 拼音输入法下悬浮窗内 ⌘, 打不开设置 | solved | 2026-09-27T14:56:40-07:00 | 2026-09-27T14:59:42-07:00 |
 | refactor | [cache-pi-session-scans](./issue/2026-09-27-14-48-18-cache-pi-session-scans.md) | pi 每轮 poll 全量重读并解析最新 session 文件，CPU 偏高 | solved | 2026-09-27T14:48:18-07:00 | 2026-09-27T14:50:38-07:00 |
 | bug | [remove-closed-agent-title](./issue/2026-09-27-14-33-09-remove-closed-agent-title.md) | [chore] title should be removed from dropdown when agent task is closed | solved | 2026-09-27T14:33:09-07:00 | 2026-09-27T14:45:53-07:00 |

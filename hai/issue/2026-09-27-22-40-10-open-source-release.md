@@ -2,9 +2,9 @@
 type: chore
 name: open-source-release
 title: "以 MIT 协议开源并把仓库转为 public"
-status: in-progress
+status: solved
 created_ts: 2026-09-27T22:40:10-07:00
-updated_ts: 2026-09-27T22:40:38-07:00
+updated_ts: 2026-09-27T22:41:59-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -40,3 +40,7 @@ updated_ts: 2026-09-27T22:40:38-07:00
 ## 2026-09-27T22:40:38-07:00: new -> in-progress
 
 用户明确要求执行（见 Decision）；在 worktree 中加 LICENSE、裁剪截图、更新 README。
+
+## 2026-09-27T22:41:59-07:00: in-progress -> solved
+
+加了 MIT LICENSE，README 补了隐私和 License 节，截图裁掉了微信内容（历史版本保留，用户已确认）。make verify 全过（326 tests），3dad28d 已推送；gh repo edit 把 lbyxiafei/island 转成了 PUBLIC，GitHub 识别出 MIT。还没做：README 演示 GIF。
