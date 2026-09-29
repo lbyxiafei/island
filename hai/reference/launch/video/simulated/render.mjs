@@ -16,7 +16,7 @@ ws.onmessage = e => { const m = JSON.parse(e.data); if (m.id && pending.has(m.id
 const send = (method, params = {}) => new Promise(r => { const id = ++seq; pending.set(id, r); ws.send(JSON.stringify({ id, method, params })); });
 await send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 2, mobile: false });
 await send('Page.enable');
-await send('Page.navigate', { url: 'file://' + here + 'index.html' });
+await send('Page.navigate', { url: 'file://' + here + 'index.html' + (process.env.SCENE_QUERY || '') });
 await sleep(1500);
 await send('Runtime.evaluate', { expression: 'Promise.all([...document.images].map(i => i.decode())).then(() => document.fonts.ready)', awaitPromise: true });
 const frame = async (t, fmt) => {

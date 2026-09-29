@@ -357,6 +357,8 @@ body { font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif; 
 <svg class="abs" id="cursor" viewBox="0 0 28 40"><path d="M3 2 L3 31 L10 24.5 L14.5 35 L19 33 L14.6 22.8 L24 22.8 Z" fill="#111" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/></svg>
 
 <script>
+const ZH = new URLSearchParams(location.search).get('lang') === 'zh';
+const L_ = (en, zh) => ZH ? zh : en;
 const $ = id => document.getElementById(id);
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const ease = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
@@ -411,13 +413,14 @@ function ccInput(text, active, t, w = 60) {
 function claudeWeather(t, active) {
   let body = ccHeader('~/home') + '\n';
   let input = '';
-  if (t < B.wSend) input = type("What's the weather in Seattle this weekend?", t, ...B.wType);
+  const WQ = L_("What's the weather in Seattle this weekend?", '这周末北京天气怎么样？');
+  if (t < B.wSend) input = type(WQ, t, ...B.wType);
   else {
-    body += `<span class="ubox">&gt; What's the weather in Seattle this weekend?</span>\n\n`;
-    if (t > B.wSend + .5) body += `<span class="o">⏺</span> Web Search(<span class="b">"Seattle weather forecast this weekend"</span>)\n`;
+    body += `<span class="ubox">&gt; ${WQ}</span>\n\n`;
+    if (t > B.wSend + .5) body += `<span class="o">⏺</span> Web Search(<span class="b">"${L_('Seattle weather forecast this weekend', '北京 本周末 天气预报')}"</span>)\n`;
     if (t > B.wSend + 1.4) body += `  <span class="dim">⎿  Did 1 search in 2s</span>\n`;
-    if (t < B.wDone) { if (t > B.wSend + 1.6) body += `\n<span class="o">${spin(t)} Checking the forecast…</span> <span class="dim">(${secs(t - B.wSend)} · esc to interrupt)</span>\n`; }
-    else body += `
+    if (t < B.wDone) { if (t > B.wSend + 1.6) body += `\n<span class="o">${spin(t)} ${L_('Checking the forecast…', '正在查天气预报…')}</span> <span class="dim">(${secs(t - B.wSend)} · esc to interrupt)</span>\n`; }
+    else body += L_(`
 <span class="o">⏺</span> This weekend in <span class="w">Seattle</span>:
 
   <span class="w">Sat</span>  ☀️  Sunny           <span class="y">68°F</span> / 52°F
@@ -425,7 +428,15 @@ function claudeWeather(t, active) {
 
   Best time to be outside: <span class="w">Saturday afternoon</span>.
   Bring a light jacket on Sunday.
-`;
+`, `
+<span class="o">⏺</span> <span class="w">北京</span>本周末天气：
+
+  <span class="w">周六</span>  ☀️  晴        <span class="y">26°C</span> / 14°C
+  <span class="w">周日</span>  🌧  小雨      <span class="y">21°C</span> / 13°C
+
+  最适合出门：<span class="w">周六下午</span>。
+  周日记得带伞。
+`);
   }
   return { body, input: ccInput(input, active, t, 52) };
 }
@@ -438,12 +449,13 @@ function piView(t, active) {
  <span class="y">[Context]</span> <span class="dim">AGENTS.md</span>
 `;
   let input = '';
-  if (t < B.nSend) input = type('Summarize the top 5 Hacker News stories today', t, ...B.nType);
+  const NQ = L_('Summarize the top 5 Hacker News stories today', '总结一下今天 Hacker News 热榜前 5');
+  if (t < B.nSend) input = type(NQ, t, ...B.nType);
   else {
-    body += `\n<span class="ubox"> Summarize the top 5 Hacker News stories today </span>\n\n`;
+    body += `\n<span class="ubox"> ${NQ} </span>\n\n`;
     if (t > B.nSend + .6) body += ` <span class="g">●</span> fetch <span class="c">news.ycombinator.com</span>\n`;
-    if (t < B.nDone) { if (t > B.nSend + 1.2) body += `\n <span class="p">${braille(t)} Working…</span> <span class="dim">(${secs(t - B.nSend)})</span>\n`; }
-    else body += `
+    if (t < B.nDone) { if (t > B.nSend + 1.2) body += `\n <span class="p">${braille(t)} ${L_('Working…', '处理中…')}</span> <span class="dim">(${secs(t - B.nSend)})</span>\n`; }
+    else body += L_(`
  <span class="w">Top 5 on Hacker News today</span>
 
  <span class="y">1.</span> Show HN: A tiny menu-bar app for AI agents  <span class="dim">412 pts</span>
@@ -453,7 +465,17 @@ function piView(t, active) {
  <span class="y">5.</span> Pixel-art city nights with generative lofi  <span class="dim">167 pts</span>
 
  <span class="dim">Theme of the day: old ideas, rediscovered.</span>
-`;
+`, `
+ <span class="w">今日 Hacker News 热榜 Top 5</span>
+
+ <span class="y">1.</span> <span class="dim">412 分</span>  Show HN：给 AI agent 用的菜单栏小工具
+ <span class="y">2.</span> <span class="dim">388 分</span>  为什么 SQLite 依然无处不在
+ <span class="y">3.</span> <span class="dim">251 分</span>  月亮明暗交界线的「指向悖论」
+ <span class="y">4.</span> <span class="dim">198 分</span>  一台从 ROM 启动的 1949 年计算机
+ <span class="y">5.</span> <span class="dim">167 分</span>  像素风城市夜景 + 生成式 lofi
+
+ <span class="dim">今日主线：老点子，新发现。</span>
+`);
   }
   const cur = active && Math.floor(t * 2) % 2 === 0 ? '<span class="cursor"></span>' : '';
   const inp = `<span class="rule">${'─'.repeat(52)}</span>
@@ -486,13 +508,14 @@ function vsCode(t) {
 function vsTerm(t, active) {
   let s = ccHeader('~/web-app') + '\n';
   let input = '';
-  if (t < B.vSend) input = type('add unit tests for parseDate()', t, ...B.vType);
+  const VQ = L_('add unit tests for parseDate()', '给 parseDate() 补单元测试');
+  if (t < B.vSend) input = type(VQ, t, ...B.vType);
   else {
-    s += `<span class="ubox">&gt; add unit tests for parseDate()</span>\n`;
+    s += `<span class="ubox">&gt; ${VQ}</span>\n`;
     if (t > B.vSend + .6) s += `<span class="o">⏺</span> Read(<span class="b">src/date.ts</span>)\n`;
     if (t > B.vSend + 1.5) s += `<span class="o">⏺</span> Write(<span class="b">src/date.test.ts</span>)  <span class="dim">+48 lines</span>\n`;
-    if (t < B.vDone) { if (t > B.vSend + 2.2) s += `<span class="o">${spin(t)} Running the test suite…</span> <span class="dim">(${secs(t - B.vSend)})</span>\n`; }
-    else s += `<span class="o">⏺</span> Bash(<span class="b">npm test</span>)  <span class="g">✓ 12 passed</span>\n<span class="o">⏺</span> Added 12 tests: valid dates, leap years, bad formats, Feb 30.\n`;
+    if (t < B.vDone) { if (t > B.vSend + 2.2) s += `<span class="o">${spin(t)} ${L_('Running the test suite…', '正在跑测试…')}</span> <span class="dim">(${secs(t - B.vSend)})</span>\n`; }
+    else s += `<span class="o">⏺</span> Bash(<span class="b">npm test</span>)  <span class="g">✓ 12 passed</span>\n<span class="o">⏺</span> ${L_('Added 12 tests: valid dates, leap years, bad formats, Feb 30.', '新增 12 个测试：合法日期、闰年、错误格式、2 月 30 日。')}\n`;
   }
   const cur = active && Math.floor(t * 2) % 2 === 0 ? '<span class="cursor"></span>' : '';
   s += `<span class="rule">${'─'.repeat(64)}</span>\n<span class="dim">❯</span> ${esc(input)}${cur}\n<span class="rule">${'─'.repeat(64)}</span>`;
@@ -500,25 +523,32 @@ function vsTerm(t, active) {
 }
 
 // ---- Codex ----
+const CQ = L_('Plan a 3-day trip to Tokyo in October', '帮我规划 10 月去东京的 3 天行程');
 function codex(t) {
   const sent = t >= B.cSend;
-  $('ctop').innerHTML = sent ? '📁&nbsp; Plan a 3-day Tokyo trip &nbsp;<span style="color:#aaa">···</span>' : 'New chat';
-  const rec = ['Plan a 3-day Tokyo trip', 'Summarize my inbox', 'Compare two laptops', 'Explain Rust lifetimes', 'Weekly grocery list', 'Refactor the auth flow'];
+  $('ctop').innerHTML = sent ? '📁&nbsp; ' + L_('Plan a 3-day Tokyo trip', '东京 3 日游行程') + ' &nbsp;<span style="color:#aaa">···</span>' : 'New chat';
+  const rec = L_(['Plan a 3-day Tokyo trip', 'Summarize my inbox', 'Compare two laptops', 'Explain Rust lifetimes', 'Weekly grocery list', 'Refactor the auth flow'],
+    ['东京 3 日游行程', '总结一下我的收件箱', '两台笔记本怎么选', '讲讲 Rust 的生命周期', '每周采购清单', '重构登录流程']);
   $('crec').innerHTML = (sent ? rec : rec.slice(1)).map((r, i) => `<div class="it${sent && i === 0 ? ' sel' : ''}">${r}</div>`).join('');
   let col = '';
   if (!sent) col = `<div class="empty">What should we do today?</div>`;
   else {
-    col = `<div class="ubub">Plan a 3-day trip to Tokyo in October</div>`;
+    col = `<div class="ubub">${CQ}</div>`;
     if (t < B.cDone) col += `<div class="shimmer">Thinking · ${secs(t - B.cSend)}</div>`;
-    else col += `<div class="worked">Worked for 42s ›</div><div class="ans">
+    else col += `<div class="worked">Worked for 42s ›</div><div class="ans">` + L_(`
 <h3>3 days in Tokyo (October)</h3>
 <p><b>Day 1 — Asakusa &amp; Ueno.</b> Senso-ji at sunrise, lunch in Ameyoko, evening river cruise to Odaiba.</p>
 <p><b>Day 2 — Shibuya &amp; Harajuku.</b> Meiji Shrine, Omotesando cafés, Shibuya Sky at sunset.</p>
 <p><b>Day 3 — Day trip to Nikko or Kamakura.</b> Autumn leaves start late October; book the Limited Express the night before.</p>
-<p style="color:#666;margin-top:10px">October is mild (15–22°C) — pack a light jacket. Get a Suica card at the airport.</p></div>`;
+<p style="color:#666;margin-top:10px">October is mild (15–22°C) — pack a light jacket. Get a Suica card at the airport.</p>`, `
+<h3>东京 3 日游（10 月）</h3>
+<p><b>第 1 天 · 浅草 &amp; 上野。</b>清晨去浅草寺，午饭逛阿美横町，傍晚坐水上巴士去台场。</p>
+<p><b>第 2 天 · 涩谷 &amp; 原宿。</b>明治神宫、表参道的咖啡馆，日落时上 Shibuya Sky。</p>
+<p><b>第 3 天 · 日光或镰仓一日游。</b>10 月下旬开始有红叶，前一晚订好特急列车。</p>
+<p style="color:#666;margin-top:10px">10 月气温 15–22°C，带件薄外套；到机场先办一张 Suica 卡。</p>`) + `</div>`;
   }
   $('ccol').innerHTML = col;
-  const typed = type('Plan a 3-day trip to Tokyo in October', t, ...B.cType);
+  const typed = type(CQ, t, ...B.cType);
   const cur = !sent && t > B.cShow + .2 && Math.floor(t * 2) % 2 === 0 ? '<span style="display:inline-block;width:2px;height:19px;background:#1f1f1f;vertical-align:-4px"></span>' : '';
   $('cin').innerHTML = !sent ? (typed ? esc(typed) + cur : `<span class="ph">Do anything</span>${cur}`) : '<span class="ph">Do anything</span>';
 }
@@ -530,10 +560,10 @@ const ICON = {
   pi: '<svg viewBox="0 0 28 28" width="28" height="28"><rect x="2.5" y="4.5" width="23" height="19" rx="4" fill="none" stroke="#b9b9c2" stroke-width="1.7"/><path d="M7.5 10.5l3.5 3-3.5 3" fill="none" stroke="#b9b9c2" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 17h6" stroke="#b9b9c2" stroke-width="1.7" stroke-linecap="round"/></svg>',
 };
 const TASK = {
-  w: { title: 'Seattle weather this weekend', sub: 'home • Claude Code', icon: 'claude', done: B.wDone },
-  c: { title: 'Plan a 3-day Tokyo trip', sub: 'travel • Codex', icon: 'codex', done: B.cDone },
-  n: { title: 'Top 5 Hacker News stories today', sub: 'news • pi', icon: 'pi', done: B.nDone },
-  v: { title: 'Add unit tests for parseDate()', sub: 'web-app • Claude Code', icon: 'claude', done: B.vDone },
+  w: { title: L_('Seattle weather this weekend', '北京周末天气'), sub: 'home • Claude Code', icon: 'claude', done: B.wDone },
+  c: { title: L_('Plan a 3-day Tokyo trip', '东京 3 日游行程'), sub: 'travel • Codex', icon: 'codex', done: B.cDone },
+  n: { title: L_('Top 5 Hacker News stories today', '今日 HN 热榜 Top 5'), sub: 'news • pi', icon: 'pi', done: B.nDone },
+  v: { title: L_('Add unit tests for parseDate()', '给 parseDate() 补单元测试'), sub: 'web-app • Claude Code', icon: 'claude', done: B.vDone },
 };
 function unread(k, t) {
   if (t < TASK[k].done) return false;
@@ -571,7 +601,7 @@ function panelState(t) {
   }
   if (t >= B.click && t < B.click + .4) return { mode: 'auto', show: 1 - ramp(t, B.click, B.click + .35), sel: 0 };
   if (t >= B.sum1 && t < B.enter1 + .4) {
-    const q = type('tok', t, ...B.qType);
+    const q = type(L_('tok', '东京'), t, ...B.qType);
     return { mode: 'sum', show: ramp(t, B.sum1, B.sum1 + .4) * (1 - ramp(t, B.enter1, B.enter1 + .35)), query: q, sel: 0 };
   }
   if (t >= B.sum2 && t < B.cmd1 + .4) return { mode: 'sum', show: ramp(t, B.sum2, B.sum2 + .4) * (1 - ramp(t, B.cmd1, B.cmd1 + .35)), sel: 0 };
@@ -610,7 +640,18 @@ function cursorAt(t) {
   return CUR[CUR.length - 1].slice(1);
 }
 
-const CAPS = [
+const CAPS = ZH ? [
+  [4.9, 8.5, '在 tmux 里问 Claude Code 和 pi 一些事…'],
+  [8.8, 11.4, '…再让 Codex 帮你办另一件事…', '', 'top'],
+  [11.8, 16.7, '…然后回到你自己的工作。', 'Claude Code 继续在 VS Code 终端里干活'],
+  [17.3, 21.2, '任务一完成，island 就从顶部弹下来。'],
+  [21.6, 24.2, 'Claude Code · Codex · pi，一个列表。', '未读优先，最新的在最上面'],
+  [24.6, 28.3, '点一下，直接回到那个 tmux 窗格。'],
+  [28.8, 33.5, '随时按下 ⌃⌘, 呼出，打字，回车。', '直接打开 Codex 里的那段对话'],
+  [34.2, 38.1, '你正看着它？island 就不打扰。', 'VS Code 里的任务在你眼前完成：不弹出，不计数'],
+  [38.5, 42.2, '⌘1–9：一个按键，直达任务。'],
+  [44.1, 49.7, '按你的习惯来。', '任意快捷键 · 5 种主题 · 弹出时长 · 按 agent 单独开关'],
+] : [
   [4.9, 8.5, 'Ask Claude Code and pi something in tmux…'],
   [8.8, 11.4, '…ask Codex something else…', '', 'top'],
   [11.8, 16.7, '…then get back to your own work.', 'Claude Code keeps going in the VS Code terminal'],
@@ -650,7 +691,7 @@ const THEMES = { Midnight: ['#050507', '#f2f2f4', '#8e8e98', '#16162a', '#45478a
   Sand: ['#f3efe6', '#1f1d1a', '#6b675f', '#e6e1d6', '#c9c1b1', '#e3ded3', '#9f93ff'] };
 function themed(name) {
   const [bg, fg, sub, selBg, selBd, num, dot] = THEMES[name];
-  const rows = [['Seattle weather this weekend', 'home • Claude Code', 'claude'], ['Add unit tests for parseDate()', 'web-app • Claude Code', 'claude'], ['Top 5 Hacker News stories today', 'news • pi', 'pi']];
+  const rows = [[TASK.w.title, 'home • Claude Code', 'claude'], [TASK.v.title, 'web-app • Claude Code', 'claude'], [TASK.n.title, 'news • pi', 'pi']];
   return `<div class="box" style="background:${bg};border-color:rgba(127,127,127,.18)"><div class="ph"><span class="dot" style="background:${dot}"></span><span class="n" style="color:${fg}">1 new</span><span class="kc" style="background:${num};color:${sub}">⌥Space</span></div>` +
     rows.map(([a, b, ic], j) => `<div class="rw${j === 0 ? ' sel' : ''}" style="${j === 0 ? `background:${selBg};border-color:${selBd}` : ''}"><span class="num" style="background:${num};color:${sub}">${j + 1}</span><span class="ico">${ICON[ic]}${j === 0 ? `<span class="rd" style="border-color:${bg}"></span>` : ''}</span><div class="tx"><div class="tt" style="color:${fg}">${a}</div><div class="st" style="color:${sub}">${b}</div></div><span class="tm" style="color:${sub}">now</span></div>`).join('') + '</div>';
 }
@@ -771,7 +812,7 @@ function render(t) {
     const themes = [['#f3efe6', '#1f1d1a', '#6b675f'], ['#152a35', '#e9f3f7', '#8fb3c2'], ['#050507', '#f2f2f4', '#8e8e98']];
     $('themes').innerHTML = themes.map(([bg, fg, sub], i) => `<div class="tp" id="th${i}"><div style="background:${bg};border-radius:0 0 24px 24px;padding:0 10px 10px;box-shadow:0 30px 70px rgba(0,0,0,.5)">
       <div class="ph"><span class="dot" style="background:${i === 1 ? '#5fd1c1' : '#9f93ff'}"></span><span class="n" style="color:${fg}">3 new</span></div>
-      ${['Seattle weather this weekend|home • Claude Code|claude', 'Plan a 3-day Tokyo trip|travel • Codex|codex', 'Top 5 Hacker News stories today|news • pi|pi'].map((r, j) => { const [a, b, ic] = r.split('|');
+      ${[TASK.w.title + '|home • Claude Code|claude', TASK.c.title + '|travel • Codex|codex', TASK.n.title + '|news • pi|pi'].map((r, j) => { const [a, b, ic] = r.split('|');
         return `<div class="rw${j === 0 ? ' sel' : ''}" style="${j === 0 ? `background:${i === 0 ? '#e6e1d6' : i === 1 ? '#1d3b48' : '#16162a'};border-color:${i === 0 ? '#c9c1b1' : i === 1 ? '#3d7383' : '#45478a'}` : ''}"><span class="num" style="background:${i === 0 ? '#e3ded3' : i === 1 ? '#1e3a47' : '#1e1e22'}">${j + 1}</span><span class="ico">${ICON[ic]}<span class="rd" style="border-color:${bg}"></span></span><div class="tx"><div class="tt" style="color:${fg}">${a}</div><div class="st" style="color:${sub}">${b}</div></div></div>`; }).join('')}
       </div></div>`).join('');
   }
@@ -788,6 +829,16 @@ function render(t) {
   $('caption').style.bottom = top ? 'auto' : '60px'; $('caption').style.top = top ? '70px' : 'auto';
   $('caption').style.transform = `translateY(${14 * (1 - co)}px)`;
   if (cap) $('captext').innerHTML = cap[0] + (cap[1] ? `<small>${cap[1]}</small>` : '');
+}
+if (ZH) {
+  document.querySelector('#title .tag').textContent = 'AI agent 一跑完，立刻知道。';
+  document.querySelector('#title .sub').textContent = '一个轻巧的 macOS 菜单栏工具 · 免费开源';
+  const F = [['所有 agent，一个列表', 'Claude Code · Codex · pi · Claude 桌面版'], ['精准跳回原处', 'tmux · Ghostty · iTerm2 · Terminal · cmux · VS Code · 桌面 app'],
+    ['你在看，就不打扰', '任务所在的 tab 就在眼前时，不弹出'], ['无需权限，不联网', '只读本地 session 文件 · 原生 Swift · 零依赖']];
+  F.forEach(([b, sp], i) => { $('ft' + i).querySelector('b').textContent = b; $('ft' + i).querySelector('span').textContent = sp; });
+  document.querySelector('#end .pills').innerHTML = '<span>免费</span><span>开源 · MIT</span><span>macOS 13+</span>';
+  const mi = document.querySelectorAll('#menu .mi2');
+  mi[4].textContent = TASK.v.title; mi[5].textContent = TASK.n.title;
 }
 window.render = render;
 render(0);

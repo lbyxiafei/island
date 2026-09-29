@@ -4,7 +4,8 @@
 
 ```bash
 node render.mjs stills ./st "6,17.5,24.3"                        # 检查几个关键帧
-node render.mjs video ./silent-4k.mp4 60                           # 渲染画面
+node render.mjs video ./silent-4k.mp4 60                           # 渲染画面（英文版）
+SCENE_QUERY='?lang=zh' node render.mjs video ./silent-4k-zh.mp4 60  # 中文版：字幕、卡片、任务内容都换成中文，app 界面保持英文
 uv run --with numpy --with scipy python music.py                   # 合成配乐 → music.wav
 ffmpeg -i silent-4k.mp4 -i music.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 320k -shortest island-intro.mp4
 ```

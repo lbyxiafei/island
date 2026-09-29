@@ -38,6 +38,31 @@
 
 **标签**：claude code, codex, ai agents, macos, menu bar app, tmux, developer tools, open source
 
+### 中文版（`~/Movies/island/island-intro-zh.mp4`，封面 `thumbnail-title-zh.jpg` / `thumbnail-panel-zh.jpg`）
+
+**标题**：
+
+> island：给 Claude Code / Codex / pi 用的 macOS「灵动岛」，AI agent 一跑完就提醒你（开源）
+
+**描述**：
+
+> 同时开好几个 AI agent 干活，最烦的是来回切窗口看谁跑完了。island 是一个 macOS 菜单栏小工具：Claude Code、Codex、pi 的任务一完成，屏幕顶部就弹出提醒；点一下直接回到那个终端 tab、tmux 窗格、VS Code 终端或桌面 app 里的对话。
+>
+> • 所有 agent 一个列表：Claude Code · Codex · pi · Claude 桌面版
+> • 精准跳回原处：tmux · Ghostty · iTerm2 · Terminal · cmux · VS Code
+> • 随时按 ⌃⌘,（快捷键可自定义）呼出，打字过滤，回车直达
+> • 你正看着的任务完成时不打扰
+> • 无需任何系统权限，不联网，只读本地 session 文件
+>
+> 安装：brew install lbyxiafei/tap/island
+> 源码（MIT）：https://github.com/lbyxiafei/island
+>
+> 0:00 同时让几个 agent 干活
+> 0:17 任务完成就弹出，一键跳回
+> 0:42 按你的习惯来：快捷键、主题、按 agent 开关
+
+**标签**：claude code, codex, ai agent, macos, 效率工具, tmux, 开发者工具, 开源
+
 ---
 
 ## Show HN
