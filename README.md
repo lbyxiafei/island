@@ -8,7 +8,7 @@ Stop checking five terminals to see who's done.
 
 ![island: tasks finish, click one to jump back to its terminal tab, or press ⌃⌘, and type to jump into the right tmux window](docs/demo.gif)
 
-▶ 60-second intro video: *(YouTube link coming soon)*
+▶ [Watch the 60-second intro on YouTube](https://youtu.be/0XrcqU0VyXI) · [中文版](https://youtu.be/1aLZ_5ponIc)
 
 > **Status: MVP.** The app shell (overlay, global hotkey, menu bar, launch at login, hotkey settings) is done; agent detection and the overlay UX are under active development. See `hai/PLAN.md`.
 

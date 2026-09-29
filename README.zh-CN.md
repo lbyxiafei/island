@@ -6,7 +6,7 @@
 
 ![island：任务完成时弹出，点一下跳回对应终端 tab；或按 ⌃⌘, 输入过滤，回车直达对应 tmux 窗口](docs/demo.gif)
 
-▶ 60 秒介绍视频：*（YouTube 链接待补）*
+▶ [在 YouTube 上看 60 秒介绍视频](https://youtu.be/1aLZ_5ponIc) · [English](https://youtu.be/0XrcqU0VyXI)
 
 > **当前处于 MVP 阶段**：POC（app 流程、global hotkey、菜单栏、开机自启、快捷键配置）已完成；MVP 正在做 agent 检测与展示 UX，详见 `hai/PLAN.md`。
 

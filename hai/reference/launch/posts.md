@@ -12,6 +12,8 @@
 
 ## YouTube
 
+已发布（2026-09-28）：英文 https://youtu.be/0XrcqU0VyXI ，中文 https://youtu.be/1aLZ_5ponIc 。缩略图是 `~/Movies/island/thumbnail.jpg` / `thumbnail-zh.jpg`，源文件在 `video/simulated/thumb.html`（`?en` / `?zh`）。发 Show HN、V2EX 等帖子时，把文案里的 `<VIDEO>` 换成对应链接。
+
 视频文件：`~/Movies/island/island-intro.mp4`（4K 3840×2160，60 秒，带原创配乐，由 `video/simulated/music.py` 合成，无版权问题）。封面候选：`~/Movies/island/thumbnail-title.jpg` / `thumbnail-panel.jpg`。最后 5 秒是静态片尾，正好放 End screen（订阅 + 链接到 repo）。
 
 **标题**：

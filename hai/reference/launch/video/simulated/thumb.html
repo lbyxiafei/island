@@ -1,0 +1,44 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1280px; height: 720px; overflow: hidden; }
+body { font-family: -apple-system, "SF Pro Display", "PingFang SC", sans-serif; -webkit-font-smoothing: antialiased; color: #fff;
+  background: radial-gradient(900px 600px at 78% 30%, #3b3fa8 0%, transparent 60%), radial-gradient(700px 500px at 10% 110%, #1d6f8f 0%, transparent 60%), linear-gradient(150deg, #10132a, #07080f); position: relative; }
+.bar { position: absolute; left: 0; right: 0; top: 0; height: 26px; background: rgba(255,255,255,.07); }
+.left { position: absolute; left: 64px; top: 210px; width: 640px; }
+.h { font-size: 96px; font-weight: 850; line-height: .98; letter-spacing: -4px; }
+.h em { font-style: normal; background: linear-gradient(90deg, #a9b2ff, #7ee7c9); -webkit-background-clip: text; color: transparent; }
+.sub { margin-top: 30px; display: flex; align-items: center; gap: 16px; font-size: 30px; font-weight: 650; color: #d9dcf5; }
+.logo { width: 54px; height: 54px; border-radius: 14px; background: linear-gradient(145deg, #8f9bff, #5b64d6); display: flex; align-items: center; justify-content: center; }
+.icons { margin-top: 34px; display: flex; gap: 14px; }
+.icons img, .icons .pi { width: 58px; height: 58px; border-radius: 14px; }
+.icons .pi { background: #1d1f2b; border: 1.5px solid #3a3d52; display: flex; align-items: center; justify-content: center; font: 800 24px Menlo, monospace; color: #b392f0; }
+.panel { position: absolute; right: 40px; top: 26px; width: 560px; transform: scale(1.12); transform-origin: top right; background: #050507; border-radius: 0 0 34px 34px; padding: 0 14px 16px;
+  box-shadow: 0 0 0 1.5px rgba(160,170,255,.35), 0 30px 90px rgba(90,100,255,.55), 0 10px 40px rgba(0,0,0,.7); }
+.ph { height: 70px; display: flex; align-items: center; gap: 12px; padding: 0 14px; }
+.dot { width: 12px; height: 12px; border-radius: 50%; background: #9f93ff; box-shadow: 0 0 12px #9f93ff; }
+.n { font-size: 26px; font-weight: 800; }
+.kc { margin-left: auto; background: #1f1f24; color: #a4a4ad; font-size: 17px; font-weight: 700; padding: 6px 11px; border-radius: 9px; }
+.rw { height: 86px; display: flex; align-items: center; gap: 16px; padding: 0 16px; border-radius: 20px; border: 2px solid transparent; }
+.rw.sel { background: #17172d; border-color: #5559b0; }
+.num { width: 34px; height: 34px; border-radius: 9px; background: #1e1e22; color: #8b8b93; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.ico { position: relative; width: 46px; height: 46px; } .ico img, .ico svg { width: 46px; height: 46px; }
+.rd { position: absolute; right: -4px; top: -4px; width: 15px; height: 15px; border-radius: 50%; background: #ff5b4f; border: 2.5px solid #050507; }
+.tt { font-size: 24px; font-weight: 750; white-space: nowrap; } .st { font-size: 17px; color: #8e8e98; margin-top: 3px; }
+.tm { margin-left: auto; font-size: 17px; color: #77777f; }
+</style></head><body>
+<div class="bar"></div>
+<div class="left">
+  <div class="h" id="h"></div>
+  <div class="sub"><div class="logo"><svg viewBox="0 0 18 18" width="34" height="34"><g fill="#fff"><rect x="3.5" y="6.2" width="11" height="8" rx="2.6"/><rect x="2" y="2.2" width="14" height="2" rx="1"/></g></svg></div><span id="sub"></span></div>
+  <div class="icons"><img src="assets/claude.png"><img src="assets/chatgpt.png"><div class="pi">pi</div><img src="assets/visual-studio-code.png"><img src="assets/ghostty.png"></div>
+</div>
+<div class="panel"><div class="ph"><span class="dot"></span><span class="n">3 new</span><span class="kc">⌃⌘,</span></div><div id="rows"></div></div>
+<script>
+const ZH = location.search.includes('zh');
+document.getElementById('h').innerHTML = ZH ? 'AI 跑完了，<br><em>立刻知道。</em>' : 'Your agent<br><em>is done.</em>';
+document.getElementById('sub').textContent = ZH ? 'island · Mac 免费开源' : 'island · free for Mac';
+const pi = '<svg viewBox="0 0 28 28"><rect x="2.5" y="4.5" width="23" height="19" rx="4" fill="none" stroke="#b9b9c2" stroke-width="1.7"/><path d="M7.5 10.5l3.5 3-3.5 3" fill="none" stroke="#b9b9c2" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 17h6" stroke="#b9b9c2" stroke-width="1.7" stroke-linecap="round"/></svg>';
+const rows = ZH ? [['北京周末天气', 'home • Claude Code', '<img src="assets/claude.png">'], ['东京 3 日游行程', 'travel • Codex', '<img src="assets/chatgpt.png">'], ['今日 HN 热榜 Top 5', 'news • pi', pi]]
+ : [['Seattle weather this weekend', 'home • Claude Code', '<img src="assets/claude.png">'], ['Plan a 3-day Tokyo trip', 'travel • Codex', '<img src="assets/chatgpt.png">'], ['Top 5 Hacker News stories', 'news • pi', pi]];
+document.getElementById('rows').innerHTML = rows.map(([t, s, ic], i) => `<div class="rw${i === 0 ? ' sel' : ''}"><span class="num">${i + 1}</span><span class="ico">${ic}<span class="rd"></span></span><div><div class="tt">${t}</div><div class="st">${s}</div></div><span class="tm">now</span></div>`).join('');
+</script></body></html>
