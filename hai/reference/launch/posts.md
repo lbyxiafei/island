@@ -1,5 +1,18 @@
 # 发布文案
 
+## 进度（2026-09-28）
+
+| 渠道 | 状态 |
+|---|---|
+| YouTube 英文 | 已公开 https://youtu.be/0XrcqU0VyXI |
+| YouTube 中文 | 已公开 https://youtu.be/1aLZ_5ponIc |
+| B 站 | 已投稿（`~/Movies/island/island-intro-zh-bilibili.mp4`，1080p <10MB；封面 16:9 `thumbnail-zh.jpg` + 4:3 `thumbnail-zh-4x3.jpg`），分区「人工智能」，话题「AI开源先锋计划」 |
+| Show HN | 未发：HN 暂时限制新账号发 Show HN（`/showlim`）。先用 lbyxiafe 正常评论攒 karma，几十分之后再发，文案见下 |
+| V2EX | 未发：lbyxiafei 需要邀请码激活 |
+| Reddit / 掘金 / 少数派 / Product Hunt | 未开始 |
+
+几天后先看 YouTube / B 站 / GitHub star 的数据，再决定下一轮。
+
 对外发布 island 用的草稿。发之前把 `<GIF>` 换成 README 里演示 GIF 的链接（或直接上传 GIF）。
 
 赞助页：https://github.com/sponsors/lbyxiafei （仓库已有 Sponsor 按钮，文案里不必强调）。
