@@ -16,13 +16,15 @@
 
 **标题**：
 
-> island — a macOS "Dynamic Island" for Claude Code, Codex & pi (open source)
+> island — a Dynamic Island for every AI agent on your Mac (open source)
 
 **描述**：
 
-> Running several AI coding agents at once? island is a tiny macOS menu-bar app that drops down the moment Claude Code, Codex or pi finishes a task, and one click takes you back to the exact terminal tab, tmux window, VS Code terminal or desktop conversation.
+> Running several AI agents at once? island is a tiny macOS menu-bar app that drops down the moment any of them finishes a task, and one click takes you back to the exact terminal tab, tmux window, VS Code terminal or desktop conversation.
 >
-> • Every agent, one list: Claude Code · Codex · pi · Claude desktop
+> Works today with Claude Code, Codex, pi and the Claude desktop app, with more agents on the way (PRs welcome).
+>
+> • Every agent, one list
 > • Jumps to the exact place: tmux · Terminal · iTerm2 · Ghostty · cmux · VS Code
 > • ⌃⌘, from anywhere (or any hotkey you record): type to filter, ↩ to jump
 > • 5 themes, pop-up timing, and per-agent / per-scenario switches
@@ -42,13 +44,15 @@
 
 **标题**：
 
-> island：给 Claude Code / Codex / pi 用的 macOS「灵动岛」，AI agent 一跑完就提醒你（开源）
+> island：Mac 上所有 AI agent 的「灵动岛」，任务一跑完就提醒你（开源）
 
 **描述**：
 
-> 同时开好几个 AI agent 干活，最烦的是来回切窗口看谁跑完了。island 是一个 macOS 菜单栏小工具：Claude Code、Codex、pi 的任务一完成，屏幕顶部就弹出提醒；点一下直接回到那个终端 tab、tmux 窗格、VS Code 终端或桌面 app 里的对话。
+> 同时开好几个 AI agent 干活，最烦的是来回切窗口看谁跑完了。island 是一个 macOS 菜单栏小工具：任何一个 agent 的任务一完成，屏幕顶部就弹出提醒；点一下直接回到那个终端 tab、tmux 窗格、VS Code 终端或桌面 app 里的对话。
 >
-> • 所有 agent 一个列表：Claude Code · Codex · pi · Claude 桌面版
+> 目前支持 Claude Code、Codex、pi 和 Claude 桌面版，更多 agent 陆续加入（欢迎 PR）。
+>
+> • 所有 agent 一个列表
 > • 精准跳回原处：tmux · Ghostty · iTerm2 · Terminal · cmux · VS Code
 > • 随时按 ⌃⌘,（快捷键可自定义）呼出，打字过滤，回车直达
 > • 你正看着的任务完成时不打扰
@@ -69,7 +73,7 @@
 
 **标题**（≤ 80 字符）：
 
-> Show HN: Island – a macOS notch popup when your Claude Code/Codex agents finish
+> Show HN: Island – a macOS notch popup when any of your AI agents finishes
 
 **正文**：
 
@@ -95,7 +99,7 @@
 
 **标题**：
 
-> I built a free, open-source "Dynamic Island" for macOS that pops up when Claude Code / Codex finishes a task
+> I built a free, open-source "Dynamic Island" for macOS that pops up when any AI agent finishes a task
 
 **正文**：
 
