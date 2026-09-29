@@ -20,25 +20,32 @@
 
 **描述**：
 
-> Running several AI agents at once? island is a tiny macOS menu-bar app that drops down the moment any of them finishes a task, and one click takes you back to the exact terminal tab, tmux window, VS Code terminal or desktop conversation.
+> Stop tabbing through terminals to see which agent is done.
 >
-> Works today with Claude Code, Codex, pi and the Claude desktop app, with more agents on the way (PRs welcome).
+> island is a free, open-source macOS menu-bar app for people who run AI agents in parallel. The moment any agent finishes a task, a panel drops down from the top of your screen. Click it and you land back in the exact place that task ran: the right terminal tab, tmux pane, VS Code terminal, or desktop conversation.
 >
-> • Every agent, one list
-> • Jumps to the exact place: tmux · Terminal · iTerm2 · Ghostty · cmux · VS Code
-> • ⌃⌘, from anywhere (or any hotkey you record): type to filter, ↩ to jump
-> • 5 themes, pop-up timing, and per-agent / per-scenario switches
-> • Quiet when you're already looking at that tab
-> • No permission prompts, no network: reads local session files only
+> Works today with Claude Code, Codex, pi and the Claude desktop app. The goal is every agent on your Mac, and more are on the way (PRs welcome).
 >
-> Install: brew install lbyxiafei/tap/island
+> ▸ One list for every agent, unread first
+> ▸ Jumps to the exact tab: tmux, Ghostty, iTerm2, Terminal, cmux, VS Code, desktop apps
+> ▸ Summon it from anywhere with ⌃⌘, (or any hotkey you like), type to filter, ↩ to jump
+> ▸ Stays quiet when you're already looking at that task
+> ▸ 5 themes, adjustable pop-up time, per-agent switches
+> ▸ No permission prompts, no network. It only reads local session files
+>
+> Install:
+> brew install lbyxiafei/tap/island
+>
 > Source (MIT): https://github.com/lbyxiafei/island
 >
-> 0:00 Ask Claude Code, pi and Codex anything
-> 0:17 island pops up — click or ⌃⌘, to jump back
+> Chapters
+> 0:00 Run a few agents at once
+> 0:17 island pops up, click or ⌃⌘, to jump back
 > 0:42 Make it yours: hotkey, themes, per-agent switches
+>
+> #ClaudeCode #Codex #AIagents #macOS #DeveloperTools
 
-**标签**：claude code, codex, ai agents, macos, menu bar app, tmux, developer tools, open source
+**标签**：AI agents, Claude Code, Codex, pi, macOS, menu bar app, developer tools, tmux, productivity, open source
 
 ### 中文版（`~/Movies/island/island-intro-zh.mp4`，封面 `thumbnail-title-zh.jpg` / `thumbnail-panel-zh.jpg`）
 
@@ -48,24 +55,32 @@
 
 **描述**：
 
-> 同时开好几个 AI agent 干活，最烦的是来回切窗口看谁跑完了。island 是一个 macOS 菜单栏小工具：任何一个 agent 的任务一完成，屏幕顶部就弹出提醒；点一下直接回到那个终端 tab、tmux 窗格、VS Code 终端或桌面 app 里的对话。
+> 同时开好几个 AI agent 干活，却总要来回切终端看谁跑完了？
 >
-> 目前支持 Claude Code、Codex、pi 和 Claude 桌面版，更多 agent 陆续加入（欢迎 PR）。
+> island 是一个免费开源的 macOS 菜单栏小工具。任何一个 agent 的任务一完成，屏幕顶部就弹出提醒；点一下，直接回到它所在的地方：对应的终端 tab、tmux 窗格、VS Code 终端，或者桌面 app 里的那段对话。
 >
-> • 所有 agent 一个列表
-> • 精准跳回原处：tmux · Ghostty · iTerm2 · Terminal · cmux · VS Code
-> • 随时按 ⌃⌘,（快捷键可自定义）呼出，打字过滤，回车直达
-> • 你正看着的任务完成时不打扰
-> • 无需任何系统权限，不联网，只读本地 session 文件
+> 目前支持 Claude Code、Codex、pi 和 Claude 桌面版。目标是覆盖你 Mac 上的所有 agent，更多正在陆续加入（欢迎 PR）。
 >
-> 安装：brew install lbyxiafei/tap/island
+> ▸ 所有 agent 一个列表，未读优先
+> ▸ 精准跳回：tmux、Ghostty、iTerm2、Terminal、cmux、VS Code、桌面 app
+> ▸ 随时按 ⌃⌘,（快捷键可自定义）呼出，打字过滤，回车直达
+> ▸ 你正看着的任务完成时，不打扰
+> ▸ 5 种主题，弹出时长可调，每个 agent 可单独开关
+> ▸ 不需要任何系统权限，不联网，只读本地 session 文件
+>
+> 安装：
+> brew install lbyxiafei/tap/island
+>
 > 源码（MIT）：https://github.com/lbyxiafei/island
 >
+> 章节
 > 0:00 同时让几个 agent 干活
-> 0:17 任务完成就弹出，一键跳回
+> 0:17 任务完成就弹出，点一下或按 ⌃⌘, 跳回
 > 0:42 按你的习惯来：快捷键、主题、按 agent 开关
+>
+> #ClaudeCode #Codex #AIagent #macOS #效率工具
 
-**标签**：claude code, codex, ai agent, macos, 效率工具, tmux, 开发者工具, 开源
+**标签**：AI agent, Claude Code, Codex, pi, macOS, 菜单栏, 效率工具, 开发者工具, tmux, 开源
 
 ---
 
