@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- island app icon (concept A, "Lagoon capsule"): the island-shaped overlay
+     hanging from the top edge of the screen, with an unread dot, over a lagoon.
+     1024 canvas, macOS icon grid: 824x824 body at (100,100), corner radius 185.
+     Rendered to assets/AppIcon.icns by scripts/render-app-icon.sh; NSImage's SVG
+     renderer ignores filters, so the shadow is a plain translucent shape. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="lagoon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0A2F3D"/>
+      <stop offset="0.6" stop-color="#0D6570"/>
+      <stop offset="1" stop-color="#11858A"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E4F4F5"/>
+    </linearGradient>
+    <clipPath id="body">
+      <rect x="100" y="100" width="824" height="824" rx="185"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#body)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#lagoon)"/>
+    <!-- the screen's top edge -->
+    <rect x="100" y="100" width="824" height="84" fill="#051C26" opacity="0.6"/>
+    <!-- waves -->
+    <path d="M100 742 q103 -44 206 0 t206 0 t206 0 t206 0 V924 H100 Z" fill="#3DD6C8" opacity="0.22"/>
+    <path d="M100 806 q103 -44 206 0 t206 0 t206 0 t206 0 V924 H100 Z" fill="#3DD6C8" opacity="0.32"/>
+    <!-- the capsule's shadow, then the capsule: flat top, round bottom -->
+    <path d="M226 184 H798 V432 a136 136 0 0 1 -136 136 H362 a136 136 0 0 1 -136 -136 Z" fill="#021016" opacity="0.12" transform="translate(0 30)"/>
+    <path d="M226 184 H798 V432 a136 136 0 0 1 -136 136 H362 a136 136 0 0 1 -136 -136 Z" fill="#021016" opacity="0.16" transform="translate(0 14)"/>
+    <path d="M226 184 H798 V432 a136 136 0 0 1 -136 136 H362 a136 136 0 0 1 -136 -136 Z" fill="url(#panel)"/>
+    <!-- a finished task: title, two lines, unread dot -->
+    <rect x="300" y="276" width="286" height="42" rx="21" fill="#0F8F86"/>
+    <rect x="300" y="360" width="424" height="30" rx="15" fill="#93B4BF" opacity="0.75"/>
+    <rect x="300" y="424" width="330" height="30" rx="15" fill="#93B4BF" opacity="0.45"/>
+    <circle cx="690" cy="297" r="42" fill="#FF7F66"/>
+  </g>
+</svg>

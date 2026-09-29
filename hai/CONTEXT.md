@@ -158,6 +158,8 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
   UpdateSettingsView.swift     #   Settings → Updates
   FeedbackSettingsView.swift   #   Settings → Feedback
 Tests/IslandCoreTests/         # IslandCore 的行为测试（XCTest）
+assets/AppIcon.svg             # app 图标设计源；scripts/render-app-icon.sh 渲染成 assets/AppIcon.icns（提交），build-app.sh 拷进 Resources
+scripts/render-app-icon.sh     # SVG -> iconset（scripts/render-app-icon.swift，NSImage 渲染）-> iconutil -> .icns
 scripts/build-app.sh           # 打包 .app + 签名（Developer ID 优先，否则 ad-hoc）
 scripts/release.sh             # 签名 + 公证 + dmg
 scripts/demo.sh                # 假数据演示；替身进程是 ad-hoc 重签的 /bin/sleep 拷贝（不重签会被 SIGKILL），目录要 pwd -P（lsof 报 /private/tmp）
@@ -165,7 +167,7 @@ scripts/publish.sh             # dmg -> lbyxiafei/homebrew-tap（Release + cask�
 scripts/Island.entitlements    # hardened runtime 下允许 Apple events（控制终端）
 scripts/coverage.sh            # 刷新 coverage.txt
 scripts/check-layering.sh      # 依赖方向检查
-hai/reference/icon/            # 菜单栏图标的设计资产（SVG + 预览 + 说明），非运行时依赖
+hai/reference/icon/            # 菜单栏图标与 app 图标的设计说明（SVG / 预览），非运行时依赖
 hai/reference/agents/          # MVP 调研：各 agent 的完成信号 / 任务身份 / 宿主 / 回到任务的手段
 hai/reference/workflow/        # 开发与发布流程：issue → agent 实现 → 本地验收 → publish.sh → brew
 vscode-extension/              # island 自带的 VS Code 扩展（纯 JS，零依赖）：按 pid 聚焦终端 tab；scripts/build-vscode-extension.sh 用系统 zip 打成 vsix，build-app.sh 放进 Resources
@@ -248,4 +250,5 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - **应用内升级**（issue `upgrade-n-feedback`）：版本真源是公开 tap 的 `Casks/island.rb`，经 GitHub contents API 读（`UpdateSource.caskRequest`，`Accept: application/vnd.github.raw` 直接拿文件；未认证 60 次/小时/IP，够用）。**不要换回 raw.githubusercontent.com**：它的 CDN 在发版 5 分钟后仍会返回旧 cask（issue `update-check-stale-cdn`）；0.2.0 / 0.2.1 还是 raw，只是晚几分钟看到新版。app 版本读 `CFBundleShortVersionString`，本地构建 `0.0.0` 视为开发版、永不提示。本地测提示用 `ISLAND_VERSION=0.0.9 ./scripts/build-app.sh`。有新版本时 Updates tab 名带 `🔴`（NSTabView 标签没法上色，emoji 是唯一不用自绘的办法）、菜单出现 `Update to x available…`。自动检查开关存 `IslandAutoCheckUpdates`（缺省开）。**升级只对 brew 装的有效**（`<prefix>/bin/brew` 与 `<prefix>/Caskroom/island` 都在）：spawn 脱离的 `sh` 后 island 立刻 `terminate`，shell 等 pid 退出再 `brew update && brew upgrade --cask lbyxiafei/tap/island`，输出与 `island-upgrade: exit N` 追加到 `~/Library/Logs/island-upgrade.log`，最后无论成败都 `open -b com.commallama.island`；下次打开 Updates tab 若日志最后一次非 0 会提示。先退出再升级，是为了让 cask 的 `uninstall quit:` 不去 quit 一个正在跑 brew 的父进程。不是 brew 装的就打开 tap 的 Release 页
 - **反馈没有服务端**（issue `upgrade-n-feedback` § Decision）：`Send Email` 是 `mailto:`（用户自己的邮件客户端）、`Open GitHub Issue` 是预填的 `lbyxiafei/island/issues/new`、`Copy` 兜底。URL 编码只放行 RFC 3986 unreserved 字符——`URLComponents` 不转义 `+` / `&`，邮件客户端会把 `+` 当空格
 - **开发流程**（PLAN § 开发指南，issue `dev-flow-brew-upgrade`，完整步骤见 `hai/reference/workflow/README.md`）：开发机只装 brew 那份。每次开发完成 = ship 到 master + `./scripts/publish.sh <下一个版本>`，开发者在 Settings → Updates 一键升级来验收，顺带验证 upgrade。只动 `hai/` 的提交不发版。agent 中途要跑构建产物，先 `pkill -x Island`，测完 `pkill -x Island; open /Applications/Island.app` 换回来
+- **app 图标**（issue `app-icon`）：源是 `assets/AppIcon.svg`，**改完要跑 `./scripts/render-app-icon.sh` 并把 `.icns` 一起提交**，`build-app.sh` 不渲染只拷贝。按 macOS 图标网格画（824 主体、圆角 185），否则 macOS 26 会套灰色底框。AppKit 的 SVG 渲染不支持 filter。Finder 有图标缓存，本地换图标后看不到变化时 `touch build/Island.app` 或重启 Finder
 
