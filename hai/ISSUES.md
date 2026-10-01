@@ -4,6 +4,7 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
+| bug | [terminal-reopen-stops-working](./issue/2026-10-01-13-18-16-terminal-reopen-stops-working.md) | 长时间运行后点击终端任务不再跳转（Claude 桌面版正常） | new | 2026-10-01T13:18:16-07:00 | 2026-10-01T13:18:29-07:00 |
 | feat | [app-icon](./issue/2026-09-28-21-10-17-app-icon.md) | 补 app 图标：Lagoon 胶囊（方案 A） | solved | 2026-09-28T21:10:17-07:00 | 2026-09-28T21:18:20-07:00 |
 | chore | [dev-flow-brew-upgrade](./issue/2026-09-28-14-11-52-dev-flow-brew-upgrade.md) | 开发完成即发布到 brew，本地从 settings 升级验收 | solved | 2026-09-28T14:11:52-07:00 | 2026-09-28T14:20:40-07:00 |
 | bug | [update-check-stale-cdn](./issue/2026-09-28-14-17-37-update-check-stale-cdn.md) | 发版后检查更新仍报 up to date：raw.githubusercontent CDN 缓存滞后 | solved | 2026-09-28T14:17:37-07:00 | 2026-09-28T14:18:54-07:00 |
