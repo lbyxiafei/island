@@ -4,7 +4,7 @@ name: terminal-reopen-stops-working
 title: "开机自启的 island 点击终端任务不跳转（重启 island 后正常）"
 status: in-progress
 created_ts: 2026-10-01T13:18:16-07:00
-updated_ts: 2026-10-20T10:11:14-07:00
+updated_ts: 2026-10-20T10:12:13-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -25,6 +25,7 @@ updated_ts: 2026-10-20T10:11:14-07:00
 - 已排除：Automation 授权（TCC 里 island → com.cmuxterm.app = allowed）；tmux socket（`/tmp/tmux-501/default`，无 `TMUX_TMPDIR`）；`AgentReopenExecutor` / `TerminalTabFocuser` 无启动期缓存；`NSWorkspace.runningApplications` 在后台队列也能看到 island 之后才启动的 app（scratchpad 小实验验证）
 - 仍缺故障进程的日志，根因未定位
 - 2026-10-20 第一步（证据收集）已实现：GUI 实例日志落盘 `~/Library/Logs/island.log`（带时间戳），reopen 路径每一步记结果（tmux 退出码 / 宿主 app 查找 / osascript 失败 / `activate()` 返回值）。随 0.2.4 发布；下次开机自启实例复现后读日志定位
+- 2026-10-20 `publish.sh 0.2.4` 卡在公证：notarytool 返回 HTTP 403「A required agreement is missing or has expired」，需要账号持有人在 developer.apple.com 签署新协议后 `macos-signing restore` 再发版。代码已 ship 到 master（292bd29）
 
 ## 可能方向（未验证）
 
