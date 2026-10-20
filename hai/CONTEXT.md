@@ -31,7 +31,8 @@ swift build                        # 编译
 
 # 运行（开发机日常跑的是 brew 装的 /Applications/Island.app，见下方 Gotchas「开发流程」）
 ./build/Island.app/Contents/MacOS/Island    # 前台运行，配置与事件日志走 stderr
-open build/Island.app                       # 后台运行（无日志输出）
+open build/Island.app                       # 后台运行；日志写 ~/Library/Logs/island.log
+tail -f ~/Library/Logs/island.log           # 开机自启 / open 启动的实例的日志（每行带本地时间戳）
 
 # 退出：点菜单栏 island 图标 → Quit island，或者
 pkill -x Island
@@ -94,8 +95,8 @@ defaults delete com.commallama.island IslandHotkeyEnabled   # 回到默认开启
 - 单个测试：`swift test --filter HotkeySpecTests/testParsesModifiersAndKeyIntoDisplayString`
 - 覆盖率：`./scripts/coverage.sh` 把**单行百分数**写进 `coverage.txt`；`make verify` 的 coverage gate 先刷新它，再与 `coverage-baseline.txt` 比对（当前基线 `100`，即 `IslandCore` 的 65 行全部被覆盖）
 - 覆盖率排除项声明在 **`coverage.config`**（`llvm-cov -ignore-filename-regex`，一行一条正则），理由如下：
-  1. `Tests/`、`\.derived/runner\.swift` —— 测试自身与 SwiftPM 自动生成的测试入口（AGENTS 排除类 1：自动生成的代码）
-  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `AgentSettingsView.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift` / `AgentReopenExecutor.swift` / `TerminalTabFocuser.swift` / `TaskVisibilityProbe.swift` / `ApplicationsMover.swift` / `Subprocess.swift` / `VSCodeExtensionInstaller.swift` / `ProcessSQLite.swift` / `ProcessInspector.swift` / `UpdateController.swift` / `UpdateSettingsView.swift` / `FeedbackSettingsView.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
+  1. `Tests/`、`\.derived/runner\.swift`、`DerivedSources/test_entry_point\.swift` —— 测试自身与 SwiftPM 自动生成的测试入口（后者是 Swift 6.4 新构建系统下的名字）（AGENTS 排除类 1：自动生成的代码）
+  2. `Sources/Island/*.swift`（逐文件列出，含 `StatusItemController.swift` / `LoginItemController.swift` / `IslandGlyph.swift` / `HotkeySettingsWindow.swift` / `AgentSettingsView.swift` / `HotkeyRecorderView.swift` / `AgentMonitor.swift` / `AgentReopenExecutor.swift` / `TerminalTabFocuser.swift` / `TaskVisibilityProbe.swift` / `ApplicationsMover.swift` / `Subprocess.swift` / `Log.swift` / `VSCodeExtensionInstaller.swift` / `ProcessSQLite.swift` / `ProcessInspector.swift` / `UpdateController.swift` / `UpdateSettingsView.swift` / `FeedbackSettingsView.swift`）—— 可执行 target 的全部内容，即 `main()` 与 AppKit / Carbon / ServiceManagement 的 wiring（AGENTS 排除类 2）。**该目录下新增文件必须显式加进 `coverage.config`**；任何决策逻辑都不该写在里面，应放 `IslandCore`
   - 没有类 3（纯数据结构）、类 4（平台分支）的排除项
 - 增量覆盖率：本 repo 没有可用的 Swift delta-coverage 工具（`xcrun llvm-cov` 没有 diff 模式）。改动达到增量门槛时，用 `xcrun llvm-cov show` 人工核对改动行，并在 commit body 说明；`IslandCore` 的基线是 100%，任何新增未覆盖行都会在下次 `make verify` 里暴露
 
@@ -131,6 +132,7 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   PopupSettings.swift          #   完成时的弹出：开关 + 秒数 + UserDefaults 存储（缺省回落到 ISLAND_OVERLAY_SECONDS）
   AppUpdate.swift              #   版本号解析/比较、cask 里的 version、UpdateStatus（红点与文案）、UpgradeMethod（brew / 下载页）与脱离进程的升级命令、升级日志结果、自动检查开关
   Feedback.swift               #   FeedbackReport：正文 + 环境信息、mailto / GitHub new issue URL（严格百分号编码）、剪贴板文本
+  LogFile.swift                #   日志文件位置（~/Library/Logs/island.log）、1 MB 轮转（留一份 .1）、带时间戳的行格式、何时把 stderr 重定向到文件
   AppLocation.swift            #   bundle 路径分类（translocated / dmg / installed）+ 移到 /Applications 的提示文案、xattr 与重启命令
 Sources/Island/                # 可执行 target：NSApplication / NSPanel / Carbon 装配
   main.swift                   #   入口 + --help / --print-config / --scan-agents / --reopen-plan
@@ -141,7 +143,8 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
   TerminalTabFocuser.swift     #   执行 TerminalTabFocus：AppleScript（cmux/Ghostty/Terminal/iTerm2）、tty 标题探针、VS Code 文件握手
   TaskVisibilityProbe.swift    #   执行 TaskVisibility：ps / tmux / 只读 AppleScript / VS Code window-<pid>.json，得出“在眼前”的任务 id
   VSCodeExtensionInstaller.swift # 启动时把包内 island-vscode.vsix 装/升级进 VS Code（版本不同才装）
-  Subprocess.swift             #   子进程 + osascript 的公共封装
+  Subprocess.swift             #   子进程 + osascript 的公共封装（用户触发的 osascript 失败会记日志）
+  Log.swift                    #   唯一的写日志入口：Log.write 带时间戳写 stderr；main 里 stderr 不是终端时 dup2 到日志文件
   ProcessInspector.swift       #   ProcessInspecting 的实现：kill(pid, 0) 判活，ps + lsof 取进程 cwd
   ProcessSQLite.swift          #   /usr/bin/sqlite3 -json 包装（Codex turn 历史用）
   HotkeyRegistrar.swift        #   Carbon RegisterEventHotKey 包装
@@ -238,6 +241,8 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - 检查登录项是否真的注册了：`sfltool dumpbtm | grep -iA6 "Name: island"`（`Disposition: [enabled, ...]` 即已启用）
 - `.app` 是 ad-hoc 签名（`codesign --sign -`）的，本地运行足够；重新构建后必须重新签名，`scripts/build-app.sh` 每次都会重签
 - 先跑 `swift test`（不带 `--enable-code-coverage`）会让 `.build` 里的二进制失去插桩，之后直接调 `llvm-cov` 会报 `no coverage data found`。覆盖率只走 `scripts/coverage.sh`
+- **Swift 6.4 起 SwiftPM 换了构建布局**：产物在 `.build/out/Products/Debug/`，测试 bundle 叫 `IslandCoreTests.xctest`（旧布局是 `.build/arm64-apple-macosx/debug/IslandPackageTests.xctest`）。`scripts/coverage.sh` 用 `swift build --show-bin-path` 定位，两种都认；老 checkout 里残留的旧布局 bundle 不会再被误测
+- **日志**（issue `terminal-reopen-stops-working`）：所有日志走 `Log.write`，不要再直接写 `FileHandle.standardError`。stderr 不是终端（开机自启、`open`）时启动即重定向到 `~/Library/Logs/island.log`，超过 1 MB 启动时轮转成 `.1`。点击任务的 reopen 路径每一步都记：`plan for ...`（进程数 / tmux pane 数）、tmux 非 0 退出与 stderr、找不到宿主 app 时的进程链、osascript 失败、`activate()` 的返回值
 - `swift test` 会连带构建可执行 target，所以 `Sources/Island` 里的编译错误会以测试失败的形式出现
 - `swift-format` 默认 2 空格缩进，本 repo 在 `.swift-format` 里改成 4 空格；不加 `--configuration` 也能被发现，但换机器/换版本时留意
 - **通知分两种**（issue `notification-n-auto-hide`）：菜单栏未读数永远跟着未读走，不可关；完成时的弹出可在 `Settings…` → `Notifications` 开关、改秒数（`UserDefaults` key `IslandPopupEnabled` / `IslandPopupSeconds`，缺省开 / `ISLAND_OVERLAY_SECONDS` / 5），hover 暂停计时。弹出关掉后，启动时那一次弹出也不再出现；改主题的预览照常弹

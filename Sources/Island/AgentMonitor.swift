@@ -89,8 +89,7 @@ final class AgentMonitor {
         let gone = inbox.allEntries.filter { presence.isGone($0.task) }
         guard !gone.isEmpty else { return }
         for entry in gone {
-            FileHandle.standardError.write(
-                Data("[island] session closed, removed \"\(entry.task.title)\"\n".utf8))
+            Log.write("session closed, removed \"\(entry.task.title)\"")
         }
         inbox.removeAll(where: presence.isGone)
         onChange(false)

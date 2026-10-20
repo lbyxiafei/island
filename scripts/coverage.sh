@@ -17,13 +17,25 @@ if ! swift test --enable-code-coverage >"$log" 2>&1; then
     exit 1
 fi
 
-executable="$(find .build -type d -name '*.xctest' -path '*/debug/*' | head -1)/Contents/MacOS/IslandPackageTests"
-if [[ ! -x "$executable" ]]; then
-    echo "coverage: test binary not found at $executable" >&2
+# Ask SwiftPM where this toolchain builds: Swift 6.4's build system moved the
+# products (and renamed the test bundle), and a stale bundle from the old
+# layout must not be measured instead.
+bin="$(swift build --show-bin-path)"
+executable=""
+for candidate in \
+    "$bin/IslandPackageTests.xctest/Contents/MacOS/IslandPackageTests" \
+    "$bin/IslandCoreTests.xctest/Contents/MacOS/IslandCoreTests"; do
+    if [[ -x "$candidate" ]]; then
+        executable="$candidate"
+        break
+    fi
+done
+if [[ -z "$executable" ]]; then
+    echo "coverage: test binary not found under $bin" >&2
     exit 1
 fi
 
-profile="$(find .build -type f -name 'default.profdata' | head -1)"
+profile="$(find "$bin/" -type f -name 'default.profdata' | head -1)"
 if [[ -z "$profile" ]]; then
     echo "coverage: default.profdata not found; run swift test --enable-code-coverage" >&2
     exit 1

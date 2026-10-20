@@ -25,16 +25,20 @@ struct TerminalTabFocuser: Sendable {
         case .scriptable(let bundleID, .terminalID(let id)):
             return result(
                 Subprocess.appleScript(
-                    TerminalScript.focus(bundleID: bundleID, match: .terminalID(id)))
+                    TerminalScript.focus(bundleID: bundleID, match: .terminalID(id)),
+                    logsFailure: true)
             ) { !$0.isEmpty }
         case .scriptable(let bundleID, .titleProbe(let tty)):
             return focusByTitleProbe(bundleID: bundleID, tty: tty)
         case .appleTerminal(let tty):
-            return result(Subprocess.appleScript(TerminalScript.appleTerminal(tty: tty))) {
+            return result(
+                Subprocess.appleScript(TerminalScript.appleTerminal(tty: tty), logsFailure: true)
+            ) {
                 $0 == "true"
             }
         case .iTerm(let tty):
-            return result(Subprocess.appleScript(TerminalScript.iTerm(tty: tty))) {
+            return result(Subprocess.appleScript(TerminalScript.iTerm(tty: tty), logsFailure: true))
+            {
                 $0 == "true"
             }
         case .vscode(let pids):

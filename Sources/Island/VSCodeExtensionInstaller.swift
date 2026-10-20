@@ -28,9 +28,7 @@ enum VSCodeExtensionInstaller {
                 VSCodeExtension.installedVersion(in: $0, id: VSCodeExtension.id)
             }
             let result = now == version ? "installed" : "failed to install"
-            FileHandle.standardError.write(
-                Data("[island] \(result) VS Code extension \(VSCodeExtension.id)@\(version)\n".utf8)
-            )
+            Log.write("\(result) VS Code extension \(VSCodeExtension.id)@\(version)")
         }
     }
 }

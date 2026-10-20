@@ -9,8 +9,7 @@ if Bundle.main.bundleIdentifier != LegacySettings.bundleID,
 {
     let copied = LegacySettings.migrate(from: legacy, to: .standard)
     if !copied.isEmpty {
-        FileHandle.standardError.write(
-            Data("[island] migrated settings from \(LegacySettings.bundleID): \(copied)\n".utf8))
+        Log.write("migrated settings from \(LegacySettings.bundleID): \(copied)")
     }
 }
 
@@ -156,6 +155,9 @@ if arguments.contains("--print-config") {
     print(configuration.summary)
     exit(EXIT_SUCCESS)
 }
+
+// Launched at login or with `open`, stderr is /dev/null; keep the log on disk.
+Log.redirectToFileIfDetached()
 
 let application = NSApplication.shared
 let delegate = AppDelegate(configuration: configuration)

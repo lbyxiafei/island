@@ -43,8 +43,8 @@ final class AgentReopenExecutor: Sendable {
     func plan(for task: AgentTask) -> AgentReopenAction {
         let resolved = resolveHost(for: task).map { task.withHost($0) } ?? task
         let nodes = ProcessTree.parse(run(["/bin/ps", "-axo", "pid=,ppid="]) ?? "")
-        let panes = TmuxPane.parse(
-            run(tmuxArguments(["list-panes", "-a", "-F", Self.paneFormat])) ?? "")
+        let panes = TmuxPane.parse(tmux(["list-panes", "-a", "-F", Self.paneFormat]) ?? "")
+        log("plan for \(resolved.host): \(nodes.count) processes, \(panes.count) tmux panes")
         return AgentReopen.plan(for: resolved, processNodes: nodes, tmuxPanes: panes)
     }
 
@@ -97,18 +97,17 @@ final class AgentReopenExecutor: Sendable {
     /// alone changes the session's current window but leaves every client on
     /// whatever session it was showing.
     private func focusTmux(windowTarget: String, paneTarget: String, task: AgentTask) {
-        _ = run(tmuxArguments(["select-window", "-t", windowTarget]))
-        _ = run(tmuxArguments(["select-pane", "-t", paneTarget]))
-        let clients = TmuxClient.parse(
-            run(tmuxArguments(["list-clients", "-F", Self.clientFormat])) ?? "")
+        _ = tmux(["select-window", "-t", windowTarget])
+        _ = tmux(["select-pane", "-t", paneTarget])
+        let clients = TmuxClient.parse(tmux(["list-clients", "-F", Self.clientFormat]) ?? "")
         if let client = TmuxClient.pick(clients, forPane: paneTarget) {
-            _ = run(tmuxArguments(["switch-client", "-c", client.tty, "-t", paneTarget]))
+            _ = tmux(["switch-client", "-c", client.tty, "-t", paneTarget])
             log("tmux client \(client.tty) -> \(paneTarget)")
             if focusTerminal(TerminalLeaf(pid: client.pid, tty: client.tty), cwd: task.cwd) {
                 return
             }
         } else {
-            log("tmux -> \(paneTarget) (no attached client)")
+            log("tmux -> \(paneTarget) (no attached client among \(clients.count))")
         }
         activateAnyTerminal()
     }
@@ -120,8 +119,7 @@ final class AgentReopenExecutor: Sendable {
                 let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
                     .first
             else { continue }
-            app.activate()
-            log("activated \(bundleID)")
+            log("activated \(bundleID): \(app.activate())")
             return
         }
         log("could not find the terminal hosting tmux")
@@ -147,7 +145,10 @@ final class AgentReopenExecutor: Sendable {
         }
         guard let host = HostApp.nearest(in: chain, among: apps),
             let app = running.first(where: { $0.processIdentifier == host.pid })
-        else { return false }
+        else {
+            log("no app hosts pid \(leaf.pid): chain \(chain), \(apps.count) regular apps")
+            return false
+        }
 
         let environment =
             host.bundleID == TerminalTabFocus.cmuxBundleID
@@ -171,18 +172,19 @@ final class AgentReopenExecutor: Sendable {
         if host.bundleID == TerminalTabFocus.vscodeBundleID, let cwd, !cwd.isEmpty {
             // Without the extension, the folder still picks the right window.
             _ = run(["/usr/bin/open", "-b", TerminalTabFocus.vscodeBundleID, cwd])
+            log("opened \(cwd) in \(name) for pid \(leaf.pid) (tab \(result): \(focus))")
         } else {
-            app.activate()
+            log(
+                "activated \(name) for pid \(leaf.pid): \(app.activate()) (tab \(result): \(focus))"
+            )
         }
-        log("activated \(name) for pid \(leaf.pid) (tab \(result): \(focus))")
         return true
     }
 
     private func activate(bundleID: String) {
         if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first
         {
-            app.activate()
-            log("activated \(bundleID)")
+            log("activated \(bundleID): \(app.activate())")
             return
         }
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
@@ -222,11 +224,27 @@ final class AgentReopenExecutor: Sendable {
         Self.tmuxCandidates.first { FileManager.default.isExecutableFile(atPath: $0) } ?? "tmux"
     }
 
+    /// Runs tmux, logging a failure: a silent tmux error is exactly what
+    /// leaves the user stuck on the wrong pane.
+    private func tmux(_ arguments: [String]) -> String? {
+        let command = tmuxArguments(arguments)
+        guard let result = Subprocess.runWithStatus(command) else {
+            log("could not start \(command.joined(separator: " "))")
+            return nil
+        }
+        if result.status != 0 {
+            log(
+                "\(command.joined(separator: " ")) exited \(result.status): "
+                    + result.error.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return result.output
+    }
+
     func run(_ arguments: [String]) -> String? {
         Subprocess.run(arguments)
     }
 
     func log(_ message: String) {
-        FileHandle.standardError.write(Data("[island] \(message)\n".utf8))
+        Log.write(message)
     }
 }

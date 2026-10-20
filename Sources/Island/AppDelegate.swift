@@ -247,8 +247,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         reopenQueue.async {
             let action = executor.plan(for: task)
             executor.perform(action, for: task)
-            FileHandle.standardError.write(
-                Data("[island] selected \(task.title) -> \(action)\n".utf8))
+            Log.write("selected \(task.title) -> \(action)")
         }
     }
 
@@ -395,6 +394,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Written to stderr, which is only visible when launch happens from a
     /// terminal — the way the POC is meant to be run.
     private func log(_ message: String) {
-        FileHandle.standardError.write(Data("[island] \(message)\n".utf8))
+        Log.write(message)
     }
 }

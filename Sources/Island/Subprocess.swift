@@ -41,9 +41,17 @@ enum Subprocess {
     /// Runs AppleScript through `osascript`; the first run against an app shows
     /// macOS's automation consent prompt (NSAppleEventsUsageDescription), and
     /// blocks until the user answers — never call this on the main thread.
-    static func appleScript(_ source: String) -> AppleScriptOutcome {
+    /// `logsFailure` is for user-triggered scripts; the visibility probe polls
+    /// and would flood the log.
+    static func appleScript(_ source: String, logsFailure: Bool = false) -> AppleScriptOutcome {
         guard let result = runWithStatus(["/usr/bin/osascript", "-e", source]) else {
+            if logsFailure { Log.write("could not start osascript") }
             return .failed
+        }
+        if logsFailure, result.status != 0 {
+            Log.write(
+                "osascript exited \(result.status): "
+                    + result.error.trimmingCharacters(in: .whitespacesAndNewlines))
         }
         return AppleScriptOutcome.classify(
             status: result.status, output: result.output, error: result.error)
