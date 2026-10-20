@@ -2,9 +2,9 @@
 type: bug
 name: terminal-reopen-stops-working
 title: "开机自启的 island 点击终端任务不跳转（重启 island 后正常）"
-status: new
+status: in-progress
 created_ts: 2026-10-01T13:18:16-07:00
-updated_ts: 2026-10-20T10:02:47-07:00
+updated_ts: 2026-10-20T10:07:48-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -31,6 +31,10 @@ updated_ts: 2026-10-20T10:02:47-07:00
 2. 旧进程里点击前的 `pruneClosed` 把行判为已关闭（但这会让行消失，用户应能察觉）
 3. 长时间运行后 tmux / cmux 状态与 island 缓存不一致（tmux server 12:04 才启动，晚于 island）
 
+## Decision
+
+- 2026-10-20，用户（仓库作者）在会话中同意：先做日志落盘（`~/Library/Logs/island.log`，带时间戳，reopen 每一步记结果），ship 后跑 `./scripts/publish.sh 0.2.4` 发版（含 tag 与 brew tap 更新）；用户重启电脑复现后再据日志定位根因修复
+
 ## 期望结果
 
 - 复现时能拿到证据：GUI 运行时的日志要落盘（例如 `~/Library/Logs/island.log`），否则下次仍然无从判断
@@ -42,3 +46,7 @@ updated_ts: 2026-10-20T10:02:47-07:00
 - 全程在独立 worktree（`../.worktree/<repo>-<slug>`）中完成，合回 master 前 `make verify` 全过，流程见 AGENTS.md / Workflow / Worktree 与 Ship
 
 # History
+
+## 2026-10-20T10:07:48-07:00: new -> in-progress
+
+用户确认方案（见 Decision）。第一步：日志落盘 + reopen 路径逐步记录，发 0.2.4 收集故障现场证据。
