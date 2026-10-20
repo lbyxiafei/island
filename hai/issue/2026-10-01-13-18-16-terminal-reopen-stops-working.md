@@ -1,10 +1,10 @@
 ---
 type: bug
 name: terminal-reopen-stops-working
-title: "长时间运行后点击终端任务不再跳转（Claude 桌面版正常）"
+title: "开机自启的 island 点击终端任务不跳转（重启 island 后正常）"
 status: new
 created_ts: 2026-10-01T13:18:16-07:00
-updated_ts: 2026-10-01T13:18:29-07:00
+updated_ts: 2026-10-20T10:02:47-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -19,6 +19,11 @@ updated_ts: 2026-10-01T13:18:29-07:00
 - 同一二进制 CLI 复现：`Island --reopen-plan 11407 --perform` → `focusTmux(chore:2.1)`，tmux client 切换成功，cmux tab 也聚焦成功
 - 杀掉旧进程、用 `nohup /Applications/Island.app/Contents/MacOS/Island > scratchpad/island.log` 重启后，用户在 GUI 里点终端行**跳转正常**（日志：`tmux client /dev/ttys000 -> job:2.1` + `focused scriptable(com.cmuxterm.app ...)`）
 - 旧进程由 launchd 启动，stderr 无处可去，点击时走了哪条路径**没有留下证据**；进程已被杀，现场丢失。**根因未定位**
+
+- 2026-10-20 第二次：用户重启电脑后，开机自启的 island（21:12:29 启动，早于 cmux 21:13:04、tmux server 21:24:15）**每次**点终端行都回不去；`pkill` 后用 `open --stderr <log> /Applications/Island.app`（同样经 LaunchServices、环境同开机自启）重启，点击正常：`tmux client /dev/ttys000 -> island:1.1` + `focused scriptable(com.cmuxterm.app ...)`
+- 两次故障的共同点：island 启动早于 cmux / tmux server。重启 island（晚于二者）即恢复
+- 已排除：Automation 授权（TCC 里 island → com.cmuxterm.app = allowed）；tmux socket（`/tmp/tmux-501/default`，无 `TMUX_TMPDIR`）；`AgentReopenExecutor` / `TerminalTabFocuser` 无启动期缓存；`NSWorkspace.runningApplications` 在后台队列也能看到 island 之后才启动的 app（scratchpad 小实验验证）
+- 仍缺故障进程的日志，根因未定位
 
 ## 可能方向（未验证）
 
