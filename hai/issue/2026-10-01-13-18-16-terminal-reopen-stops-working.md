@@ -4,7 +4,7 @@ name: terminal-reopen-stops-working
 title: "开机自启的 island 点击终端任务不跳转（重启 island 后正常）"
 status: in-progress
 created_ts: 2026-10-01T13:18:16-07:00
-updated_ts: 2026-10-20T10:21:49-07:00
+updated_ts: 2026-10-21T16:10:00-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -28,7 +28,19 @@ updated_ts: 2026-10-20T10:21:49-07:00
 - 2026-10-20 `publish.sh 0.2.4` 卡在公证：notarytool 返回 HTTP 403「A required agreement is missing or has expired」，需要账号持有人在 developer.apple.com 签署新协议后 `macos-signing restore` 再发版。代码已 ship 到 master（292bd29）
 - 2026-10-20 用户签署新版 Program License Agreement，约 2 分钟后公证恢复；0.2.4 已发布（app 与 dmg 公证 Accepted，tag `v0.2.4`，tap Release `island-v0.2.4`）。下一步：用户升级后重启电脑，复现时读 `~/Library/Logs/island.log`
 
-## 可能方向（未验证）
+## 根因（2026-10-21 定位）
+
+重启电脑后用户仍在 0.2.3（未升级），直接对故障中的开机自启实例（pid 3196）取证：
+
+- 临时把 `/opt/homebrew/bin/tmux` 换成只记录 island 调用的包装脚本（取证后已恢复原软链）。点击那一刻 island 只调用了 `tmux list-panes -a`（成功，4 个 pane），**之后没有 select-window / switch-client，也没有 osascript**
+- 用户剪贴板里出现 `claude --resume 74b3e379-…`：reopen 走到了 `focusHostApp` → 找不到宿主 → `copyResumeCommand` 兜底
+- 同一 session 当前 pid 50722（`claude -c`，16:00:18 启动，父进程是 tmux pane `island:1.1` 的 shell 4262）；CLI `--reopen-plan 50722` 得到 `focusTmux(island:1.1)`，正常
+
+即：**inbox 里的行带着入库那一刻的 `AgentHost.terminal(pid)`，之后从不更新**。session 被恢复（`claude -c` / `--resume`，重启电脑后几乎必然）或入库时读到了重启前残留的 `~/.claude/sessions/<旧pid>.json`，行里的 pid 就是死的（或被别的进程复用），进程链对不上任何 tmux pane，也对不上任何终端 app。重启 island 会清空 inbox，新行带当前 pid，所以"重启 island 就好了"。与通知开关无关。
+
+修法：点击前与每轮 poll 用 session 文件里**仍在运行**的 pid 刷新行的 host（`AgentActivitySource.liveHosts` + `AgentInbox.refreshHosts`），行的 id / 已读状态不变。
+
+## 可能方向（已被上面的根因取代）
 
 1. `reopenQueue` 是串行队列，`Subprocess.run` 没有超时：某次 osascript / tmux 卡住会让之后所有 reopen 排队不动。但 Claude 桌面版的 openURL 也在同一队列，与"桌面版正常"矛盾，除非桌面版的点击发生在卡住之前
 2. 旧进程里点击前的 `pruneClosed` 把行判为已关闭（但这会让行消失，用户应能察觉）
