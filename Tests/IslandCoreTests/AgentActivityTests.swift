@@ -439,6 +439,28 @@ final class ClaudeCodeActivitySourceTests: XCTestCase {
                 .liveSessionIDs(processes: StubProcesses(running: [7, 8])))
     }
 
+    /// Issue terminal-reopen-stops-working: after a reboot or `claude -c` the
+    /// same session can have a stale file with a dead pid next to the live
+    /// one; only the running process is where the session is now.
+    func testLiveHostsAreTheRunningProcessOfEachSession() throws {
+        let home = try makeTempHome()
+        let sessions = home.appendingPathComponent(".claude/sessions")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        try write(
+            #"{"pid":7,"sessionId":"resumed"}"#, to: sessions.appendingPathComponent("7.json"))
+        try write(
+            #"{"pid":12,"sessionId":"resumed"}"#, to: sessions.appendingPathComponent("12.json"))
+        try write(
+            #"{"pid":8,"sessionId":"closed"}"#, to: sessions.appendingPathComponent("8.json"))
+        try write(#"{"sessionId":"no-pid"}"#, to: sessions.appendingPathComponent("9.json"))
+        try write(#"{"pid":10,"sess"#, to: sessions.appendingPathComponent("10.json"))
+
+        let hosts = ClaudeCodeActivitySource.standard(home: home)
+            .liveHosts(processes: StubProcesses(running: [12]))
+
+        XCTAssertEqual(hosts, ["resumed": .terminal(processID: 12)])
+    }
+
     func testNoSessionDirectoryMeansNothingIsOpen() throws {
         let home = try makeTempHome()
 

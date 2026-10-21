@@ -120,6 +120,20 @@ public final class AgentInbox {
         return entries.count != before
     }
 
+    /// Points rows at where their session runs now (`hosts` is keyed by
+    /// `sessionKey`). The row stays the same run: id and read state are kept.
+    @discardableResult
+    public func refreshHosts(_ hosts: [String: AgentHost]) -> Bool {
+        var changed = false
+        for index in entries.indices {
+            let task = entries[index].task
+            guard let host = hosts[task.sessionKey], host != task.host else { continue }
+            entries[index] = Entry(task: task.withHost(host), isRead: entries[index].isRead)
+            changed = true
+        }
+        return changed
+    }
+
     private func sort() {
         entries.sort { lhs, rhs in
             if lhs.isRead != rhs.isRead { return !lhs.isRead }

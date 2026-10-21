@@ -38,6 +38,22 @@ final class SessionPresenceTests: XCTestCase {
         XCTAssertEqual(skipped.calls.count, 0)
     }
 
+    /// Hosts come back keyed like inbox rows (`sessionKey`), only from the
+    /// asked agents; a source that does not track processes adds nothing.
+    func testScannerCollectsLiveHostsByRowKeyForTheAskedAgents() {
+        let scanner = AgentActivityScanner(sources: [
+            HostStub(agent: .claudeCode, hosts: ["s": .terminal(processID: 9)]),
+            HostStub(agent: .codex, hosts: ["c": .terminal(processID: 5)]),
+            LiveStub(agent: .claudeCode, live: ["s"]),
+        ])
+
+        let hosts = scanner.liveHosts(of: [.claudeCode], processes: NoProcessInspecting())
+
+        XCTAssertEqual(hosts, ["claude-code:s": .terminal(processID: 9)])
+        XCTAssertEqual(
+            LiveStub(agent: .pi, live: nil).liveHosts(processes: NoProcessInspecting()), [:])
+    }
+
     func testOneSourceThatCannotTellMakesItsWholeAgentUnknown() {
         let scanner = AgentActivityScanner(sources: [
             LiveStub(agent: .codex, live: ["a"]),
@@ -94,4 +110,13 @@ private final class LiveStub: AgentActivitySource, @unchecked Sendable {
         calls.append(1)
         return live
     }
+}
+
+private struct HostStub: AgentActivitySource {
+    let agent: AgentKind
+    let hosts: [String: AgentHost]
+
+    func completedTasks() -> [AgentTask] { [] }
+
+    func liveHosts(processes: any ProcessInspecting) -> [String: AgentHost] { hosts }
 }

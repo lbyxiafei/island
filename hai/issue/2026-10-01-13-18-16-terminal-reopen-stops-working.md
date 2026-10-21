@@ -2,9 +2,9 @@
 type: bug
 name: terminal-reopen-stops-working
 title: "开机自启的 island 点击终端任务不跳转（重启 island 后正常）"
-status: in-progress
+status: solved
 created_ts: 2026-10-01T13:18:16-07:00
-updated_ts: 2026-10-21T16:10:00-07:00
+updated_ts: 2026-10-21T16:31:51-07:00
 ---
 
 > 总纲：[ISSUES.md](../ISSUES.md)
@@ -65,3 +65,13 @@ updated_ts: 2026-10-21T16:10:00-07:00
 ## 2026-10-20T10:07:48-07:00: new -> in-progress
 
 用户确认方案（见 Decision）。第一步：日志落盘 + reopen 路径逐步记录，发 0.2.4 收集故障现场证据。
+
+## 2026-10-21T16:31:51-07:00: in-progress -> solved
+
+根因：inbox 行的 `AgentHost.terminal(pid)` 在入库时定死，session 被恢复（`claude -c` / 重启后 resume）后 pid 失效，进程链对不上 tmux pane，点击退到复制 `claude --resume`。与通知开关无关；重启 island 清空 inbox 所以"重启就好"。
+
+修复：`AgentActivitySource.liveHosts`（Claude Code：session 文件里仍在运行的 pid）+ `AgentActivityScanner.liveHosts` + `AgentInbox.refreshHosts`（按 sessionKey 换 host，保留 id / 已读）；`AgentMonitor.refreshHosts` 每轮 poll 与点击前调用。新增 4 个测试。
+
+验证：`make verify` 全过；端到端用 worktree 构建 + `ISLAND_AGENT_HOME` 假 session：行以 pid A 入库 → 杀 A、同 sessionId 换成 tmux `island:2` 里的 pid C → 日志 `refreshed task hosts` → 用户点击 → `tmux client /dev/ttys000 -> island:2.1` + cmux tab 聚焦，剪贴板为空。随 0.2.5 发布（PLAN § 开发指南）。
+
+未覆盖：pi / Codex 不记录 pid（host 为 unknown 或 desktop），不受影响；同一 session 在两个终端同时运行时取任一个活着的 pid。

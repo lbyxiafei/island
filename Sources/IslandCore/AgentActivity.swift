@@ -14,6 +14,9 @@ public protocol AgentActivitySource: Sendable {
     /// The ids of the sessions that are still open, or nil when the source
     /// cannot tell (see `SessionPresence`).
     func liveSessionIDs(processes: any ProcessInspecting) -> Set<String>?
+    /// Where each open session runs now, by session id; a row's host was
+    /// captured when its run finished and goes stale once the session moves.
+    func liveHosts(processes: any ProcessInspecting) -> [String: AgentHost]
 }
 
 /// Runs every source and returns their completed tasks, newest first.
@@ -108,6 +111,23 @@ public struct ClaudeCodeActivitySource: AgentActivitySource {
             live.insert(sessionID)
         }
         return live
+    }
+
+    /// Where each session runs now: the pid of a session file whose process
+    /// is alive. A resumed session (`claude -c`, or after a reboot) has a new
+    /// pid, and a stale file of the old one can linger next to it.
+    public func liveHosts(processes: any ProcessInspecting) -> [String: AgentHost] {
+        var hosts: [String: AgentHost] = [:]
+        for url in AgentFiles.directoryContents(sessionsDirectory) where url.pathExtension == "json"
+        {
+            guard let data = try? Data(contentsOf: url),
+                let state = try? JSONDecoder().decode(ClaudeSessionState.self, from: data),
+                let sessionID = state.sessionId, !sessionID.isEmpty,
+                let pid = state.pid, processes.isRunning(pid)
+            else { continue }
+            hosts[sessionID] = .terminal(processID: pid)
+        }
+        return hosts
     }
 
     /// The transcript lives in `<projects>/<cwd-slug>/<sessionId>.jsonl`; the

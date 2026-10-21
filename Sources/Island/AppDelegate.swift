@@ -232,7 +232,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The session may have closed since the last poll; then the row just
         // goes away instead of focusing a terminal that no longer shows it.
         monitor?.pruneClosed()
-        guard inbox?.allEntries.contains(where: { $0.id == entry.id }) == true else {
+        // A resumed session runs under a new pid; reopen where it is now.
+        monitor?.refreshHosts()
+        guard let entry = inbox?.allEntries.first(where: { $0.id == entry.id }) else {
             hideOverlay(reason: "overlay hidden after selecting a closed task")
             return
         }

@@ -64,6 +64,7 @@ final class AgentMonitor {
     /// task clears its dot without waiting for the next tick.
     func poll() {
         pruneClosed()
+        refreshHosts()
         guard !isChecking else { return }
         // PLAN: historical runs do not matter, only what finished after island
         // came up.
@@ -76,6 +77,17 @@ final class AgentMonitor {
             let seen = await inView(fresh + unread)
             isChecking = false
             apply(fresh: fresh, seen: seen)
+        }
+    }
+
+    /// Points rows at the process their session runs in now: a row keeps the
+    /// pid its run finished under, which is dead once the session is resumed
+    /// (issue terminal-reopen-stops-working).
+    func refreshHosts() {
+        let agents = Set(inbox.allEntries.map(\.task.agent))
+        guard !agents.isEmpty else { return }
+        if inbox.refreshHosts(scanner.liveHosts(of: agents, processes: processes)) {
+            Log.write("refreshed task hosts from the live sessions")
         }
     }
 

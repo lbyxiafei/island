@@ -67,7 +67,11 @@ public struct AgentTask: Equatable, Sendable {
 
     /// Identity of the session across runs: the overlay shows one row per
     /// session, however many turns it finishes.
-    public var sessionKey: String { "\(agent.rawValue):\(sessionID)" }
+    public var sessionKey: String { Self.sessionKey(agent: agent, sessionID: sessionID) }
+
+    public static func sessionKey(agent: AgentKind, sessionID: String) -> String {
+        "\(agent.rawValue):\(sessionID)"
+    }
 
     /// A copy with a host resolved at click time (some agents do not record one).
     public func withHost(_ host: AgentHost) -> AgentTask {

@@ -210,14 +210,50 @@ final class AgentInboxTests: XCTestCase {
             AgentInbox.Change(changed: false, alerted: false))
     }
 
-    private func task(_ sessionID: String, at seconds: TimeInterval) -> AgentTask {
+    /// Issue terminal-reopen-stops-working: a row keeps the pid its run was
+    /// seen with; once the session is resumed under a new process, clicking
+    /// must reach that process, not the dead one.
+    func testRefreshHostsMovesARowToItsSessionsCurrentProcess() {
+        let inbox = AgentInbox()
+        let old = task("a", at: 1, host: .terminal(processID: 100))
+        inbox.ingest([old, task("b", at: 2, host: .terminal(processID: 200))])
+        inbox.markRead(id: old.id)
+
+        let changed = inbox.refreshHosts([
+            old.sessionKey: .terminal(processID: 300),
+            task("b", at: 2).sessionKey: .terminal(processID: 200),
+        ])
+
+        XCTAssertTrue(changed)
+        let refreshed = inbox.allEntries.first { $0.task.sessionID == "a" }
+        XCTAssertEqual(refreshed?.task.host, .terminal(processID: 300))
+        XCTAssertEqual(refreshed?.id, old.id)
+        XCTAssertEqual(refreshed?.isRead, true)
+        XCTAssertEqual(
+            inbox.allEntries.first { $0.task.sessionID == "b" }?.task.host,
+            .terminal(processID: 200))
+    }
+
+    func testRefreshHostsLeavesRowsWithoutAKnownProcessAlone() {
+        let inbox = AgentInbox()
+        inbox.ingest([task("a", at: 1, host: .terminal(processID: 100))])
+
+        XCTAssertFalse(inbox.refreshHosts([:]))
+        XCTAssertFalse(
+            inbox.refreshHosts([task("a", at: 1).sessionKey: .terminal(processID: 100)]))
+        XCTAssertEqual(inbox.allEntries.first?.task.host, .terminal(processID: 100))
+    }
+
+    private func task(
+        _ sessionID: String, at seconds: TimeInterval, host: AgentHost = .unknown
+    ) -> AgentTask {
         AgentTask(
             agent: .pi,
             sessionID: sessionID,
             title: sessionID,
             cwd: nil,
             completedAt: Date(timeIntervalSince1970: seconds),
-            host: .unknown,
+            host: host,
             resumeCommand: nil
         )
     }

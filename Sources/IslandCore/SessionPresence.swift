@@ -39,6 +39,9 @@ public struct SessionPresence: Equatable, Sendable {
 extension AgentActivitySource {
     /// Sources cannot tell unless they say otherwise.
     public func liveSessionIDs(processes: any ProcessInspecting) -> Set<String>? { nil }
+
+    /// Sources that record no process have no host to report.
+    public func liveHosts(processes: any ProcessInspecting) -> [String: AgentHost] { [:] }
 }
 
 extension AgentActivityScanner {
@@ -57,5 +60,19 @@ extension AgentActivityScanner {
             }
         }
         return SessionPresence(live: live.filter { !unknown.contains($0.key) })
+    }
+
+    /// The current host of each open session of `agents`, keyed by
+    /// `AgentTask.sessionKey` so it lines up with inbox rows.
+    public func liveHosts(
+        of agents: Set<AgentKind>, processes: any ProcessInspecting
+    ) -> [String: AgentHost] {
+        var hosts: [String: AgentHost] = [:]
+        for source in sources where agents.contains(source.agent) {
+            for (sessionID, host) in source.liveHosts(processes: processes) {
+                hosts[AgentTask.sessionKey(agent: source.agent, sessionID: sessionID)] = host
+            }
+        }
+        return hosts
     }
 }

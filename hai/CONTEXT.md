@@ -242,6 +242,7 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 - `.app` 是 ad-hoc 签名（`codesign --sign -`）的，本地运行足够；重新构建后必须重新签名，`scripts/build-app.sh` 每次都会重签
 - 先跑 `swift test`（不带 `--enable-code-coverage`）会让 `.build` 里的二进制失去插桩，之后直接调 `llvm-cov` 会报 `no coverage data found`。覆盖率只走 `scripts/coverage.sh`
 - **Swift 6.4 起 SwiftPM 换了构建布局**：产物在 `.build/out/Products/Debug/`，测试 bundle 叫 `IslandCoreTests.xctest`（旧布局是 `.build/arm64-apple-macosx/debug/IslandPackageTests.xctest`）。`scripts/coverage.sh` 用 `swift build --show-bin-path` 定位，两种都认；老 checkout 里残留的旧布局 bundle 不会再被误测
+- **行的 host 会刷新**（issue `terminal-reopen-stops-working`）：一行入库时带着当时的 `AgentHost.terminal(pid)`，但 session 被恢复（`claude -c` / `--resume`，重启电脑后几乎必然）后 pid 就变了，旧 pid 死掉或被复用，进程链对不上 tmux pane，点击会退到“复制恢复命令”。所以每轮 poll 和点击前都会 `AgentMonitor.refreshHosts`：`AgentActivitySource.liveHosts` 报告每个 session **仍在运行**的 pid（Claude Code 读 `~/.claude/sessions/*.json` 并 `kill(pid,0)`；残留的旧 pid 文件自然被跳过），`AgentInbox.refreshHosts` 按 `sessionKey` 换掉 host，行 id 与已读状态不变。新增会记录 pid 的 agent 时记得实现 `liveHosts`
 - **日志**（issue `terminal-reopen-stops-working`）：所有日志走 `Log.write`，不要再直接写 `FileHandle.standardError`。stderr 不是终端（开机自启、`open`）时启动即重定向到 `~/Library/Logs/island.log`，超过 1 MB 启动时轮转成 `.1`。点击任务的 reopen 路径每一步都记：`plan for ...`（进程数 / tmux pane 数）、tmux 非 0 退出与 stderr、找不到宿主 app 时的进程链、osascript 失败、`activate()` 的返回值
 - `swift test` 会连带构建可执行 target，所以 `Sources/Island` 里的编译错误会以测试失败的形式出现
 - `swift-format` 默认 2 空格缩进，本 repo 在 `.swift-format` 里改成 4 空格；不加 `--configuration` 也能被发现，但换机器/换版本时留意
