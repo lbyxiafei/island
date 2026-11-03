@@ -66,6 +66,14 @@ public enum HostApp {
     }
 }
 
+/// How island invokes tmux. `-u` forces UTF-8 output: a login-item launch has
+/// no UTF-8 locale, and tmux would then print the tab in our formats as `_`.
+public enum TmuxCommand {
+    public static func arguments(executable: String, _ arguments: [String]) -> [String] {
+        [executable, "-u"] + arguments
+    }
+}
+
 /// One pane from `tmux list-panes -a`. `pane_pid` is the shell running inside
 /// the pane, which is what the agent's ancestor chain points at.
 public struct TmuxPane: Equatable, Sendable {

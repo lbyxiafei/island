@@ -217,7 +217,7 @@ final class AgentReopenExecutor: Sendable {
         "#{client_pid}\t#{client_tty}\t#{client_session}\t#{client_activity}"
 
     func tmuxArguments(_ arguments: [String]) -> [String] {
-        [tmuxPath()] + arguments
+        TmuxCommand.arguments(executable: tmuxPath(), arguments)
     }
 
     private func tmuxPath() -> String {

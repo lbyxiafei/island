@@ -4,6 +4,7 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
+| bug | [tmux-output-without-utf8-locale](./issue/2026-11-03-12-08-10-tmux-output-without-utf8-locale.md) | 开机启动的 island 解析不到 tmux pane（无 UTF-8 locale 时 tab 被转成 _） | solved | 2026-11-03T12:08:10-08:00 | 2026-11-03T12:09:36-08:00 |
 | bug | [terminal-reopen-stops-working](./issue/2026-10-01-13-18-16-terminal-reopen-stops-working.md) | 开机自启的 island 点击终端任务不跳转（重启 island 后正常） | solved | 2026-10-01T13:18:16-07:00 | 2026-10-21T16:31:51-07:00 |
 | feat | [app-icon](./issue/2026-09-28-21-10-17-app-icon.md) | 补 app 图标：Lagoon 胶囊（方案 A） | solved | 2026-09-28T21:10:17-07:00 | 2026-09-28T21:18:20-07:00 |
 | chore | [dev-flow-brew-upgrade](./issue/2026-09-28-14-11-52-dev-flow-brew-upgrade.md) | 开发完成即发布到 brew，本地从 settings 升级验收 | solved | 2026-09-28T14:11:52-07:00 | 2026-09-28T14:20:40-07:00 |

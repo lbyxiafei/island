@@ -199,6 +199,7 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 
 ## Gotchas
 
+- **调 tmux 一律走 `TmuxCommand.arguments`（带 `-u`）**。开机自启的 island 没有 UTF-8 locale，不带 `-u` 时 tmux 把 `-F` 格式里的 tab 输出成 `_`，解析不到任何 pane 且不报错；命令行里调试时 shell 有 locale，复现不了，要用 `env -i PATH=/usr/bin:/bin HOME=$HOME <Island> --reopen-plan <pid>`
 - **hotkey 用 Carbon 而不是 `NSEvent.addGlobalMonitorForEvents`**。后者需要用户在「隐私与安全性 → 输入监控/辅助功能」里授权，Carbon 的 `RegisterEventHotKey` 不需要任何授权。这是 POC 要验证的结论之一，改动前先想清楚
 - Carbon 的 keycode 是 **US 布局**的物理键位；真正的产品阶段要考虑非 US 布局下的键位映射（POC 不管）
 - 悬浮窗靠 `NSPanel` + `.nonactivatingPanel` + `level = .statusBar` + `canJoinAllSpaces` 浮在最上层。**是否拿键盘由 `OverlayPanel.acceptsKeyboard` 决定**（`canBecomeKey` 读它）：热键 / 菜单 `Summon overlay` 召唤时为 true，面板 `makeKey` 但因为 non-activating 不会激活 island，底下的 app 仍是前台；任务完成自动弹出时为 false，绝不抢焦点。改这里务必保住"自动弹出不抢焦点"
