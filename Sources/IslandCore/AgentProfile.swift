@@ -62,6 +62,11 @@ extension AgentScenario {
         id: "codex.exec", agent: .codex, title: "Headless exec",
         detection: "codex exec runs from scripts or CI",
         jumpBack: "Opens the thread in the Codex app (codex:// link)")
+
+    public static let deepseekApp = AgentScenario(
+        id: "deepseek.app", agent: .deepseek, title: "Desktop app",
+        detection: "Sessions in the DeepSeek Harness app (its local session cache)",
+        jumpBack: "Brings DeepSeek Harness forward (it has no per-session link)")
 }
 
 /// Everything that differs from one agent to the next, in one declarative
@@ -112,6 +117,11 @@ extension AgentKind {
                 appBundleIDs: ["com.openai.codex"],
                 symbolName: "chevron.left.forwardslash.chevron.right",
                 scenarios: [.codexApp, .codexCLI, .codexExec])
+        case .deepseek:
+            return AgentProfile(
+                agent: self, displayName: "DeepSeek", processNames: ["DeepSeek Harness"],
+                appBundleIDs: [DeepSeekActivitySource.bundleID], symbolName: "fish",
+                scenarios: [.deepseekApp])
         }
     }
 

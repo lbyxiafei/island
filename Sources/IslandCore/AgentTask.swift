@@ -7,6 +7,7 @@ public enum AgentKind: String, Sendable, CaseIterable {
     case claudeDesktop = "claude-desktop"
     case pi
     case codex
+    case deepseek
 }
 
 /// Where a task runs, so island can decide how to bring it back to the front.

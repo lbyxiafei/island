@@ -112,6 +112,21 @@ order by completed_at desc limit 100;
 - 回到对话：`claude://claude.ai/chat/<uuid>`（app 注册了 `claude` scheme）
 - 局限：只有**当前打开 / 最近打开**的对话才有 `hub_transcript`；格式无公开文档，桌面版升级可能改动
 
+## 4b. DeepSeek Harness（桌面版）
+
+`/Applications/DeepSeek Harness.app`（Electron，bundle id `com.deepseek.dsh`，2026-11-05 实测 0.2.1-rc.2），数据在 `~/.dsh/`（**`~/.dsh/.credentials.yaml` 是凭据，不要读**）。
+
+**已解决（2026-11-05，issue `deepseek-harness-source`）**：
+
+- 事件流：`~/.dsh/sessions/<编码后的 cwd>/session-<uuid>/session.v4.jsonl.zstd`（zstd 压缩、追加写），有 `turn/start`、`turn/end`（`data.reason.kind == "completed"`）等事件。macOS 没有内置 zstd 解码，**island 不读它**
+- 投影缓存（island 读这个）：`~/.dsh/storages/session_projcache/sessions/session-<uuid>.json`，纯 JSON，session 运行中持续重写。结构是 `{version: 7, record: {identity: {cwd, createdAt, …}, rows: {<row>: {ver, seq, val}}}}`，用到的 row：
+  - `turnBoundary.val`：`openTurnStartSeq` 在一轮进行中非 null、结束后为 null；`lastStepBoundary.kind == "end"`；`lastTurn > 0`（0 = 从没跑过）。三者同时满足 = 最近一轮已完成
+  - `timeContext.val.lastMessageTime`（epoch ms）：完成时间，与 `turn/end.time` 只差 2ms
+  - `title.val`（首轮后才生成）→ `titleInput.val.first.text`（首条 prompt）→ 目录名
+  - `workingDirectory.val` → `identity.cwd`
+- 局限：缓存里没有 `turn/end` 的 reason，**用户中途停止的一轮也会被当作完成**（未实测停止后 `turnBoundary` 的样子）；session 删除后缓存文件是否删除未验证，所以 `liveSessionIDs` 保持“无法判断”，行不会自动消失
+- 回到任务：app 只注册了 `dsh://open`（`open-url` 里只认 `dsh://open` / `dsh://open/`，作用是把主窗口提到前面），**没有按 session 打开的链接**。点击走 `openURL("dsh://open")`，失败则按 bundle id 激活
+
 ## 5. 回到任务的可行手段（按可靠性排序）
 
 1. **tmux**（本机最常见）：`claude → zsh → tmux`。由 pid 沿父进程链命中 `tmux list-panes -a` 的 `pane_pid` 得到 `session:window.pane`，`select-window` + `select-pane` 之后**必须 `switch-client -c <client_tty> -t <pane>`**——只 select 不会让 client 离开它当前显示的 session（2026-09-25 实测 client 挂在 `job`，目标在 `island`，点完屏幕不变）。client 优先选已经在目标 session 上的，否则选 `client_activity` 最新的。之后把 **tmux client** 当作下面第 2 条的"叶子进程"，继续定位显示它的终端 tab。

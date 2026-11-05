@@ -38,6 +38,7 @@ public struct AgentActivityScanner: Sendable {
             ClaudeDesktopActivitySource.standard(home: home),
             PiActivitySource.standard(home: home),
             CodexActivitySource.standard(home: home, sqlite: sqlite),
+            DeepSeekActivitySource.standard(home: home),
         ])
     }
 

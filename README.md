@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-A macOS menu-bar app that watches the AI agents running on your machine — Claude Code, Codex, pi, and the Claude desktop app — and drops a Dynamic-Island-style panel from the top of the screen the moment one of them finishes a task. Click a task and you land right back in the terminal tab, tmux pane, VS Code terminal, or desktop conversation it came from.
+A macOS menu-bar app that watches the AI agents running on your machine — Claude Code, Codex, pi, the Claude desktop app, and DeepSeek Harness — and drops a Dynamic-Island-style panel from the top of the screen the moment one of them finishes a task. Click a task and you land right back in the terminal tab, tmux pane, VS Code terminal, or desktop conversation it came from.
 
 Stop checking five terminals to see who's done.
 
@@ -24,7 +24,7 @@ Requires macOS 13+.
 
 ## Features
 
-- **Detects finished agent runs**: Claude Code (terminal), Claude desktop app (chat), pi (terminal), Codex (CLI + desktop). How each agent's completion signal, task identity, title, and host process are read is documented in `hai/reference/agents/README.md`
+- **Detects finished agent runs**: Claude Code (terminal), Claude desktop app (chat), pi (terminal), Codex (CLI + desktop), DeepSeek Harness (desktop; a click brings the app forward, since it has no per-session link). How each agent's completion signal, task identity, title, and host process are read is documented in `hai/reference/agents/README.md`
 - **Pops up when a task finishes**, listing tasks (unread first, with a red dot); hovering pauses auto-hide
 - **Meaningful titles**: the agent's own title when it has one, otherwise the **last message**, otherwise the directory name
 - **Click to jump back** to the exact tab — the panel closes and you're taken to the task: tmux switches to the right session/window/pane; cmux / Ghostty / Terminal / iTerm2 switch to the right tab; VS Code switches to the right terminal tab (island installs a companion extension automatically, no setup); desktop apps open the conversation. When the task can't be located, the resume command (e.g. `claude --resume <id>`) is copied to the clipboard. macOS asks once for permission the first time island controls a given terminal app. Clicked tasks lose their red dot but stay in the list
@@ -113,7 +113,7 @@ Set via environment variables; no rebuild needed.
 | `ISLAND_HOTKEY` | `cmd+ctrl+,` | Summon hotkey |
 | `ISLAND_OVERLAY_SECONDS` | `5` | How long an auto-popup stays (a value set in `Settings…` wins) |
 | `ISLAND_TASK_LIMIT` | `10` | Number of tasks shown in the panel |
-| `ISLAND_AGENT_HOME` | `~` | Where agent session stores (`~/.claude`, `~/.pi`, `~/.codex`, …) are read from |
+| `ISLAND_AGENT_HOME` | `~` | Where agent session stores (`~/.claude`, `~/.pi`, `~/.codex`, `~/.dsh`, …) are read from |
 
 ```bash
 ISLAND_HOTKEY=cmd+shift+k ISLAND_OVERLAY_SECONDS=2 ./build/Island.app/Contents/MacOS/Island
