@@ -4,6 +4,7 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
+| feat | [pet-mode](./issue/2026-11-06-11-50-52-pet-mode.md) | 宠物模式：常驻桌面的宠物 + 任务完成气泡 | solved | 2026-11-06T11:50:52-08:00 | 2026-11-06T11:59:08-08:00 |
 | feat | [deepseek-harness-source](./issue/2026-11-05-06-40-11-deepseek-harness-source.md) | 支持 DeepSeek Harness 桌面版 | solved | 2026-11-05T06:40:11-08:00 | 2026-11-05T06:42:58-08:00 |
 | bug | [tmux-output-without-utf8-locale](./issue/2026-11-03-12-08-10-tmux-output-without-utf8-locale.md) | 开机启动的 island 解析不到 tmux pane（无 UTF-8 locale 时 tab 被转成 _） | solved | 2026-11-03T12:08:10-08:00 | 2026-11-03T12:09:36-08:00 |
 | bug | [terminal-reopen-stops-working](./issue/2026-10-01-13-18-16-terminal-reopen-stops-working.md) | 开机自启的 island 点击终端任务不跳转（重启 island 后正常） | solved | 2026-10-01T13:18:16-07:00 | 2026-10-21T16:31:51-07:00 |

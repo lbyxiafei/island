@@ -20,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let overlayStore = UserDefaultsOverlayStore()
     private let popupStore = UserDefaultsPopupStore()
     private let scenarioStore = UserDefaultsAgentScenarioStore()
+    private let petStore = UserDefaultsPetStore()
+    /// Pet mode (Settings → Pet); while on, it replaces the auto pop-up.
+    private var petSettings: PetSettings
+    private var pet: PetController?
     /// Which agent scenarios island watches (Settings → Agents).
     private var scenarios: AgentScenarioSettings
     /// Whether a finished run pops the overlay up, and for how long.
@@ -34,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.configuration = configuration
         popup = popupStore.load(fallback: configuration.duration)
         scenarios = scenarioStore.load()
+        petSettings = petStore.load()
         super.init()
     }
 
@@ -113,6 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showsHints: content.showsHints,
             popup: popup,
             scenarios: scenarios,
+            pet: petSettings,
             updates: updates,
             feedbackEnvironment: FeedbackEnvironment(
                 appVersion: updates.current.description,
@@ -125,7 +131,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onThemeChanged: { [weak self] theme in self?.setTheme(theme) },
             onHintsChanged: { [weak self] shows in self?.setShowsHints(shows) },
             onPopupChanged: { [weak self] popup in self?.setPopup(popup) },
-            onScenariosChanged: { [weak self] scenarios in self?.setScenarios(scenarios) }
+            onScenariosChanged: { [weak self] scenarios in self?.setScenarios(scenarios) },
+            onPetChanged: { [weak self] pet in self?.setPet(pet) }
         )
         self.settingsWindow = settingsWindow
 
@@ -134,9 +141,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotkeySource: configuration.hotkey.source,
             hotkeyEnabled: settings.isEnabled,
             popup: popup,
+            petEnabled: petSettings.isEnabled,
             loginItem: LoginItemController(),
             onSummon: { [weak self] in self?.showOverlay(interactive: true) },
             onToggleHotkey: { [weak self] enabled in self?.setHotkeyEnabled(enabled) },
+            onTogglePet: { [weak self] enabled in self?.setPetEnabled(enabled) },
             onSelectTask: { [weak self] id in self?.selectTask(id: id) },
             onOpenSettings: { [weak self] in self?.settingsWindow?.show() },
             onOpenUpdates: { [weak self] in self?.settingsWindow?.show(tab: "Updates") },
@@ -144,6 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         log("menu bar item installed; launch at login: \(LoginItemController().status.rawValue)")
 
+        startPet()
         startAgentMonitor()
 
         updates.onChange = { [weak self] status in
@@ -156,8 +166,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         updates.start()
 
-        // Show once at launch so the POC is visible without hunting for the hotkey.
-        if popup.isEnabled { showOverlay() }
+        // Show once at launch so the POC is visible without hunting for the
+        // hotkey; the pet already is.
+        if popup.isEnabled && !petSettings.isEnabled { showOverlay() }
     }
 
     /// Watches the local agent session stores and mirrors the unread count into
@@ -172,10 +183,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             scenarios: scenarios,
             inView: { [weak self] tasks in await self?.tasksInView(tasks) ?? [] },
             onChange: { [weak self] alerted in
-                self?.refreshAgentUI()
+                guard let self else { return }
+                self.refreshAgentUI(alerted: alerted)
                 // PLAN § Goal: a finished run pops the overlay with its summary —
-                // unless the user watched it finish, or switched pop-ups off.
-                if alerted, self?.popup.isEnabled == true { self?.showOverlay() }
+                // unless the user watched it finish, switched pop-ups off, or
+                // the pet is showing it instead.
+                if alerted, self.popup.isEnabled, !self.petSettings.isEnabled {
+                    self.showOverlay()
+                }
             }
         )
         self.monitor = monitor
@@ -206,11 +221,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Pushes the inbox into the three places it shows up: the menu bar badge,
     /// the overlay list, and the menu's task section.
-    private func refreshAgentUI() {
+    private func refreshAgentUI(alerted: Bool = false) {
         guard let inbox else { return }
         let entries = inbox.visibleEntries
         statusItem?.setUnreadCount(inbox.unreadCount)
         statusItem?.setTasks(entries)
+        pet?.update(unread: inbox.unreadEntries, alerted: alerted)
         overlayContent?.update(
             entries: entries,
             unread: inbox.unreadCount,
@@ -251,6 +267,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             executor.perform(action, for: task)
             Log.write("selected \(task.title) -> \(action)")
         }
+    }
+
+    // MARK: - Pet
+
+    private func startPet() {
+        let pet = PetController(settings: petSettings, store: petStore)
+        pet.onSelect = { [weak self] entry in self?.selectTask(entry) }
+        pet.onDismiss = { [weak self] entry in
+            self?.inbox?.markRead(id: entry.id)
+            self?.refreshAgentUI()
+        }
+        pet.onDismissAll = { [weak self] in
+            guard let inbox = self?.inbox else { return }
+            for entry in inbox.unreadEntries { inbox.markRead(id: entry.id) }
+            self?.refreshAgentUI()
+        }
+        pet.onOpenList = { [weak self] in self?.toggleOverlay() }
+        pet.onOpenSettings = { [weak self] in self?.settingsWindow?.show(tab: "Pet") }
+        pet.onHide = { [weak self] in self?.setPetEnabled(false) }
+        self.pet = pet
+    }
+
+    private func setPetEnabled(_ enabled: Bool) {
+        var settings = petSettings
+        settings.isEnabled = enabled
+        setPet(settings)
+        settingsWindow?.setPet(settings)
+    }
+
+    /// From Settings → Pet, the menu bar or the pet's own menu.
+    private func setPet(_ settings: PetSettings) {
+        petSettings = settings
+        petStore.save(settings)
+        pet?.apply(settings)
+        if let inbox { pet?.update(unread: inbox.unreadEntries, alerted: false) }
+        statusItem?.setPetEnabled(settings.isEnabled)
+        log(
+            "pet: \(settings.isEnabled ? "on" : "off"), \(settings.avatar.spec), idle opacity \(settings.idleOpacity)"
+        )
     }
 
     private func recordAutomation(_ check: AutomationCheck) {

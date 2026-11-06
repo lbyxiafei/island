@@ -5,7 +5,8 @@ import IslandCore
 /// General (record the summon hotkey by pressing it, switch it on or off, or
 /// clear it — PLAN § Scope #3, #5), Appearance (overlay theme, keyboard
 /// hints), Notifications (the pop-up shown when a run finishes), Agents
-/// (which agent scenarios island watches, see `AgentSettingsView`), Updates
+/// (which agent scenarios island watches, see `AgentSettingsView`), Pet
+/// (`PetSettingsView`), Updates
 /// (`UpdateSettingsView`, its label dotted while an upgrade waits) and
 /// Feedback (`FeedbackSettingsView`).
 ///
@@ -26,6 +27,7 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         checkboxWithTitle: "Pop up when an agent run finishes", target: nil, action: nil)
     private let popupSeconds = NSTextField(string: "")
     private let agentsView: AgentSettingsView
+    private let petView: PetSettingsView
     private let updates: UpdateController
     private let updatesView: UpdateSettingsView
     private let feedbackView: FeedbackSettingsView
@@ -42,13 +44,15 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         showsHints: Bool,
         popup: PopupSettings,
         scenarios: AgentScenarioSettings,
+        pet: PetSettings,
         updates: UpdateController,
         feedbackEnvironment: FeedbackEnvironment,
         onHotkeyChanged: @escaping (HotkeySpec, Bool) -> Void,
         onThemeChanged: @escaping (OverlayTheme) -> Void,
         onHintsChanged: @escaping (Bool) -> Void,
         onPopupChanged: @escaping (PopupSettings) -> Void,
-        onScenariosChanged: @escaping (AgentScenarioSettings) -> Void
+        onScenariosChanged: @escaping (AgentScenarioSettings) -> Void,
+        onPetChanged: @escaping (PetSettings) -> Void
     ) {
         self.popup = popup
         self.onPopupChanged = onPopupChanged
@@ -60,6 +64,7 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         enabledToggle = NSButton(checkboxWithTitle: "Enabled", target: nil, action: nil)
         feedback = NSTextField(labelWithString: "")
         agentsView = AgentSettingsView(settings: scenarios, onChange: onScenariosChanged)
+        petView = PetSettingsView(settings: pet, onChange: onPetChanged)
         self.updates = updates
         updatesView = UpdateSettingsView(updates: updates)
         feedbackView = FeedbackSettingsView(environment: feedbackEnvironment)
@@ -100,6 +105,11 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         refreshFromCoordinator()
     }
 
+    /// The pet was changed from outside this window (its menu, the menu bar).
+    func setPet(_ pet: PetSettings) {
+        petView.set(pet)
+    }
+
     /// `tab` is a tab identifier (its untitled label, e.g. "Updates").
     func show(tab: String? = nil) {
         refreshFromCoordinator()
@@ -122,6 +132,7 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
             ("Appearance", pane(appearanceSection())),
             ("Notifications", pane(notificationSection())),
             ("Agents", agentsView as NSView),
+            ("Pet", petView as NSView),
         ] {
             let item = NSTabViewItem(identifier: title)
             item.label = title

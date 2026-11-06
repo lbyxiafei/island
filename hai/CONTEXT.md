@@ -117,6 +117,7 @@ Sources/IslandCore/            # 纯逻辑，不 import 任何 UI 框架；被�
   AgentActivity.swift          #   Claude Code / pi 的落盘解析 + AgentActivityScanner（按 AgentScenarioSettings 过滤、跳过全关的 agent）；pi 的 session 扫描按 (mtime, size) 缓存在 PiScanCache
   ClaudeDesktopActivity.swift  #   Claude 桌面版：IndexedDB blob（react-query 缓存）-> 已完成的聊天
   DeepSeekActivity.swift       #   DeepSeek Harness：~/.dsh/storages/session_projcache 的 JSON 投影 -> 已完成的 session
+  Pet.swift                    #   宠物模式的纯逻辑：形象（PetAvatar）、设置与存储、气泡布局 / 屏幕内定位（PetLayout）
   Snappy.swift                 #   snappy 原始流解压 + ByteReader
   V8Value.swift                #   V8 structured clone 反序列化（只覆盖 island 用到的类型）
   CodexTurns.swift             #   Codex：turn 历史（sqlite，注入 runner）+ session_index 兑底
@@ -200,6 +201,7 @@ swift build                  # SwiftPM 自身拒绝 cyclic target dependency
 
 ## Gotchas
 
+- **宠物模式**（issue `pet-mode`）：`PetController` 管两个 `PetPanel`（`.floating` 层级、不能成为 key、所有 Space 可见）——宠物本体 64×64 和旁边的气泡栈。布局 / 设置 / 持久化全在 `IslandCore/Pet.swift`（`PetLayout`、`PetSettings`、`UserDefaultsPetStore`，键 `IslandPet*`，位置存 `IslandPetOrigin` 为 `"x,y"`）。气泡 = `inbox.unreadEntries`，不另存状态：点击走 `selectTask`，× 和"Dismiss all"就是 `markRead`。宠物开着时 `AppDelegate` 不再自动弹顶部悬浮窗（热键 / 菜单召唤照旧）。宠物本体画了一层 alpha 0.02 的圆底：**完全透明的像素会让点击穿透到下面的 app**，删掉它就点不中了。透明度 0 时宠物完全看不见，只能等有未读或从菜单 / 设置操作
 - **调 tmux 一律走 `TmuxCommand.arguments`（带 `-u`）**。开机自启的 island 没有 UTF-8 locale，不带 `-u` 时 tmux 把 `-F` 格式里的 tab 输出成 `_`，解析不到任何 pane 且不报错；命令行里调试时 shell 有 locale，复现不了，要用 `env -i PATH=/usr/bin:/bin HOME=$HOME <Island> --reopen-plan <pid>`
 - **hotkey 用 Carbon 而不是 `NSEvent.addGlobalMonitorForEvents`**。后者需要用户在「隐私与安全性 → 输入监控/辅助功能」里授权，Carbon 的 `RegisterEventHotKey` 不需要任何授权。这是 POC 要验证的结论之一，改动前先想清楚
 - Carbon 的 keycode 是 **US 布局**的物理键位；真正的产品阶段要考虑非 US 布局下的键位映射（POC 不管）

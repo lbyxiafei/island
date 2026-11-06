@@ -11,6 +11,8 @@ final class StatusItemController {
     private let loginItem: LoginItemController
     private let onSummon: () -> Void
     private let onToggleHotkey: (Bool) -> Void
+    private let onTogglePet: (Bool) -> Void
+    private var petEnabled: Bool
     private let onSelectTask: (String) -> Void
     private let onOpenSettings: () -> Void
     private let onOpenUpdates: () -> Void
@@ -37,9 +39,11 @@ final class StatusItemController {
         hotkeySource: HotkeySource,
         hotkeyEnabled: Bool,
         popup: PopupSettings,
+        petEnabled: Bool,
         loginItem: LoginItemController,
         onSummon: @escaping () -> Void,
         onToggleHotkey: @escaping (Bool) -> Void,
+        onTogglePet: @escaping (Bool) -> Void,
         onSelectTask: @escaping (String) -> Void,
         onOpenSettings: @escaping () -> Void,
         onOpenUpdates: @escaping () -> Void,
@@ -49,6 +53,8 @@ final class StatusItemController {
         self.loginItem = loginItem
         self.onSummon = onSummon
         self.onToggleHotkey = onToggleHotkey
+        self.onTogglePet = onTogglePet
+        self.petEnabled = petEnabled
         self.onSelectTask = onSelectTask
         self.onOpenSettings = onOpenSettings
         self.onOpenUpdates = onOpenUpdates
@@ -79,6 +85,11 @@ final class StatusItemController {
     /// Called after the pop-up was changed in the settings window.
     func setPopup(_ popup: PopupSettings) {
         self.popup = popup
+        rebuildMenu()
+    }
+
+    func setPetEnabled(_ enabled: Bool) {
+        petEnabled = enabled
         rebuildMenu()
     }
 
@@ -141,9 +152,13 @@ final class StatusItemController {
         )
         menu.addItem(
             disabled(
-                popup.isEnabled
-                    ? "pops up for \(ResolvedConfiguration.secondsText(popup.seconds))s when a run finishes"
-                    : "pop-up off — the count still updates"))
+                petEnabled
+                    ? "the pet shows finished runs instead of the pop-up"
+                    : popup.isEnabled
+                        ? "pops up for \(ResolvedConfiguration.secondsText(popup.seconds))s when a run finishes"
+                        : "pop-up off — the count still updates"))
+        menu.addItem(
+            action("Pet mode", #selector(togglePet), keyEquivalent: "", isChecked: petEnabled))
         menu.addItem(.separator())
 
         if !taskEntries.isEmpty {
@@ -249,6 +264,10 @@ final class StatusItemController {
 
     @objc private func toggleHotkey() {
         onToggleHotkey(!hotkeyEnabled)
+    }
+
+    @objc private func togglePet() {
+        onTogglePet(!petEnabled)
     }
 
     @objc private func selectTask(_ sender: NSMenuItem) {
