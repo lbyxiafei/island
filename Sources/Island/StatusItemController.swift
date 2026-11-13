@@ -30,6 +30,8 @@ final class StatusItemController {
 
     /// Set when a terminal refused automation; the item opens the settings pane.
     private var automationHint: String?
+    /// Set while island lacks the Accessibility grant DeepSeek needs.
+    private var accessibilityHint: String?
 
     /// A newer release; the item opens Settings → Updates.
     private var availableUpdate: AppVersion?
@@ -96,6 +98,12 @@ final class StatusItemController {
     /// Called when the agent monitor sees a new finished run.
     func setAutomationHint(_ hint: String?) {
         automationHint = hint
+        rebuildMenu()
+    }
+
+    func setAccessibilityHint(_ hint: String?) {
+        guard hint != accessibilityHint else { return }
+        accessibilityHint = hint
         rebuildMenu()
     }
 
@@ -181,6 +189,17 @@ final class StatusItemController {
                 systemSymbolName: "exclamationmark.triangle", accessibilityDescription: nil)
             item.toolTip =
                 "island could only bring the app forward, not the exact tab. Turn island on for these apps in Privacy & Security → Automation."
+            menu.addItem(item)
+            menu.addItem(.separator())
+        }
+
+        if let accessibilityHint {
+            let item = action(
+                accessibilityHint, #selector(openAccessibilitySettings), keyEquivalent: "")
+            item.image = NSImage(
+                systemSymbolName: "exclamationmark.triangle", accessibilityDescription: nil)
+            item.toolTip =
+                "Without it island can only bring DeepSeek forward, and a session you open there yourself stays unread. Turn Island on in Privacy & Security → Accessibility."
             menu.addItem(item)
             menu.addItem(.separator())
         }
@@ -279,6 +298,13 @@ final class StatusItemController {
 
     @objc private func openAutomationSettings() {
         guard let url = URL(string: AutomationDenials.settingsURL) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    @objc private func openAccessibilitySettings() {
+        // Asking once more puts Island in the list, so there is a switch to flip.
+        _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
+        guard let url = URL(string: AccessibilityHint.settingsURL) else { return }
         NSWorkspace.shared.open(url)
     }
 

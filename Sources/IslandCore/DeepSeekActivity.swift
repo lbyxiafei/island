@@ -124,3 +124,19 @@ public enum DeepSeekSidebar {
         return TaskTitle.resolve(title: text, lastMessage: nil, cwd: nil) == title
     }
 }
+
+/// The menu item that says why DeepSeek sessions neither open exactly nor
+/// clear when the user reads them: island cannot read or press DeepSeek's
+/// window without the Accessibility grant.
+public enum AccessibilityHint {
+    public static let settingsURL =
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+
+    /// Nil unless the grant is missing while DeepSeek is installed and watched.
+    public static func menuTitle(
+        _ trusted: Bool, _ watchesDeepSeek: Bool, _ deepSeekInstalled: Bool
+    ) -> String? {
+        trusted || !watchesDeepSeek || !deepSeekInstalled
+            ? nil : "Allow Accessibility to open DeepSeek sessions…"
+    }
+}

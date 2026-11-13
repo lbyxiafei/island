@@ -4,6 +4,7 @@
 
 | type | name | title | status | created_ts | updated_ts |
 |---|---|---|---|---|---|
+| feat | [accessibility-hint](./issue/2026-11-13-15-36-34-accessibility-hint.md) | Menu hint when island lacks Accessibility for DeepSeek | solved | 2026-11-13T15:36:34-08:00 | 2026-11-13T15:38:40-08:00 |
 | feat | [deepseek-focus-session](./issue/2026-11-13-14-54-14-deepseek-focus-session.md) | Clicking a DeepSeek task opens that session, not just the app | solved | 2026-11-13T14:54:14-08:00 | 2026-11-13T14:57:59-08:00 |
 | feat | [row-hotkeys](./issue/2026-11-13-14-47-35-row-hotkeys.md) | Global ⌃⌘1…9 opens the N-th task; pet bubbles show their key | solved | 2026-11-13T14:47:35-08:00 | 2026-11-13T14:51:56-08:00 |
 | feat | [update-badge](./issue/2026-11-13-14-27-01-update-badge.md) | Badge the menu bar icon while an update is available | solved | 2026-11-13T14:27:01-08:00 | 2026-11-13T14:28:36-08:00 |

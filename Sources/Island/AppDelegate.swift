@@ -37,6 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let rowHotkeyStore = UserDefaultsRowHotkeyStore()
     private var rowHotkeys: RowHotkeys
     private var rowRegistrars: [HotkeyRegistrar] = []
+    /// Last Accessibility state logged, so a change shows up once.
+    private var accessibilityTrusted: Bool?
 
     init(configuration: ResolvedConfiguration) {
         self.configuration = configuration
@@ -211,7 +213,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.monitor?.poll() }
+            MainActor.assumeIsolated {
+                self?.monitor?.poll()
+                self?.refreshAccessibilityHint()
+            }
         }
     }
 
@@ -244,6 +249,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotkey: settings?.current ?? configuration.hotkey.spec
         )
         log("agent tasks: \(inbox.unreadCount) unread, \(inbox.allEntries.count) tracked")
+        refreshAccessibilityHint()
+    }
+
+    /// Re-read on every inbox change and app switch: the user flips the grant
+    /// in System Settings, then comes back.
+    private func refreshAccessibilityHint() {
+        let trusted = AXIsProcessTrusted()
+        if trusted != accessibilityTrusted {
+            accessibilityTrusted = trusted
+            log("accessibility: \(trusted ? "granted" : "not granted")")
+        }
+        statusItem?.setAccessibilityHint(
+            AccessibilityHint.menuTitle(
+                trusted,
+                scenarios.isEnabled(AgentScenario.deepseekApp.id),
+                NSWorkspace.shared.urlForApplication(
+                    withBundleIdentifier: DeepSeekActivitySource.bundleID) != nil))
     }
 
     // MARK: - Row hotkeys
@@ -435,6 +457,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitor?.scenarios = scenarios
         if inbox?.removeAll(where: { !scenarios.allows($0) }) == true { refreshAgentUI() }
         log("agent scenarios off: \(scenarios.disabled.sorted().joined(separator: ", "))")
+        refreshAccessibilityHint()
     }
 
     /// Settings switched the keyboard-mode footer on or off.
