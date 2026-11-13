@@ -102,6 +102,7 @@ final class StatusItemController {
     func setAvailableUpdate(_ version: AppVersion?) {
         guard version != availableUpdate else { return }
         availableUpdate = version
+        installButton()
         rebuildMenu()
     }
 
@@ -119,14 +120,15 @@ final class StatusItemController {
 
     private func installButton() {
         guard let button = statusItem.button else { return }
-        button.image = IslandGlyph.menuBarImage()
+        button.image = IslandGlyph.menuBarImage(badged: availableUpdate != nil)
         button.imagePosition = .imageLeading
         button.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
         button.title = unreadCount > 0 ? " \(unreadCount)" : ""
         button.toolTip =
-            hotkeyEnabled
-            ? "island — summon with \(hotkeyDisplay)"
-            : "island — hotkey switched off"
+            (hotkeyEnabled
+                ? "island — summon with \(hotkeyDisplay)"
+                : "island — hotkey switched off")
+            + (availableUpdate.map { "\nUpdate to \($0) available" } ?? "")
     }
 
     private func rebuildMenu() {

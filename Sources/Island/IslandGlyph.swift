@@ -10,17 +10,27 @@ enum IslandGlyph {
     /// Canvas the design is laid out on; the menu bar scales it down to ~16pt.
     static let canvas: CGFloat = 18
 
-    static func menuBarImage() -> NSImage {
+    /// `badged` adds a red dot to the top-right corner (an update waits). A
+    /// template image cannot carry color, so the badged one draws the glyph in
+    /// `labelColor`, which the drawing handler resolves for the menu bar's
+    /// light or dark appearance each time it renders.
+    static func menuBarImage(badged: Bool = false) -> NSImage {
         let image = NSImage(size: NSSize(width: canvas, height: canvas), flipped: false) { _ in
-            NSColor.black.setFill()
+            (badged ? NSColor.labelColor : NSColor.black).setFill()
             panelPath.fill()
             screenEdgePath.fill()
+            if badged {
+                NSColor.systemRed.setFill()
+                NSBezierPath(ovalIn: badgeRect).fill()
+            }
             return true
         }
         // Template images let macOS tint for light/dark menubars and highlight.
-        image.isTemplate = true
+        image.isTemplate = !badged
         return image
     }
+
+    private static let badgeRect = NSRect(x: 11.5, y: 11.5, width: 6.5, height: 6.5)
 
     private static var panelPath: NSBezierPath {
         NSBezierPath(

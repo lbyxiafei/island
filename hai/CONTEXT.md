@@ -159,7 +159,7 @@ Sources/Island/                # 可执行 target：NSApplication / NSPanel / Ca
   ApplicationsMover.swift      #   启动时从 dmg / 迁移路径运行则弹框：复制到 /Applications、去 quarantine、等本进程退出后重开
   AgentMonitor.swift           #   轮询 agent 落盘，把未读数推到菜单栏；每轮 pruneClosed 移除已关闭 session 的行
   ResolvedConfiguration.swift  #   环境变量 -> 配置对象
-  UpdateController.swift       #   拉 tap 的 cask 判断新版本（启动 / 每 6 小时 / 打开 settings）+ 执行升级
+  UpdateController.swift       #   拉 tap 的 cask 判断新版本（启动 / 每小时 / 打开 settings）+ 执行升级
   UpdateSettingsView.swift     #   Settings → Updates
   FeedbackSettingsView.swift   #   Settings → Feedback
 Tests/IslandCoreTests/         # IslandCore 的行为测试（XCTest）

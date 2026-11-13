@@ -6,7 +6,7 @@ import IslandCore
 /// the release page. The decisions live in IslandCore (`AppUpdate.swift`).
 @MainActor
 final class UpdateController {
-    static let checkInterval: TimeInterval = 6 * 60 * 60
+    static let checkInterval: TimeInterval = 60 * 60
     static let logURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Logs/island-upgrade.log")
 
