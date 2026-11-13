@@ -51,6 +51,10 @@ extension AgentReopenExecutor {
                 if isFocused(leaf, in: host, chain: chain, cwd: cwd) {
                     seen.insert(task.id)
                 }
+            case .checkWindow(let host, let title):
+                if DeepSeekActivitySource.windowShows(Self.focusedWindowTitle(of: host), title) {
+                    seen.insert(task.id)
+                }
             }
         }
         return seen
@@ -79,6 +83,25 @@ extension AgentReopenExecutor {
             environment: environment)
         guard let script = FocusedTab.script(for: focus) else { return false }
         return FocusedTab.matches(focus, output: Subprocess.appleScript(script).text, cwd: cwd)
+    }
+
+    /// The title of `host`'s focused window, read through Accessibility. Nil
+    /// unless island already holds that permission — it never asks — so a
+    /// session that cannot be told apart counts as not in view.
+    private static func focusedWindowTitle(of host: RunningApp) -> String? {
+        guard AXIsProcessTrusted() else { return nil }
+        let app = AXUIElementCreateApplication(host.pid)
+        var window: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &window)
+                == .success, let window, CFGetTypeID(window) == AXUIElementGetTypeID()
+        else { return nil }
+        var title: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(
+                window as! AXUIElement, kAXTitleAttribute as CFString, &title) == .success
+        else { return nil }
+        return title as? String
     }
 
     /// What each open VS Code window last published; files left behind by a

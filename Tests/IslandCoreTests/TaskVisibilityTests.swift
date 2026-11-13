@@ -29,6 +29,16 @@ final class TaskVisibilityTests: XCTestCase {
         XCTAssertEqual(plan(task, frontmost: nil), .hidden)
     }
 
+    func testADeepSeekTaskIsInViewOnlyWhenItsWindowShowsIt() {
+        // DeepSeek runs many sessions side by side in one app: being frontmost
+        // says nothing about which one the user is reading.
+        let task = makeTask(host: .desktop(bundleID: "com.deepseek.dsh"))
+        let dsh = RunningApp(pid: 11, bundleID: "com.deepseek.dsh")
+
+        XCTAssertEqual(plan(task, frontmost: dsh), .checkWindow(host: dsh, title: task.title))
+        XCTAssertEqual(plan(task, frontmost: finder), .hidden)
+    }
+
     func testATaskWithNoKnownHostIsNeverAssumedInView() {
         XCTAssertEqual(plan(makeTask(host: .unknown), frontmost: ghostty), .hidden)
     }

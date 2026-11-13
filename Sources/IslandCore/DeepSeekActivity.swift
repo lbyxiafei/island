@@ -10,10 +10,17 @@ import Foundation
 /// `end`. `timeContext.lastMessageTime` (epoch ms) is the turn's last message.
 /// The app registers only `dsh://open`, which brings its window forward; it
 /// has no link to a single session.
+///
+/// Teammates and subagents a session spawns get files of their own, marked by
+/// a `subagent.identity`; they are steps of the parent's run, not conversations
+/// the user opens, so they are skipped. The main window's title is the open
+/// session's title, which is how island tells which session is on screen.
 public struct DeepSeekActivitySource: AgentActivitySource {
     public let agent = AgentKind.deepseek
 
-    static let bundleID = "com.deepseek.dsh"
+    public static let bundleID = "com.deepseek.dsh"
+
+    static let windowTitleSuffix = " — DeepSeek Harness"
 
     private let cacheDirectory: URL
 
@@ -44,6 +51,7 @@ public struct DeepSeekActivitySource: AgentActivitySource {
             let rows = record["rows"] as? [String: Any]
         else { return nil }
         func value(_ row: String) -> Any? { (rows[row] as? [String: Any])?["val"] }
+        if (value("subagent") as? [String: Any])?["identity"] is [String: Any] { return nil }
 
         guard let boundary = value("turnBoundary") as? [String: Any],
             boundary["openTurnStartSeq"] is NSNull,
@@ -69,5 +77,13 @@ public struct DeepSeekActivitySource: AgentActivitySource {
             resumeCommand: nil,
             deepLink: "dsh://open"
         )
+    }
+
+    /// Whether the app's focused window, titled `windowTitle`, shows the
+    /// session island lists as `title` (already cleaned by `TaskTitle`).
+    public static func windowShows(_ windowTitle: String?, _ title: String) -> Bool {
+        guard var name = windowTitle else { return false }
+        if name.hasSuffix(windowTitleSuffix) { name.removeLast(windowTitleSuffix.count) }
+        return TaskTitle.resolve(title: name, lastMessage: nil, cwd: nil) == title
     }
 }

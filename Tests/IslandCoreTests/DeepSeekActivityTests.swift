@@ -61,6 +61,30 @@ final class DeepSeekActivityTests: XCTestCase {
     }
 
     /// The working directory row wins over the one the session was created in.
+    func testSubagentSessionsAreSkipped() {
+        // A teammate or subagent the session spawned lives in its own file; it
+        // is part of the parent's run, not a conversation the user can open.
+        XCTAssertNil(
+            DeepSeekActivitySource.task(
+                sessionID: "4c821f59",
+                from: cache(subagent: ["mode": "continuable", "label": "audit", "seq": 0])))
+        XCTAssertNotNil(DeepSeekActivitySource.task(sessionID: "session-1", from: cache()))
+    }
+
+    func testTheWindowTitleTellsWhichSessionIsOnScreen() {
+        let shows = DeepSeekActivitySource.windowShows
+        XCTAssertTrue(shows("微信文章链接学习测试 — DeepSeek Harness", "微信文章链接学习测试"))
+        XCTAssertTrue(shows("微信文章链接学习测试", "微信文章链接学习测试"))
+        XCTAssertFalse(shows("审查其他 agent 的建议 — DeepSeek Harness", "微信文章链接学习测试"))
+        XCTAssertFalse(shows("DeepSeek Harness", "微信文章链接学习测试"))
+        XCTAssertFalse(shows(nil, "微信文章链接学习测试"))
+        let long = String(repeating: "长", count: 100)
+        XCTAssertTrue(
+            shows(
+                "\(long) — DeepSeek Harness",
+                TaskTitle.resolve(title: long, lastMessage: nil, cwd: nil)))
+    }
+
     func testTheCurrentWorkingDirectoryWins() {
         XCTAssertEqual(
             DeepSeekActivitySource.task(
@@ -110,7 +134,8 @@ final class DeepSeekActivityTests: XCTestCase {
         lastStep: String? = "end",
         lastTurn: Int = 1,
         lastMessageAt: Int? = 1_000,
-        workingDirectory: String? = nil
+        workingDirectory: String? = nil,
+        subagent: [String: Any]? = nil
     ) -> Data {
         func row(_ value: Any?) -> [String: Any] {
             ["ver": 1, "seq": 9, "val": value ?? NSNull()]
@@ -134,6 +159,7 @@ final class DeepSeekActivityTests: XCTestCase {
                     ]),
         ]
         if let workingDirectory { rows["workingDirectory"] = row(workingDirectory) }
+        rows["subagent"] = row(subagent.map { ["identity": $0] as Any } ?? [String: Any]())
         let root: [String: Any] = [
             "version": 7,
             "record": [

@@ -125,6 +125,8 @@ order by completed_at desc limit 100;
   - `title.val`（首轮后才生成）→ `titleInput.val.first.text`（首条 prompt）→ 目录名
   - `workingDirectory.val` → `identity.cwd`
 - 局限：缓存里没有 `turn/end` 的 reason，**用户中途停止的一轮也会被当作完成**（未实测停止后 `turnBoundary` 的样子）；session 删除后缓存文件是否删除未验证，所以 `liveSessionIDs` 保持“无法判断”，行不会自动消失
+- **子 agent 也有自己的缓存文件**（2026-11-13 实测，issue `deepseek-subagents-and-visibility`）：session 派出的 teammate / subagent 各占一个 `<uuid>.json`（**没有 `session-` 前缀**），`subagent.val.identity = {mode, label, seq}` 非空；主 session 的 `subagent.val` 是 `{}`，并在 `agentTeam` / `subagentCatalog` 里列出子 id。本机 82 个文件里 61 个是子 agent，前缀与 `identity` 完全一致。子 agent 是父 session 这一轮的步骤，用户在 app 里不会单独打开，**island 跳过 `identity` 非空的文件**
+- 当前 session：主窗口标题是 `<title.val> — DeepSeek Harness`（em dash），用来判断“用户是否正看着这个 session”（见 CONTEXT Gotchas）。`workspace.json` 里没有“当前打开的 session”字段；内置的 `dsh --session-id` 是 headless CLI，不能让 GUI 切到某个 session
 - 回到任务：app 只注册了 `dsh://open`（`open-url` 里只认 `dsh://open` / `dsh://open/`，作用是把主窗口提到前面），**没有按 session 打开的链接**。点击走 `openURL("dsh://open")`，失败则按 bundle id 激活
 
 ## 5. 回到任务的可行手段（按可靠性排序）

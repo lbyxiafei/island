@@ -9,6 +9,9 @@ public enum TaskViewPlan: Equatable, Sendable {
     /// task's own has to be asked of the app (`FocusedTab`). `cwd` is the task's
     /// directory when `leaf` is the agent itself, nil when it is a tmux client.
     case checkTab(host: RunningApp, leaf: TerminalLeaf, chain: [Int32], cwd: String?)
+    /// The app is frontmost but holds many sessions; the task is in view only
+    /// when its focused window is titled after it.
+    case checkWindow(host: RunningApp, title: String)
 }
 
 /// Decides whether a finished task needs a notification at all: a run the user
@@ -26,8 +29,11 @@ public enum TaskVisibility {
         guard let frontmost else { return .hidden }
         switch task.host {
         case .desktop(let bundleID):
-            // Desktop apps expose no conversation to compare, so the app it is.
-            return frontmost.bundleID == bundleID ? .visible : .hidden
+            guard frontmost.bundleID == bundleID else { return .hidden }
+            // DeepSeek titles its window after the open session; other desktop
+            // apps expose no conversation to compare, so the app it is.
+            return bundleID == DeepSeekActivitySource.bundleID
+                ? .checkWindow(host: frontmost, title: task.title) : .visible
         case .unknown:
             return .hidden
         case .terminal(let pid):
