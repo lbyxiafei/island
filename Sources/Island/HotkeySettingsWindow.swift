@@ -37,6 +37,11 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
     private let recorder: HotkeyRecorderView
     private let enabledToggle: NSButton
     private let feedback: NSTextField
+    private var rowHotkeys: RowHotkeys
+    private let onRowHotkeysChanged: (RowHotkeys) -> Void
+    private let rowToggle = NSButton(
+        checkboxWithTitle: "Open the N-th task from anywhere with", target: nil, action: nil)
+    private let rowModifiers = NSPopUpButton()
 
     init(
         coordinator: HotkeySettingsCoordinator,
@@ -45,6 +50,7 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         popup: PopupSettings,
         scenarios: AgentScenarioSettings,
         pet: PetSettings,
+        rowHotkeys: RowHotkeys,
         updates: UpdateController,
         feedbackEnvironment: FeedbackEnvironment,
         onHotkeyChanged: @escaping (HotkeySpec, Bool) -> Void,
@@ -52,8 +58,11 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         onHintsChanged: @escaping (Bool) -> Void,
         onPopupChanged: @escaping (PopupSettings) -> Void,
         onScenariosChanged: @escaping (AgentScenarioSettings) -> Void,
-        onPetChanged: @escaping (PetSettings) -> Void
+        onPetChanged: @escaping (PetSettings) -> Void,
+        onRowHotkeysChanged: @escaping (RowHotkeys) -> Void
     ) {
+        self.rowHotkeys = rowHotkeys
+        self.onRowHotkeysChanged = onRowHotkeysChanged
         self.popup = popup
         self.onPopupChanged = onPopupChanged
         self.onHintsChanged = onHintsChanged
@@ -91,6 +100,15 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         }
         enabledToggle.target = self
         enabledToggle.action = #selector(enabledToggled)
+        rowToggle.state = rowHotkeys.isEnabled ? .on : .off
+        rowToggle.target = self
+        rowToggle.action = #selector(rowHotkeysEdited)
+        rowModifiers.addItems(
+            withTitles: RowHotkeys.presets.map { RowHotkeys(modifiers: $0).symbols + "1…9" })
+        rowModifiers.selectItem(at: RowHotkeys.presets.firstIndex(of: rowHotkeys.modifiers) ?? 0)
+        rowModifiers.target = self
+        rowModifiers.action = #selector(rowHotkeysEdited)
+        rowModifiers.isEnabled = rowHotkeys.isEnabled
         themePicker.addItems(withTitles: OverlayTheme.allCases.map(\.displayName))
         themePicker.selectItem(at: OverlayTheme.allCases.firstIndex(of: theme) ?? 0)
         themePicker.target = self
@@ -195,7 +213,20 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         buttons.orientation = .horizontal
         buttons.spacing = 8
 
-        let stack = NSStackView(views: [title, recorder, help, enabledToggle, feedback, buttons])
+        let rowTitle = label("Task hotkeys", font: .systemFont(ofSize: 13, weight: .semibold))
+        let rowLine = NSStackView(views: [rowToggle, rowModifiers])
+        rowLine.orientation = .horizontal
+        rowLine.spacing = 6
+        let rowHelp = label(
+            "Works without opening the overlay: the same rows ⌘1…⌘9 pick in it.\nPet bubbles show each run's key.",
+            font: .systemFont(ofSize: 11),
+            color: .secondaryLabelColor
+        )
+
+        let stack = NSStackView(views: [
+            title, recorder, help, enabledToggle, feedback, buttons, rowTitle, rowLine, rowHelp,
+        ])
+        stack.setCustomSpacing(24, after: buttons)
         NSLayoutConstraint.activate([
             recorder.widthAnchor.constraint(equalTo: stack.widthAnchor),
             recorder.heightAnchor.constraint(equalToConstant: 44),
@@ -238,6 +269,14 @@ final class HotkeySettingsWindow: NSObject, NSTextFieldDelegate {
         label.font = font
         label.textColor = color
         return label
+    }
+
+    @objc private func rowHotkeysEdited() {
+        let index = max(0, rowModifiers.indexOfSelectedItem)
+        rowHotkeys = RowHotkeys(
+            isEnabled: rowToggle.state == .on, modifiers: RowHotkeys.presets[index])
+        rowModifiers.isEnabled = rowHotkeys.isEnabled
+        onRowHotkeysChanged(rowHotkeys)
     }
 
     // MARK: - State

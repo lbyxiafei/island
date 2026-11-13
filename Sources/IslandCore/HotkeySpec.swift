@@ -113,6 +113,12 @@ extension HotkeySpec {
         return HotkeySpec(keyLabel: keyLabel, keyCode: keyCode, modifiers: modifiers)
     }
 
+    /// The virtual key code of a digit key `1`…`9` (what `RowHotkeys` binds);
+    /// every digit is in the table.
+    static func keyCode(for digit: String) -> UInt32 {
+        virtualKeyCodes[digit]!
+    }
+
     /// Turns the compact form into the explicit one: `⌃⌘,` -> `⌃+⌘+,`. Without
     /// this, the string `displayString` produces could not be fed back in.
     private static func expanded(_ text: String) -> String {

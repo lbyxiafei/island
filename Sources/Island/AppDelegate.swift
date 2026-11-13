@@ -33,12 +33,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let visibilityQueue = DispatchQueue(label: "island.visibility", qos: .utility)
     private var hideTask: Task<Void, Never>?
     private let updates = UpdateController()
+    /// Global ⌃⌘1…9 (Settings → General): open the N-th task directly.
+    private let rowHotkeyStore = UserDefaultsRowHotkeyStore()
+    private var rowHotkeys: RowHotkeys
+    private var rowRegistrars: [HotkeyRegistrar] = []
 
     init(configuration: ResolvedConfiguration) {
         self.configuration = configuration
         popup = popupStore.load(fallback: configuration.duration)
         scenarios = scenarioStore.load()
         petSettings = petStore.load()
+        rowHotkeys = rowHotkeyStore.load()
         super.init()
     }
 
@@ -119,6 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             popup: popup,
             scenarios: scenarios,
             pet: petSettings,
+            rowHotkeys: rowHotkeys,
             updates: updates,
             feedbackEnvironment: FeedbackEnvironment(
                 appVersion: updates.current.description,
@@ -127,12 +133,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.log("hotkey changed to \(spec.displayString) (enabled: \(enabled))")
                 self?.statusItem?.setHotkey(spec, source: .menu)
                 self?.statusItem?.setHotkeyEnabled(enabled)
+                // The summon hotkey may now hold, or have freed, a row's digit.
+                self?.registerRowHotkeys()
+                self?.refreshAgentUI()
             },
             onThemeChanged: { [weak self] theme in self?.setTheme(theme) },
             onHintsChanged: { [weak self] shows in self?.setShowsHints(shows) },
             onPopupChanged: { [weak self] popup in self?.setPopup(popup) },
             onScenariosChanged: { [weak self] scenarios in self?.setScenarios(scenarios) },
-            onPetChanged: { [weak self] pet in self?.setPet(pet) }
+            onPetChanged: { [weak self] pet in self?.setPet(pet) },
+            onRowHotkeysChanged: { [weak self] hotkeys in self?.setRowHotkeys(hotkeys) }
         )
         self.settingsWindow = settingsWindow
 
@@ -154,6 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         log("menu bar item installed; launch at login: \(LoginItemController().status.rawValue)")
 
         startPet()
+        registerRowHotkeys()
         startAgentMonitor()
 
         updates.onChange = { [weak self] status in
@@ -226,13 +237,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let entries = inbox.visibleEntries
         statusItem?.setUnreadCount(inbox.unreadCount)
         statusItem?.setTasks(entries)
-        pet?.update(unread: inbox.unreadEntries, alerted: alerted)
+        pet?.update(unread: inbox.unreadEntries, keys: rowKeys(entries), alerted: alerted)
         overlayContent?.update(
             entries: entries,
             unread: inbox.unreadCount,
             hotkey: settings?.current ?? configuration.hotkey.spec
         )
         log("agent tasks: \(inbox.unreadCount) unread, \(inbox.allEntries.count) tracked")
+    }
+
+    // MARK: - Row hotkeys
+
+    /// The summon hotkey, when it is on: a row binding never shadows it.
+    private var summonSpec: HotkeySpec? {
+        guard let settings, settings.isEnabled else { return nil }
+        return settings.current
+    }
+
+    private func rowKeys(_ entries: [AgentInbox.Entry]) -> [String: String] {
+        rowHotkeys.labels(forRows: entries.map(\.id), avoiding: summonSpec)
+    }
+
+    /// (Re)registers ⌃⌘1…9; a digit another app holds is logged and skipped.
+    private func registerRowHotkeys() {
+        for registrar in rowRegistrars { registrar.unregister() }
+        rowRegistrars = []
+        var failed: [String] = []
+        for binding in rowHotkeys.bindings(avoiding: summonSpec) {
+            let row = binding.row
+            let registrar = HotkeyRegistrar(id: 100 + UInt32(row)) { [weak self] in
+                MainActor.assumeIsolated { self?.openRow(row) }
+            }
+            do {
+                try registrar.register(binding.spec)
+                rowRegistrars.append(registrar)
+            } catch {
+                failed.append(binding.spec.displayString)
+            }
+        }
+        if rowHotkeys.isEnabled {
+            log(
+                "row hotkeys \(rowHotkeys.symbols)1…9 registered: \(rowRegistrars.count)"
+                    + (failed.isEmpty ? "" : ", taken: \(failed.joined(separator: " "))"))
+        }
+    }
+
+    private func setRowHotkeys(_ hotkeys: RowHotkeys) {
+        rowHotkeys = hotkeys
+        rowHotkeyStore.save(hotkeys)
+        registerRowHotkeys()
+        refreshAgentUI()
+    }
+
+    /// ⌃⌘N: the row ⌘N would pick in the overlay, without opening it.
+    private func openRow(_ row: Int) {
+        guard let entries = inbox?.visibleEntries, entries.indices.contains(row - 1) else {
+            log("row hotkey \(row): no task in that row")
+            NSSound.beep()
+            return
+        }
+        log("row hotkey \(row): \(entries[row - 1].task.title)")
+        selectTask(entries[row - 1])
     }
 
     // MARK: - Task selection
@@ -301,7 +366,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         petSettings = settings
         petStore.save(settings)
         pet?.apply(settings)
-        if let inbox { pet?.update(unread: inbox.unreadEntries, alerted: false) }
+        if let inbox {
+            pet?.update(
+                unread: inbox.unreadEntries, keys: rowKeys(inbox.visibleEntries), alerted: false)
+        }
         statusItem?.setPetEnabled(settings.isEnabled)
         log(
             "pet: \(settings.isEnabled ? "on" : "off"), \(settings.avatar.spec), idle opacity \(settings.idleOpacity)"

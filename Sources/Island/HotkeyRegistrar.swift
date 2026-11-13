@@ -24,12 +24,18 @@ enum HotkeyRegistrationError: Error, LocalizedError {
 /// Registration is swappable at runtime: `register(_:)` replaces whatever was
 /// registered before, and throws instead of leaving the app with a hotkey that
 /// silently does nothing.
+///
+/// Every registrar's handler sees every hotkey press in the app, so each one
+/// owns an `id` and passes presses of other ids on (the summon hotkey is 1,
+/// the row hotkeys ⌃⌘1…9 are 101…109).
 final class HotkeyRegistrar: HotkeyRegistering {
+    private let id: UInt32
     private let handler: () -> Void
     private var eventHandlerRef: EventHandlerRef?
     private var hotKeyRef: EventHotKeyRef?
 
-    init(handler: @escaping () -> Void) {
+    init(id: UInt32 = 1, handler: @escaping () -> Void) {
+        self.id = id
         self.handler = handler
         installEventHandler()
     }
@@ -47,7 +53,7 @@ final class HotkeyRegistrar: HotkeyRegistering {
         let status = RegisterEventHotKey(
             spec.keyCode,
             Self.carbonModifiers(for: spec.modifiers),
-            EventHotKeyID(signature: OSType(0x4953_4C4E), id: 1),  // 'ISLN'
+            EventHotKeyID(signature: Self.signature, id: id),
             GetApplicationEventTarget(),
             0,
             &ref
@@ -62,6 +68,8 @@ final class HotkeyRegistrar: HotkeyRegistering {
         self.hotKeyRef = nil
     }
 
+    private static let signature = OSType(0x4953_4C4E)  // 'ISLN'
+
     private func installEventHandler() {
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
@@ -69,12 +77,19 @@ final class HotkeyRegistrar: HotkeyRegistering {
         )
         let status = InstallEventHandler(
             GetApplicationEventTarget(),
-            { _, _, userData in
+            { _, event, userData in
                 guard let userData else { return noErr }
-                Unmanaged<HotkeyRegistrar>
-                    .fromOpaque(userData)
+                let registrar = Unmanaged<HotkeyRegistrar>.fromOpaque(userData)
                     .takeUnretainedValue()
-                    .handler()
+                var pressed = EventHotKeyID()
+                let status = GetEventParameter(
+                    event, EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    nil, MemoryLayout<EventHotKeyID>.size, nil, &pressed)
+                guard status == noErr, pressed.signature == HotkeyRegistrar.signature,
+                    pressed.id == registrar.id
+                else { return OSStatus(eventNotHandledErr) }
+                registrar.handler()
                 return noErr
             },
             1,

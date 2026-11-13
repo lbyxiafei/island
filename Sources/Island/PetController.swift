@@ -23,6 +23,8 @@ final class PetController {
     private let bubblePanel = PetPanel(size: CGSize(width: PetBubbleStack.width, height: 40))
     private let bubbleStack = PetBubbleStack()
     private var unread: [AgentInbox.Entry] = []
+    /// The global key that opens each listed run (`RowHotkeys`), by entry id.
+    private var keys: [String: String] = [:]
     private var hovering = false
 
     init(settings: PetSettings, store: UserDefaultsPetStore) {
@@ -68,8 +70,9 @@ final class PetController {
 
     /// The unread runs changed; `alerted` means one arrived the user did not
     /// watch finish, worth a hop.
-    func update(unread: [AgentInbox.Entry], alerted: Bool) {
+    func update(unread: [AgentInbox.Entry], keys: [String: String], alerted: Bool) {
         self.unread = unread
+        self.keys = keys
         guard settings.isEnabled else { return }
         refreshBubbles()
         if alerted { petView.hop() }
@@ -93,7 +96,7 @@ final class PetController {
             bubblePanel.orderOut(nil)
             return
         }
-        bubbleStack.show(bubbles, growth: growth)
+        bubbleStack.show(bubbles, growth: growth, keys: keys)
         placeBubbles()
         bubblePanel.orderFrontRegardless()
     }
@@ -340,6 +343,7 @@ final class PetBubbleStack: NSView {
     private let stack = NSStackView()
     private var bubbles = PetLayout.Bubbles(shown: [], overflow: 0)
     private var growth = PetLayout.Growth.up
+    private var keys: [String: String] = [:]
 
     var isEmpty: Bool { bubbles.shown.isEmpty }
 
@@ -361,9 +365,10 @@ final class PetBubbleStack: NSView {
 
     required init?(coder: NSCoder) { nil }
 
-    func show(_ bubbles: PetLayout.Bubbles, growth: PetLayout.Growth) {
+    func show(_ bubbles: PetLayout.Bubbles, growth: PetLayout.Growth, keys: [String: String]) {
         self.bubbles = bubbles
         self.growth = growth
+        self.keys = keys
         rebuild()
     }
 
@@ -376,7 +381,7 @@ final class PetBubbleStack: NSView {
     private func rebuild() {
         for view in stack.arrangedSubviews { view.removeFromSuperview() }
         var views: [NSView] = bubbles.shown.map { entry in
-            let bubble = PetBubbleView(entry: entry)
+            let bubble = PetBubbleView(entry: entry, key: keys[entry.id])
             bubble.onSelect = { [weak self] in self?.onSelect?(entry) }
             bubble.onDismiss = { [weak self] in self?.onDismiss?(entry) }
             return bubble
@@ -410,7 +415,9 @@ final class PetBubbleView: NSView {
 
     private let close = NSButton()
 
-    init(entry: AgentInbox.Entry) {
+    /// `key` is the global hotkey that opens this run (e.g. `⌃⌘1`), shown as a
+    /// keycap next to the dismiss button.
+    init(entry: AgentInbox.Entry, key: String?) {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
 
@@ -452,7 +459,18 @@ final class PetBubbleView: NSView {
         close.toolTip = "Dismiss (marks it read)"
         close.translatesAutoresizingMaskIntoConstraints = false
 
-        for view in [icon, text, close] { addSubview(view) }
+        let keycap = NSTextField(labelWithString: key.map { " \($0) " } ?? "")
+        keycap.font = .monospacedSystemFont(ofSize: 10, weight: .semibold)
+        keycap.textColor = .secondaryLabelColor
+        keycap.isHidden = key == nil
+        keycap.wantsLayer = true
+        keycap.layer?.cornerRadius = 4
+        keycap.layer?.backgroundColor = NSColor.quaternaryLabelColor.cgColor
+        keycap.setContentHuggingPriority(.required, for: .horizontal)
+        keycap.setContentCompressionResistancePriority(.required, for: .horizontal)
+        keycap.translatesAutoresizingMaskIntoConstraints = false
+
+        for view in [icon, text, keycap, close] { addSubview(view) }
         NSLayoutConstraint.activate([
             background.leadingAnchor.constraint(equalTo: leadingAnchor),
             background.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -463,7 +481,9 @@ final class PetBubbleView: NSView {
             icon.widthAnchor.constraint(equalToConstant: 20),
             icon.heightAnchor.constraint(equalToConstant: 20),
             text.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
-            text.trailingAnchor.constraint(lessThanOrEqualTo: close.leadingAnchor, constant: -6),
+            text.trailingAnchor.constraint(lessThanOrEqualTo: keycap.leadingAnchor, constant: -6),
+            keycap.trailingAnchor.constraint(equalTo: close.leadingAnchor, constant: -6),
+            keycap.centerYAnchor.constraint(equalTo: centerYAnchor),
             text.topAnchor.constraint(equalTo: topAnchor, constant: 8),
             text.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
             close.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
@@ -471,7 +491,8 @@ final class PetBubbleView: NSView {
             close.widthAnchor.constraint(equalToConstant: 16),
             close.heightAnchor.constraint(equalToConstant: 16),
         ])
-        toolTip = [entry.task.title, entry.task.cwd].compactMap { $0 }.joined(separator: "\n")
+        toolTip = [entry.task.title, entry.task.cwd, key.map { "Open with \($0)" }]
+            .compactMap { $0 }.joined(separator: "\n")
     }
 
     required init?(coder: NSCoder) { nil }
