@@ -24,7 +24,7 @@ Requires macOS 13+.
 
 ## Features
 
-- **Detects finished agent runs**: Claude Code (terminal), Claude desktop app (chat), pi (terminal), Codex (CLI + desktop), DeepSeek Harness (desktop; a click brings the app forward, since it has no per-session link). How each agent's completion signal, task identity, title, and host process are read is documented in `hai/reference/agents/README.md`
+- **Detects finished agent runs**: Claude Code (terminal), Claude desktop app (chat), pi (terminal), Codex (CLI + desktop), DeepSeek Harness (desktop; a click picks the session in the app's sidebar, which needs the Accessibility grant island asks for once — without it the app just comes forward). How each agent's completion signal, task identity, title, and host process are read is documented in `hai/reference/agents/README.md`
 - **Pops up when a task finishes**, listing tasks (unread first, with a red dot); hovering pauses auto-hide
 - **Meaningful titles**: the agent's own title when it has one, otherwise the **last message**, otherwise the directory name
 - **Click to jump back** to the exact tab — the panel closes and you're taken to the task: tmux switches to the right session/window/pane; cmux / Ghostty / Terminal / iTerm2 switch to the right tab; VS Code switches to the right terminal tab (island installs a companion extension automatically, no setup); desktop apps open the conversation. When the task can't be located, the resume command (e.g. `claude --resume <id>`) is copied to the clipboard. macOS asks once for permission the first time island controls a given terminal app. Clicked tasks lose their red dot but stay in the list

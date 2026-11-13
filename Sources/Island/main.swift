@@ -33,6 +33,7 @@ if arguments.contains("--help") || arguments.contains("-h") {
           --live-sessions                 list the sessions each agent reports as still open
           --reopen-plan <pid> [--perform] print how island would reopen a task on that pid (and do it)
           --in-view <pid> [cwd]           whether a task on that pid is the tab in front of the user
+          --open-task <session id | title> open a finished task the way clicking its row does
           --login-item-status             report the launch-at-login state
           --login-item-enable             start at login from now on
           --login-item-disable            stop starting at login
@@ -133,6 +134,26 @@ if let flag = CommandLine.arguments.firstIndex(of: "--reopen-plan") {
     if CommandLine.arguments.contains("--perform") {
         executor.perform(plan, for: task)
     }
+    exit(EXIT_SUCCESS)
+}
+
+if let flag = CommandLine.arguments.firstIndex(of: "--open-task") {
+    let query =
+        CommandLine.arguments.indices.contains(flag + 1) ? CommandLine.arguments[flag + 1] : ""
+    let tasks = AgentActivityScanner.standard(
+        home: configuration.agentHome, sqlite: ProcessSQLiteQuerying()
+    ).completedTasks()
+    guard !query.isEmpty,
+        let task = tasks.first(where: { $0.sessionID == query })
+            ?? tasks.first(where: { $0.title.localizedCaseInsensitiveContains(query) })
+    else {
+        print("usage: --open-task <session id | part of a title> (see --scan-agents)")
+        exit(EXIT_FAILURE)
+    }
+    let executor = AgentReopenExecutor()
+    let plan = executor.plan(for: task)
+    print("\(task.title): \(plan)")
+    executor.perform(plan, for: task)
     exit(EXIT_SUCCESS)
 }
 

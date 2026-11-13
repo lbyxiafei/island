@@ -127,7 +127,8 @@ order by completed_at desc limit 100;
 - 局限：缓存里没有 `turn/end` 的 reason，**用户中途停止的一轮也会被当作完成**（未实测停止后 `turnBoundary` 的样子）；session 删除后缓存文件是否删除未验证，所以 `liveSessionIDs` 保持“无法判断”，行不会自动消失
 - **子 agent 也有自己的缓存文件**（2026-11-13 实测，issue `deepseek-subagents-and-visibility`）：session 派出的 teammate / subagent 各占一个 `<uuid>.json`（**没有 `session-` 前缀**），`subagent.val.identity = {mode, label, seq}` 非空；主 session 的 `subagent.val` 是 `{}`，并在 `agentTeam` / `subagentCatalog` 里列出子 id。本机 82 个文件里 61 个是子 agent，前缀与 `identity` 完全一致。子 agent 是父 session 这一轮的步骤，用户在 app 里不会单独打开，**island 跳过 `identity` 非空的文件**
 - 当前 session：主窗口标题是 `<title.val> — DeepSeek Harness`（em dash），用来判断“用户是否正看着这个 session”（见 CONTEXT Gotchas）。`workspace.json` 里没有“当前打开的 session”字段；内置的 `dsh --session-id` 是 headless CLI，不能让 GUI 切到某个 session
-- 回到任务：app 只注册了 `dsh://open`（`open-url` 里只认 `dsh://open` / `dsh://open/`，作用是把主窗口提到前面），**没有按 session 打开的链接**。点击走 `openURL("dsh://open")`，失败则按 bundle id 激活
+- **按 session 打开（2026-11-13，issue `deepseek-focus-session`）**：侧栏经 AX 可读可按——Electron 要先 `AXManualAccessibility = true` 才建树；每个 session 是一个 `AXRow`（动作 `AXPress`），子节点 `AXStaticText` 的值就是 `title.val`（运行中的行文本前面会多 `Running`，但子 StaticText 仍是纯标题）；工作区也是 `AXRow`，默认工作区显示为 `Default workspace`，其他用 `workspace.json` 的 `title`。island 点击 = `dsh://open` → 按标题找行按下 → 找不到就先按所在工作区的行再找。实测同工作区、跨 doc-triage / Default workspace 都能切到。没处理：列表折叠在 "Show more" 后面的旧 session、无标题 session（标题回退到首条 prompt，对不上行）
+- 回到任务（原始限制）：app 只注册了 `dsh://open`（`open-url` 里只认 `dsh://open` / `dsh://open/`，作用是把主窗口提到前面），**没有按 session 打开的链接**。点击走 `openURL("dsh://open")`，失败则按 bundle id 激活
 
 ## 5. 回到任务的可行手段（按可靠性排序）
 

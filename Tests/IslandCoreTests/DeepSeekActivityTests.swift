@@ -85,6 +85,37 @@ final class DeepSeekActivityTests: XCTestCase {
                 TaskTitle.resolve(title: long, lastMessage: nil, cwd: nil)))
     }
 
+    func testFindsTheSidebarLabelOfASessionsWorkspace() throws {
+        let workspaces = try JSONSerialization.data(withJSONObject: [
+            "global": ["defaultWorkspaceId": "w-default"],
+            "tables": [
+                "workspaces": [
+                    "w-default": ["title": "default-workspace", "sessionIds": ["session-a"]],
+                    "w-repo": ["title": "buddy-q", "sessionIds": ["session-b", "session-c"]],
+                ]
+            ],
+        ])
+        let label = DeepSeekSidebar.workspaceLabel
+        // The default workspace is listed under a fixed name, not its folder's.
+        XCTAssertEqual(label("session-a", workspaces), "Default workspace")
+        XCTAssertEqual(label("session-c", workspaces), "buddy-q")
+        XCTAssertNil(label("session-z", workspaces))
+        XCTAssertNil(label("session-a", Data("nope".utf8)))
+        XCTAssertEqual(
+            DeepSeekSidebar.workspacesFile(home: URL(fileURLWithPath: "/Users/me")).path,
+            "/Users/me/.dsh/storages/workspace.json")
+    }
+
+    func testSidebarRowsMatchOnTheSessionTitle() {
+        XCTAssertTrue(DeepSeekSidebar.rowShows("审查其他 agent 的建议", "审查其他 agent 的建议"))
+        XCTAssertFalse(DeepSeekSidebar.rowShows("resume update", "审查其他 agent 的建议"))
+        XCTAssertFalse(DeepSeekSidebar.rowShows(nil, "审查其他 agent 的建议"))
+        let long = String(repeating: "长", count: 100)
+        XCTAssertTrue(
+            DeepSeekSidebar.rowShows(
+                long, TaskTitle.resolve(title: long, lastMessage: nil, cwd: nil)))
+    }
+
     func testTheCurrentWorkingDirectoryWins() {
         XCTAssertEqual(
             DeepSeekActivitySource.task(

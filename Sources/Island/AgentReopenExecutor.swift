@@ -64,6 +64,8 @@ final class AgentReopenExecutor: Sendable {
             } else {
                 activate(bundleID: fallbackBundleID)
             }
+        case .openDeepSeekSession(let sessionID, let title):
+            openDeepSeekSession(sessionID: sessionID, title: title)
         case .copyToClipboard(let command):
             copy(command)
         case .nothing:
@@ -181,7 +183,7 @@ final class AgentReopenExecutor: Sendable {
         return true
     }
 
-    private func activate(bundleID: String) {
+    func activate(bundleID: String) {
         if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first
         {
             log("activated \(bundleID): \(app.activate())")

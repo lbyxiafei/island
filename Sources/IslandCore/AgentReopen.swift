@@ -116,6 +116,9 @@ public enum AgentReopenAction: Equatable, Sendable {
     case activateApp(bundleID: String)
     /// Open a deep link into the task; activate the app if the link fails.
     case openURL(String, fallbackBundleID: String)
+    /// DeepSeek: bring the app forward (`dsh://open`), then pick the session
+    /// in its sidebar (`DeepSeekSidebar`), switching workspace if needed.
+    case openDeepSeekSession(sessionID: String, title: String)
     case copyToClipboard(String)
     case nothing
 }
@@ -187,6 +190,9 @@ public enum AgentReopen {
             }
             return .focusHostApp(processID: pid, cwd: task.cwd)
         case .desktop(let bundleID):
+            if bundleID == DeepSeekActivitySource.bundleID {
+                return .openDeepSeekSession(sessionID: task.sessionID, title: task.title)
+            }
             if let link = task.deepLink, !link.isEmpty {
                 return .openURL(link, fallbackBundleID: bundleID)
             }

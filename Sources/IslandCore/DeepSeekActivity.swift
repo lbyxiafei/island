@@ -84,6 +84,43 @@ public struct DeepSeekActivitySource: AgentActivitySource {
     public static func windowShows(_ windowTitle: String?, _ title: String) -> Bool {
         guard var name = windowTitle else { return false }
         if name.hasSuffix(windowTitleSuffix) { name.removeLast(windowTitleSuffix.count) }
-        return TaskTitle.resolve(title: name, lastMessage: nil, cwd: nil) == title
+        return DeepSeekSidebar.rowShows(name, title)
+    }
+}
+
+/// How island picks a session in DeepSeek's sidebar, which it reads and
+/// presses through Accessibility: each session is a row whose text is the
+/// session's title, grouped under a row per workspace. Only the open
+/// workspace's sessions are listed, so a session elsewhere needs its
+/// workspace row pressed first; `~/.dsh/storages/workspace.json` says which
+/// workspace holds it.
+public enum DeepSeekSidebar {
+    public static func workspacesFile(
+        home: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) -> URL {
+        home.appendingPathComponent(".dsh/storages/workspace.json")
+    }
+
+    /// The sidebar row naming the workspace that holds `sessionID`. The default
+    /// workspace is listed as "Default workspace", whatever its folder is called.
+    public static func workspaceLabel(_ sessionID: String, _ workspacesJSON: Data) -> String? {
+        guard
+            let root = (try? JSONSerialization.jsonObject(with: workspacesJSON)) as? [String: Any],
+            let workspaces = (root["tables"] as? [String: Any])?["workspaces"]
+                as? [String: [String: Any]]
+        else { return nil }
+        let defaultID = (root["global"] as? [String: Any])?["defaultWorkspaceId"] as? String
+        for (id, workspace) in workspaces
+        where (workspace["sessionIds"] as? [String])?.contains(sessionID) == true {
+            return id == defaultID ? "Default workspace" : workspace["title"] as? String
+        }
+        return nil
+    }
+
+    /// Whether a sidebar row whose text is `text` is the session island lists
+    /// as `title` (cleaned and truncated by `TaskTitle`).
+    public static func rowShows(_ text: String?, _ title: String) -> Bool {
+        guard let text else { return false }
+        return TaskTitle.resolve(title: text, lastMessage: nil, cwd: nil) == title
     }
 }
